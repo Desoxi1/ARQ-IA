@@ -1,0 +1,139 @@
+{
+  "Uuid": "6d1173de-3713-491d-b4da-84b24e04569b",
+  "IsCustomNode": false,
+  "Description": "Read active view and selected element IDs and categories",
+  "Name": "read_active_view_selection",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Point": {
+        "Key": "Autodesk.DesignScript.Geometry.Point",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Rectangle": {
+        "Key": "Autodesk.DesignScript.Geometry.Rectangle",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Surface": {
+        "Key": "Autodesk.DesignScript.Geometry.Surface",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Sphere": {
+        "Key": "Autodesk.DesignScript.Geometry.Sphere",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Cylinder": {
+        "Key": "Autodesk.DesignScript.Geometry.Cylinder",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Line": {
+        "Key": "Autodesk.DesignScript.Geometry.Line",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolyCurve": {
+        "Key": "Autodesk.DesignScript.Geometry.PolyCurve",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolySurface": {
+        "Key": "Autodesk.DesignScript.Geometry.PolySurface",
+        "Value": "ProtoGeometry.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import clr\nclr.AddReference(\"RevitServices\")\nfrom RevitServices.Persistence import DocumentManager\n\nuiapp = DocumentManager.Instance.CurrentUIApplication\nuidoc = uiapp.ActiveUIDocument if uiapp is not None else None\nif uidoc is None:\n    OUT = {\n        \"status\": \"no_active_document\",\n        \"view_name\": None,\n        \"view_type\": None,\n        \"selection_count\": 0,\n        \"selected_elements\": [],\n    }\nelse:\n    doc = uidoc.Document\n    view = uidoc.ActiveView\n    elements = []\n    for element_id in uidoc.Selection.GetElementIds():\n        element = doc.GetElement(element_id)\n        if element is not None:\n            category = element.Category.Name if element.Category is not None else None\n            elements.append({\"id\": str(element.Id.Value), \"category\": category})\n    OUT = {\n        \"status\": \"ok\",\n        \"view_name\": view.Name,\n        \"view_type\": str(view.ViewType),\n        \"selection_count\": len(elements),\n        \"selected_elements\": elements,\n    }\n",
+      "Engine": "PythonNet3",
+      "EngineName": "PythonNet3",
+      "VariableInputPorts": false,
+      "Id": "e0cd811c9c484f57b80c7d31d6e54bd1",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "950619a7cf04473fbd933a7492959fc0",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Read active view and selected element IDs and categories"
+    }
+  ],
+  "Connectors": [],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "2.17",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "4.0",
+      "Data": {}
+    }
+  ],
+  "Author": "None provided",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": false,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "4.0.2.3852",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -5.3452959060668945,
+      "EyeY": 22.243146896362305,
+      "EyeZ": 4.974541664123535,
+      "LookX": -0.17156505584716797,
+      "LookY": -17.0781307220459,
+      "LookZ": -12.28675365447998,
+      "UpX": -0.004545882344245911,
+      "UpY": 0.9455187916755676,
+      "UpZ": -0.32553616166114807
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "e0cd811c9c484f57b80c7d31d6e54bd1",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": false,
+        "X": 300,
+        "Y": 250
+      }
+    ],
+    "Annotations": [],
+    "X": -1897.82278109683,
+    "Y": -2864.4645680747544,
+    "Zoom": 0.9697726550953407
+  }
+}

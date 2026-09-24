@@ -1,0 +1,41 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Revit models and generated output
+*.rvt
+*.rfa
+*.rte
+*.ifc
+*.nwc
+*.nwd
+
+# Local logs
+logs/*.log
+logs/*.jsonl
+*.log
+*.tmp
+*.temp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+
+# Large third-party installer is fetched from its pinned official release.
+vendor/*.zip
+
+# Python/Node tooling caches
+__pycache__/
+*.py[cod]
+node_modules/
+
+# Per-machine Codex wiring contains absolute executable paths
+.codex/config.toml
+.codex/config.toml.*
+!.codex/config.toml.example
