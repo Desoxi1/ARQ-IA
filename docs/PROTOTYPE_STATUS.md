@@ -39,6 +39,7 @@ La conexión Codex se escribe como configuración de proyecto en `.codex/config.
 | MCP generador de rutinas, integración viva | Aprobado: initialize/tools/list/create; el test temporal generó `.py`, `.dyn` y manifiesto, validó PythonNet3/Manual y hashes, y limpió los tres archivos. No ejecutó el grafo. |
 | Build del bridge propio | Aprobado: `revit/bridge/build.ps1` compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. No se instaló en Addins. |
 | Contrato MCP del runner Dynamo | Aprobado: initialize/tools/list; anuncia solo ping y ejecución del identificador fijo de lectura. |
+| Arranque desde `.codex/config.toml` local | Aprobado: los tres procesos (`rvt_mcp`, generador y runner) iniciaron desde sus comandos configurados y respondieron initialize/tools/list; 51/2/2 herramientas. No se invocaron operaciones ni se probó la carga desde la app Codex. |
 | Runner MCP → Revit, smoke vivo | Fallido/pendiente: el contrato MCP respondió, pero `REVIT_BRIDGE_PING=FAIL`; el puente no está cargado en la sesión. No se ejecutó Dynamo ni se cambió el modelo. |
 | DynamoCLI 4.0.2 con grafo PythonNet3 sintético | Fallido: el proceso inició el perfil aislado, pero lanzó una aserción ProtoCore antes de crear el XML de evaluaciones. No se considera evidencia de ejecución. |
 | Cargar y correr `.dyn` PythonNet3 en Dynamo dentro de Revit | Pendiente de prueba visual. |
