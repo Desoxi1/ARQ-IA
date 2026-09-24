@@ -35,6 +35,6 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 
 ## Preparar el equipo
 
-Ejecuta `setup.ps1` desde esta carpeta con Revit cerrado. Si falta el instalador, el script descarga rvt-mcp v0.6.2 desde su release oficial, verifica el SHA-256 y recién entonces lo instala para Revit 2027. Crea una configuración MCP de proyecto en `.codex/config.toml`; no modifica la configuración global de Codex. Luego ejecuta `revit/bridge/install.ps1` para instalar el add-in puente. Abre esta carpeta como proyecto confiable en Codex y reinicia Codex para cargar los MCP. La prueba viva del runner requiere Revit con un RVT descartable.
+Ejecuta `setup.ps1` desde esta carpeta con Revit cerrado. Si falta el instalador, el script descarga rvt-mcp v0.6.2 desde su release oficial, verifica el SHA-256 y recién entonces lo instala para Revit 2027. Crea una configuración MCP de proyecto en `.codex/config.toml`; no modifica la configuración global de Codex. Si rvt-mcp ya está instalado, `setup.ps1 -ConfigureOnly` actualiza solo esa configuración y puede ejecutarse con Revit abierto. Luego ejecuta `revit/bridge/install.ps1` con Revit cerrado para instalar el add-in puente. Abre esta carpeta como proyecto confiable en Codex y reinicia Codex para cargar los MCP. La prueba viva del runner requiere Revit con un RVT descartable.
 
 Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para replicar el POC en otro PC.

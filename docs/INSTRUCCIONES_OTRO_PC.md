@@ -12,6 +12,12 @@ El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desd
    ```
 
    El script verifica SHA-256 antes de instalar. Instala rvt-mcp solo para Revit 2027 y el usuario actual; no registra un MCP global. Crea `.codex/config.toml` para este proyecto con una lista acotada de consultas y operaciones tipadas. Codex solicita aprobación en cada llamada. El runner expone una sola rutina de lectura fijada por hashes; no acepta código arbitrario ni escrituras Dynamo.
+
+   Si rvt-mcp ya está instalado, puedes actualizar solo el cableado del proyecto sin reinstalar add-ins:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -ConfigureOnly
+   ```
 3. Instala el add-in puente local:
 
    ```powershell

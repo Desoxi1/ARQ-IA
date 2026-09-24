@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 [CmdletBinding()]
-param()
+param([switch]$ConfigureOnly)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath($PSScriptRoot)
@@ -9,6 +9,8 @@ $packageUri = 'https://github.com/bimwright/rvt-mcp/releases/download/v0.6.2/Rvt
 $expectedHash = '0d6239afcab47c729c30b8c5b763214c20c38c4b72de7e30c5a7191b4131b1ae'
 $revitAddins = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
 $serverPath = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
+$addinManifest = Join-Path $revitAddins 'RvtMcp.R27.addin'
+$pluginDll = Join-Path $revitAddins 'RvtMcp\RvtMcp.Plugin.dll'
 $codexDir = Join-Path $repoRoot '.codex'
 $codexConfig = Join-Path $codexDir 'config.toml'
 
@@ -23,8 +25,16 @@ function Get-Sha256Hex([string]$Path) {
     }
 }
 
-$runningRevit = Get-Process -Name Revit -ErrorAction SilentlyContinue
-if ($runningRevit) { throw 'Cierra todas las ventanas de Revit 2027 antes de ejecutar setup.ps1.' }
+if ($ConfigureOnly) {
+    if (-not (Test-Path -LiteralPath $serverPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) {
+        throw 'ConfigureOnly requiere que rvt-mcp v0.6.2 ya esté instalado para Revit 2027.'
+    }
+    Write-Host 'Se actualizará solamente la configuración local MCP del proyecto.'
+} else {
+    $runningRevit = Get-Process -Name Revit -ErrorAction SilentlyContinue
+    if ($runningRevit) { throw 'Cierra todas las ventanas de Revit 2027 antes de instalar o actualizar add-ins.' }
 
 if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     $vendorDir = Split-Path -Parent $packagePath
@@ -45,8 +55,6 @@ if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
 $actualHash = Get-Sha256Hex $packagePath
 if ($actualHash -ne $expectedHash) { throw "El hash del paquete no coincide. No se instalará. SHA-256 encontrado: $actualHash" }
 
-$addinManifest = Join-Path $revitAddins 'RvtMcp.R27.addin'
-$pluginDll = Join-Path $revitAddins 'RvtMcp\RvtMcp.Plugin.dll'
 $needsInstall = -not ((Test-Path -LiteralPath $addinManifest) -and (Test-Path -LiteralPath $pluginDll) -and (Test-Path -LiteralPath $serverPath))
 if ($needsInstall) {
     $tempRoot = [IO.Path]::GetFullPath($env:TEMP)
@@ -66,6 +74,7 @@ if ($needsInstall) {
 
 if (-not (Test-Path -LiteralPath $serverPath -PathType Leaf)) { throw "No se encontró el servidor instalado: $serverPath" }
 if (-not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) { throw 'No se encontró el add-in de Revit 2027 después de instalar.' }
+}
 
 New-Item -ItemType Directory -Force -Path $codexDir | Out-Null
 if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
@@ -133,6 +142,10 @@ tool_timeout_sec = 120
 "@
 [IO.File]::WriteAllText($codexConfig, $configText, (New-Object System.Text.UTF8Encoding($false)))
 
-Write-Host 'Instalación completada para Revit 2027 en el perfil de usuario.'
+if ($ConfigureOnly) {
+    Write-Host 'Configuración MCP del proyecto actualizada; no se modificaron add-ins ni Revit.'
+} else {
+    Write-Host 'Instalación completada para Revit 2027 en el perfil de usuario.'
+}
 Write-Host 'Codex pedirá aprobación para cada herramienta Revit tipada permitida y para el generador de rutinas.'
 Write-Host "Abre este directorio como proyecto confiable en Codex y reinicia Codex: $repoRoot"
