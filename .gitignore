@@ -14,6 +14,7 @@
 # Local logs
 logs/*.log
 logs/*.jsonl
+logs/runner-results/
 *.log
 *.tmp
 *.temp

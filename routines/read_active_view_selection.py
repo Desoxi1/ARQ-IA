@@ -1,3 +1,5 @@
+import json
+import os
 import clr
 clr.AddReference("RevitServices")
 from RevitServices.Persistence import DocumentManager
@@ -28,3 +30,20 @@ else:
         "selection_count": len(elements),
         "selected_elements": elements,
     }
+
+# The Revit-hosted runner sets these for a single approved smoke execution.
+# The side-channel contains no view name, element id, or parameter value.
+run_id = os.environ.get("BIM_AI_RUN_ID")
+result_dir = os.environ.get("BIM_AI_RESULT_DIR")
+if run_id and result_dir and len(run_id) == 32 and all(c in "0123456789abcdef" for c in run_id):
+    from pathlib import Path
+
+    result_root = Path(result_dir).resolve()
+    result_path = (result_root / (run_id + ".json")).resolve()
+    if result_path.parent == result_root:
+        summary = {
+            "status": OUT.get("status"),
+            "view_type": OUT.get("view_type"),
+            "selection_count": OUT.get("selection_count", 0),
+        }
+        result_path.write_text(json.dumps(summary), encoding="utf-8")

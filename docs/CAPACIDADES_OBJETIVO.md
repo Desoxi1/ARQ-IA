@@ -31,7 +31,7 @@ Volver a consultar el modelo y comparar con el plan
 Informar resultados y guardar el procedimiento reutilizable
 ```
 
-Para las tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede preparar PythonNet3/Dynamo. El runner que lo ejecutaría desde MCP está pendiente.
+Para las tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede preparar PythonNet3/Dynamo. El runner compilado solo admite una rutina de lectura; aún no se probó dentro de Revit.
 
 ## Conocimiento técnico reutilizable
 
@@ -48,8 +48,8 @@ Una rutina entra a la biblioteca común después de revisión y prueba en un mod
 ## Capacidad disponible hoy
 
 - La consulta directa Revit 2027 ↔ rvt-mcp pasó en solo lectura: se obtuvo la vista activa y la selección de un muro. Los IDs y nombres del modelo se omitieron de la versión pública.
-- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado, código arbitrario ni autoejecución Dynamo. La integración de ese perfil desde Codex aún no se ha validado.
-- El MCP de rutinas genera un `.py`, un `.dyn` de un nodo PythonNet3 y un manifiesto. Dynamo debe abrirse y ejecutarse manualmente.
+- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. La integración de ese perfil desde Codex aún no se ha validado.
+- El MCP de rutinas genera un `.py`, un `.dyn` de un nodo PythonNet3 y un manifiesto. El runner MCP presenta una sola rutina read-only con hashes fijos, pero el smoke vivo no encontró el add-in en Revit; su ejecución aún no está validada.
 - La app Codex todavía debe abrir esta carpeta como proyecto confiable y confirmar que cargó los MCP. La consulta viva de Revit aún no se ha hecho desde esa configuración de Codex.
 
 El inventario local es una lectura del esquema de herramientas, no una prueba de cada comando. Antes de aprobar una escritura, Codex debe explicar el objetivo y consultar los datos relevantes del proyecto. Cada herramienta aprobada puede aplicar el cambio inmediatamente; el MCP no proporciona una vista previa o rollback general. Las tareas compuestas se ejecutan en pasos pequeños sobre un modelo descartable y se verifican con consultas posteriores. Borrado, guardado, exportación y ejecución libre requieren controles separados.
@@ -60,7 +60,7 @@ El inventario local es una lectura del esquema de herramientas, no una prueba de
 2. **Creación tipada:** enseñar plan y objetivos; ejecutar solo después de confirmar la llamada concreta en un modelo descartable.
 3. **Edición:** identificar IDs, valores anteriores/nuevos, unidades y alcance de instancia/tipo; confirmar antes de aplicar.
 4. **Borrado, archivos, guardado y exportación:** permiso por acción, previa y efecto claramente visibles.
-5. **Rutina Dynamo:** almacenar código y huellas; revisar y probar en modelo descartable. El futuro runner debe aceptar un ID de rutina aprobado, no código arbitrario, comprobar documento/sesión y devolver verificación posterior.
+5. **Rutina Dynamo:** almacenar código y huellas; revisar y probar en modelo descartable. El runner prototipo acepta solo el ID/hash fijado de una rutina read-only. Antes de habilitar escrituras debe añadirse una lista permitida explícita, aprobación, comprobación de documento/sesión y verificación posterior.
 6. **Errores:** cancelar o revertir el grupo transaccional cuando sea posible; reportar explícitamente resultados parciales cuando Revit no permita revertirlos.
 
 La configuración de Codex debe exponer herramientas por perfil y mantener `default_tools_approval_mode = "prompt"`. No se habilita el escape `revit_send_code_to_revit` como herramienta cotidiana. Un `dry-run` documentado debe probarse en el binario exacto antes de depender de él; la lista de herramientas por sí sola no demuestra que una acción sea reversible.
@@ -78,15 +78,16 @@ No se instalarán varias implementaciones de puente Revit simultáneamente hasta
 ## Ruta propuesta
 
 1. Abrir esta carpeta como proyecto confiable en Codex y validar las consultas de vista/selección; confirmar qué herramientas del perfil se cargaron.
+2. Instalar el add-in con Revit cerrado y ejecutar la única rutina Dynamo de lectura en una plantilla descartable.
 3. En modelo desechable, probar una única creación tipada y una edición de parámetro: plan, aprobación de la llamada, operación y verificación.
 4. Evaluar un lote de operaciones en una transacción y manejo de rollback antes de probar flujos compuestos.
 5. Revisar y seleccionar qué capacidades externas se adoptan tras inspeccionar código, licencia, dependencias, releases y evidencia de pruebas.
-6. Implementar el runner PythonNet3/Dynamo bajo lista de rutinas guardadas; iniciar con la rutina de lectura ya generada y continuar con una escritura muy acotada en archivo descartable.
+6. Ampliar el runner por IDs y hashes aprobados, empezando con una escritura muy acotada en archivo descartable; mantener la ejecución arbitraria deshabilitada.
 7. Añadir glosario bilingüe, manuales de tareas y evaluaciones con resultados esperados; ampliar arquitectura hacia estructura/MEP según los casos de uso reales.
 
 ## Interfaz recomendada
 
-Para esta prueba, el arquitecto conversa con Codex en una ventana separada y el agente opera Revit mediante el MCP del proyecto. Si necesita una rutina, Codex la guarda y Dynamo la ejecuta manualmente. Esta ruta permite medir los pedidos frecuentes antes de financiar y desplegar otra interfaz.
+Para esta prueba, el arquitecto conversa con Codex en una ventana separada y el agente opera Revit mediante los MCP del proyecto. La única ejecución presentada por el runner es de solo lectura y todavía no ha pasado la prueba viva. Las rutinas nuevas se guardan para revisión y ejecución manual. Esta ruta permite medir los pedidos frecuentes antes de financiar y desplegar otra interfaz.
 
 Si la adopción justifica un panel dentro del flujo de trabajo, la opción a evaluar primero es un panel acoplable en Revit. El panel puede enviar solicitudes al mismo agente/orquestador y conservar un solo puente autorizado para operar el modelo. Un paquete de extensión de Dynamo queda como opción para controles propios del editor de grafos. La interfaz no reemplaza el runner, el despacho de Revit, las aprobaciones ni la verificación posterior.
 

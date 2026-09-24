@@ -6,6 +6,9 @@
 - Antes de una escritura, consulta en el modelo activo IDs, tipos, niveles, parámetros, anfitriones y unidades pertinentes. Usa los datos del proyecto; no inventes IDs, nombres de tipos ni coordenadas.
 - Pregunta cuando falten datos que cambian geometría, ubicación, selección, tipo, anfitrión, nivel, alcance de instancia/tipo o resultado esperado.
 - Explica el plan en lenguaje simple y deja los nombres técnicos y unidades visibles para que el arquitecto pueda revisarlos.
+- Sigue las etapas de interpretar → leer → resolver alcance → planificar → aprobar → ejecutar → verificar → reutilizar definidas en `docs/ASSISTANT_EXECUTION_LOOP.md`.
+- Para pedidos compuestos, divide la ejecución en pasos pequeños con dependencias explícitas; verifica el modelo después de cada paso que cambie elementos.
+- Si una capacidad no aparece en las herramientas MCP habilitadas, dilo y ofrece generar una rutina Dynamo como borrador. No afirmes que se ejecutó si solo se guardaron archivos.
 
 ## Cambios en Revit
 
@@ -22,3 +25,4 @@
 - Muestra la ruta y resume el alcance de la rutina. Pide revisar el código y probar en modelo descartable antes de usarla en un proyecto real.
 - Dynamo usa milímetros en las herramientas que así lo declaran; confirma unidades antes de convertir o calcular.
 - La biblioteca común incorpora una rutina solo después de revisión y prueba documentadas.
+- No marques una rutina como reutilizable/validada hasta ejecutarla en un modelo descartable y verificar el resultado con una lectura posterior.

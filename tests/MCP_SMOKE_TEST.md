@@ -11,11 +11,18 @@
 | 2026-09-23 | Rechazo de rutina de escritura no confirmada | Aprobado | `writes_model=true` con `confirm_model_write=false` devuelve error y no crea archivos. |
 | 2026-09-23 | Consulta Revit vista activa + selección | No aprobado | Ambas devolvieron `Revit MCP plugin not running`. Revit no llegó a registrar el add-in en la sesión lanzada desde este entorno; no se leyó ni cambió ningún documento. |
 | 2026-09-24 | Consulta Revit en sesión iniciada por el usuario | Aprobado | El servidor rvt-mcp en modo `query --read-only` obtuvo la vista activa y, tras selección manual, un muro. La lectura se repitió en esta fase sin cambios en el documento. Los IDs y nombres del modelo se excluyeron de la versión pública. Falta probar las herramientas desde Codex con el proyecto confiable abierto. |
+| 2026-09-24 | Smoke de lectura MCP repetible | Aprobado | `python tests/run_revit_mcp_readonly_smoke.py`: initialize, lista de 16 herramientas query, vista activa y selección. La prueba no escribe ni muestra valores del modelo. |
+| 2026-09-24 | Smoke MCP del generador de rutinas | Aprobado | `python tests/run_routine_builder_mcp_smoke.py`: initialize, tools/list, guardado temporal `.py/.dyn/manifest`, validación de motor y hashes, y eliminación segura de los tres archivos de prueba. No abre Dynamo ni modifica Revit. |
 | 2026-09-24 | rvt-mcp initialize + tools/list (grupos de perfil) | Aprobado | Lista 51 herramientas para `query,create,modify,view,annotation`. El proyecto expone una lista curada de consultas y escrituras tipadas; esto valida el inventario/esquemas, no su ejecución en el modelo. |
 | 2026-09-24 | Rutina base read-only: pruebas offline | Aprobado | `python -m unittest discover -s tests -v`: 4 pruebas aprobadas sobre documento ausente, selección vacía, elementos/categorías y coherencia/hash del paquete. Usa dobles de Revit; la ejecución visual del `.dyn` en Dynamo sigue pendiente. |
+| 2026-09-24 | Compilación del add-in puente | Aprobado | `revit/bridge/build.ps1` compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. La DLL no se ha instalado ni cargado en Revit. |
+| 2026-09-24 | Contrato MCP del runner Dynamo | Aprobado | Initialize y `tools/list` anuncian solo ping y ejecución del ID fijo `read_active_view_selection`. |
+| 2026-09-24 | Smoke vivo del runner Revit | Pendiente | `python tests/run_dynamo_runner_mcp_smoke.py --live` pasó el contrato MCP pero falló en `REVIT_BRIDGE_PING`; el add-in no está cargado. No se ejecutó Dynamo ni se cambió el documento. |
+| 2026-09-24 | DynamoCLI 4.0.2: prueba de grafo sintético | Fallido | El ejecutable salió sin XML de evaluación y registró una aserción ProtoCore. La prueba no usó Revit ni modificó modelos; no se usará DynamoCLI como runner hasta resolverlo. |
 | Pendiente | Codex `tools/list` desde la app | Pendiente | Abrir este proyecto como confiable y reiniciar Codex. |
 | Pendiente | Abrir/correr grafo PythonNet3 | Pendiente | Revit/Dynamo debe iniciarse interactivamente. |
-| Pendiente | MCP → ejecución automática de Dynamo | Fuera del prototipo actual | Requiere implementar runner acotado antes de declarar el flujo completo. |
+| Pendiente | Ejecución del runner en Revit | Pendiente | Instalar el add-in con Revit cerrado, abrir un RVT descartable y volver a ejecutar la rutina read-only fijada. |
+| Pendiente | Rutina de escritura mediante Dynamo | No habilitada | Requiere primero verificar el runner de lectura, diseñar una allowlist, probar en copia descartable y verificar el cambio mediante consulta posterior. |
 
 ## Criterios para vista/selección
 
