@@ -19,7 +19,7 @@ namespace BimAiDynamoBridge
         internal const string PipeName = "BIM-AI-POC-Revit-27";
         internal const string RoutineId = "read_active_view_selection";
         internal const string ExpectedPythonHash = "6eac802870573eb2fad211fc30f1422caf0299979bf718c1d506d341c0fae17c";
-        internal const string ExpectedGraphHash = "117c23c7f978112a07f17090ba5110171343df13f0f4544c8286ccf890057b63";
+        internal const string ExpectedGraphHash = "a4312143c1e0f6120fb65cf889873f19516bd3a84907777fe648d4fd536de9b8";
         internal static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
         private static readonly ConcurrentQueue<PendingRequest> Requests = new ConcurrentQueue<PendingRequest>();

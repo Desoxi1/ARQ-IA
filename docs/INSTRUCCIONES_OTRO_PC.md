@@ -54,6 +54,8 @@ Pídele:
 
 El MCP local guarda fuente, grafo y manifiesto en `routines/`. Revisa los tres archivos. Abre el `.dyn` en Dynamo desde Revit 2027; comprueba que el Python node diga PythonNet3 y que el modo sea Manual. Ejecuta solo sobre el modelo desechable.
 
+El paquete también incluye `routines/set_comments_on_selection.dyn`, un borrador que escribe `PRUEBA_IA` en Comments para los elementos seleccionados. Sus pruebas actuales usan dobles de Revit y no demuestran que Dynamo lo ejecute. No lo ejecutes en un proyecto productivo; aún falta validarlo en una copia desechable y comprobar el cambio con una consulta posterior.
+
 ## Alcance y limitación actual
 
 El perfil de Revit incluye herramientas tipadas para niveles, ejes, muros u otros elementos lineales, pisos/superficies, recintos, instancias de familias, parámetros, tipos, textos, cotas y etiquetas. No se han verificado individualmente todas las operaciones del servidor y la lista se mantiene deliberadamente acotada. Las tareas complejas se deben dividir en pasos verificables y aprobar llamada por llamada.

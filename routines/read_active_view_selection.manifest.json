@@ -1,15 +1,15 @@
 {
-  "schema_version": 1,
-  "name": "read_active_view_selection",
-  "description": "Read active view and selected element IDs and categories",
-  "scope": "active_selection",
-  "writes_model": false,
-  "status": "draft_not_validated",
-  "execution": "manual_dynamo_or_allowlisted_readonly_bridge",
-  "revit_version": "2027",
-  "dynamo_version": "4.0.2.3852",
-  "python_engine": "PythonNet3",
-  "created_utc": "2026-09-23T20:54:49.0101912Z",
-  "python_sha256": "6eac802870573eb2fad211fc30f1422caf0299979bf718c1d506d341c0fae17c",
-  "dynamo_sha256": "117c23c7f978112a07f17090ba5110171343df13f0f4544c8286ccf890057b63"
+    "schema_version": 1,
+    "name": "read_active_view_selection",
+    "description": "Read active view and selected element IDs and categories",
+    "scope": "active_selection",
+    "writes_model": false,
+    "status": "draft_not_validated",
+    "execution": "manual_dynamo_or_allowlisted_readonly_bridge",
+    "revit_version": "2027",
+    "dynamo_version": "4.0.2.3852",
+    "python_engine": "PythonNet3",
+    "created_utc": "2026-09-23T20:54:49.0101912Z",
+    "python_sha256": "6eac802870573eb2fad211fc30f1422caf0299979bf718c1d506d341c0fae17c",
+    "dynamo_sha256": "a4312143c1e0f6120fb65cf889873f19516bd3a84907777fe648d4fd536de9b8"
 }

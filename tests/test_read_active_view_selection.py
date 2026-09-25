@@ -112,6 +112,7 @@ class ReadOnlyRoutineTests(unittest.TestCase):
         self.assertEqual(graph["Nodes"][0]["Code"], SOURCE)
         self.assertEqual(graph["View"]["Dynamo"]["RunType"], "Manual")
         self.assertEqual(graph["Connectors"], [])
+        self.assertNotIn(b"\r\n", GRAPH.read_bytes())
         self.assertFalse(manifest["writes_model"])
         self.assertEqual(manifest["status"], "draft_not_validated")
         self.assertEqual(

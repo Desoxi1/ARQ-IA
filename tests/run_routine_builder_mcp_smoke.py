@@ -203,6 +203,7 @@ def main() -> int:
             == manifest.get("python_sha256")
             and hashlib.sha256(files[1].read_bytes()).hexdigest()
             == manifest.get("dynamo_sha256")
+            and b"\r\n" not in files[1].read_bytes()
             and len(graph.get("Nodes", [])) == 1
             and graph["Nodes"][0].get("Engine") == "PythonNet3"
             and graph.get("View", {}).get("Dynamo", {}).get("RunType") == "Manual"

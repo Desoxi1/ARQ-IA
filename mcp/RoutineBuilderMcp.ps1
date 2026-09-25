@@ -78,7 +78,8 @@ function Get-SavedRoutines {
 
 function Write-Utf8NoBom([string]$Path, [string]$Content) {
     $encoding = New-Object System.Text.UTF8Encoding($false)
-    [IO.File]::WriteAllText($Path, $Content, $encoding)
+    $normalizedContent = $Content.Replace("`r`n", "`n").Replace("`r", "`n")
+    [IO.File]::WriteAllText($Path, $normalizedContent, $encoding)
 }
 
 function Get-Sha256Hex([string]$Path) {
@@ -95,7 +96,7 @@ function Get-Sha256Hex([string]$Path) {
 function Save-DynamoRoutine([object]$Payload) {
     $name = [string]$Payload.name
     $description = ([string]$Payload.description).Trim()
-    $code = [string]$Payload.python_code
+    $code = ([string]$Payload.python_code).Replace("`r`n", "`n").Replace("`r", "`n")
     $scope = [string]$Payload.scope
     $writesModel = [bool]$Payload.writes_model
     $confirmModelWrite = [bool]$Payload.confirm_model_write

@@ -1,0 +1,15 @@
+{
+    "schema_version": 1,
+    "name": "set_comments_on_selection",
+    "description": "Set built-in instance Comments to PRUEBA_IA for the current selection. Test only on a disposable RVT.",
+    "scope": "active_selection",
+    "writes_model": true,
+    "status": "draft_not_validated",
+    "execution": "manual_in_dynamo_only",
+    "revit_version": "2027",
+    "dynamo_version": "4.0.2.3852",
+    "python_engine": "PythonNet3",
+    "created_utc": "2026-09-25T12:28:11.6578684Z",
+    "python_sha256": "2df0f3c823f9344a5ac6e87429bde0293d4c191f05d7e21a7390f3b92d62e05a",
+    "dynamo_sha256": "8ba416244c7d4d5bac87edc3fc4b6e8321e26cc7e5d469b5a2b860e471b5ad05"
+}
