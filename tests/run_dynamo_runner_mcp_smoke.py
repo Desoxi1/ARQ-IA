@@ -29,6 +29,21 @@ TIMEOUT_SECONDS = 105
 EXPECTED_TOOLS = {"ping_revit_dynamo_bridge", "execute_saved_readonly_routine"}
 
 
+def parse_tool_payload(response: dict[str, Any]) -> dict[str, Any]:
+    result = response.get("result", {})
+    items = result.get("content", []) if isinstance(result, dict) else []
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("text"), str):
+            continue
+        try:
+            payload = json.loads(item["text"])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
 class McpStdioClient:
     def __init__(self, powershell: str) -> None:
         self.process = subprocess.Popen(
@@ -142,7 +157,8 @@ def main() -> int:
             "tools/call", {"name": "ping_revit_dynamo_bridge", "arguments": {}}
         )
         if ping.get("result", {}).get("isError"):
-            print("REVIT_BRIDGE_PING=FAIL")
+            status = parse_tool_payload(ping).get("status", "unknown")
+            print(f"REVIT_BRIDGE_PING=FAIL status={status}")
             return 1
         print("REVIT_BRIDGE_PING=PASS")
 
@@ -155,12 +171,11 @@ def main() -> int:
         )
         result = run.get("result", {})
         if result.get("isError"):
-            print("DYNAMO_READONLY_RUN=FAIL")
+            status = parse_tool_payload(run).get("status", "unknown")
+            print(f"DYNAMO_READONLY_RUN=FAIL status={status}")
             return 1
-        text_items = [item.get("text", "") for item in result.get("content", []) if isinstance(item, dict)]
-        try:
-            payload = json.loads(text_items[0])
-        except (IndexError, json.JSONDecodeError):
+        payload = parse_tool_payload(run)
+        if not payload:
             print("DYNAMO_READONLY_RUN=FAIL")
             return 1
         ok = (

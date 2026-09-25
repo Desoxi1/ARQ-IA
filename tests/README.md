@@ -33,6 +33,7 @@ python tests/run_dynamo_runner_mcp_smoke.py --live
 ```
 
 No prueba escrituras ni habilita otras rutinas.
+Si el bridge no está cargado, el smoke informa `bridge_connect_timeout` y termina sin llamar a la rutina.
 
 Para probar solo el transporte MCP ↔ named pipe sin abrir Revit:
 

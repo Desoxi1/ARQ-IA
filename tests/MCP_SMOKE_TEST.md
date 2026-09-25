@@ -21,7 +21,7 @@
 | 2026-09-24 | Smoke vivo del runner Revit | Pendiente | `python tests/run_dynamo_runner_mcp_smoke.py --live` pasó el contrato MCP pero falló en `REVIT_BRIDGE_PING`; el add-in no está cargado. No se ejecutó Dynamo ni se cambió el documento. |
 | 2026-09-24 | DynamoCLI 4.0.2: prueba de grafo sintético | Fallido | El ejecutable salió sin XML de evaluación y registró una aserción ProtoCore. La prueba no usó Revit ni modificó modelos; no se usará DynamoCLI como runner hasta resolverlo. |
 | 2026-09-25 | Transporte del runner con fake named pipe | Aprobado | `python tests/run_dynamo_runner_pipe_smoke.py`: verifica ping, respuesta de la rutina allowlisted y `bridge_connect_timeout` cuando falta servidor, usando un fake named pipe aleatorio. No inicia Revit/Dynamo ni demuestra ejecución dentro del add-in. |
-| 2026-09-25 | Smoke vivo del runner tras reparar timeouts | Pendiente por instalación | El contrato MCP pasó y el ping devolvió `REVIT_BRIDGE_PING=FAIL`; el add-in no está instalado/cargado porque Revit sigue abierto. La prueba no llegó a la rutina ni cambió el modelo. |
+| 2026-09-25 | Smoke vivo del runner tras reparar timeouts | Pendiente por instalación | El contrato MCP pasó y el ping devolvió `bridge_connect_timeout`; el add-in no está instalado/cargado porque Revit sigue abierto. La prueba no llegó a la rutina ni cambió el modelo. |
 | Pendiente | Codex `tools/list` desde la app | Pendiente | Abrir este proyecto como confiable y reiniciar Codex. |
 | Pendiente | Abrir/correr grafo PythonNet3 | Pendiente | Revit/Dynamo debe iniciarse interactivamente. |
 | Pendiente | Ejecución del runner en Revit | Pendiente | Instalar el add-in con Revit cerrado, abrir un RVT descartable y volver a ejecutar la rutina read-only fijada. |
