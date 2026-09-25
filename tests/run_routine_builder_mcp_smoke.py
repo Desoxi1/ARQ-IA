@@ -109,7 +109,11 @@ def main() -> int:
         return 2
 
     slug = "smoke_" + uuid.uuid4().hex[:12]
-    files = [ROUTINES / f"{slug}{suffix}" for suffix in (".py", ".dyn", ".manifest.json")]
+    denied_slug = "reject_" + uuid.uuid4().hex[:12]
+    suffixes = (".py", ".dyn", ".manifest.json")
+    files = [ROUTINES / f"{slug}{suffix}" for suffix in suffixes]
+    denied_files = [ROUTINES / f"{denied_slug}{suffix}" for suffix in suffixes]
+    cleanup_files = files + denied_files
     client: McpStdioClient | None = None
     passed = False
     try:
@@ -144,6 +148,30 @@ def main() -> int:
         discovery_ok = {"list_saved_routines", "create_dynamo_routine"}.issubset(tool_names)
         print(f"ROUTINE_MCP_TOOLS={'PASS' if discovery_ok else 'FAIL'} count={len(tools)}")
         if not discovery_ok:
+            return 1
+
+        denied_response = client.request(
+            "tools/call",
+            {
+                "name": "create_dynamo_routine",
+                "arguments": {
+                    "name": denied_slug,
+                    "description": "Negative probe: unconfirmed model write.",
+                    "python_code": "OUT = {'status': 'must_not_be_saved'}",
+                    "scope": "active_selection",
+                    "writes_model": True,
+                    "confirm_model_write": False,
+                },
+            },
+        )
+        denied_result = denied_response.get("result", {})
+        write_rejected = (
+            isinstance(denied_result, dict)
+            and denied_result.get("isError") is True
+            and not any(path.exists() for path in denied_files)
+        )
+        print(f"UNCONFIRMED_MODEL_WRITE_REJECTED={'PASS' if write_rejected else 'FAIL'}")
+        if not write_rejected:
             return 1
 
         response = client.request(
@@ -189,10 +217,10 @@ def main() -> int:
     finally:
         if client is not None:
             client.close()
-        for path in files:
+        for path in cleanup_files:
             if path.exists() and path.parent.resolve() == ROUTINES.resolve():
                 path.unlink()
-        cleanup_ok = not any(path.exists() for path in files)
+        cleanup_ok = not any(path.exists() for path in cleanup_files)
         print(f"TEMP_ROUTINE_CLEANUP={'PASS' if cleanup_ok else 'FAIL'}")
 
 
