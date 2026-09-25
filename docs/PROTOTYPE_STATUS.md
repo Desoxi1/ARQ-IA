@@ -16,7 +16,7 @@
 
 ## Límite funcional actual
 
-Codex puede consultar Revit por `rvt-mcp`, crear rutinas y solicitar al runner una ejecución de solo lectura de `read_active_view_selection`. El runner está compilado, pero la prueba viva terminó en `REVIT_BRIDGE_PING=FAIL`: el add-in no está instalado/cargado en la sesión actual. No hay evidencia todavía de que el runner haya abierto Dynamo o ejecutado el `.dyn`.
+Codex puede consultar Revit por `rvt-mcp`, crear rutinas y solicitar al runner una ejecución de solo lectura de `read_active_view_selection`. El runner está compilado, pero el smoke vivo repetido el 25-09-2026 terminó en `REVIT_BRIDGE_PING=FAIL`: el add-in no está instalado/cargado en la sesión actual. No hay evidencia todavía de que el runner haya abierto Dynamo o ejecutado el `.dyn`.
 
 El producto no puede recibir y ejecutar con seguridad “cualquier pedido” todavía. Las escrituras tipadas de `rvt-mcp` están disponibles bajo aprobación, pero falta probarlas en un RVT descartable. El runner no acepta código nuevo, no ejecuta rutinas de escritura y solo admite la rutina fija de lectura. La rutina sigue siendo PythonNet3 con `RunType=Manual`; el runner intenta abrirla mediante la API de Dynamo dentro de Revit.
 
@@ -39,6 +39,8 @@ La conexión Codex se escribe como configuración de proyecto en `.codex/config.
 | MCP generador de rutinas, integración viva | Aprobado: initialize/tools/list/create; el test temporal generó `.py`, `.dyn` y manifiesto, validó PythonNet3/Manual y hashes, y limpió los tres archivos. No ejecutó el grafo. |
 | Build del bridge propio | Aprobado: `revit/bridge/build.ps1` compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. No se instaló en Addins. |
 | Contrato MCP del runner Dynamo | Aprobado: initialize/tools/list; anuncia solo ping y ejecución del identificador fijo de lectura. |
+| Transporte MCP↔named pipe simulado | Aprobado: ping y respuesta de la rutina permitida cruzaron el cliente PowerShell y un fake bridge con nombre aleatorio; también verificó que un pipe ausente termina en `bridge_connect_timeout`. No carga Revit ni Dynamo y no sustituye el smoke vivo. |
+| Runner vivo, repetido tras el test de transporte | Pendiente/bloqueado por instalación: el contrato MCP pasó, pero `REVIT_BRIDGE_PING=FAIL`; no existe el manifest/DLL del puente en Addins y Revit sigue abierto. La prueba solo hizo ping, no intentó ejecutar Dynamo. |
 | Arranque desde `.codex/config.toml` local | Aprobado: los tres procesos (`rvt_mcp`, generador y runner) iniciaron desde sus comandos configurados y respondieron initialize/tools/list; 51/2/2 herramientas. No se invocaron operaciones ni se probó la carga desde la app Codex. |
 | Runner MCP → Revit, smoke vivo | Fallido/pendiente: el contrato MCP respondió, pero `REVIT_BRIDGE_PING=FAIL`; el puente no está cargado en la sesión. No se ejecutó Dynamo ni se cambió el modelo. |
 | DynamoCLI 4.0.2 con grafo PythonNet3 sintético | Fallido: el proceso inició el perfil aislado, pero lanzó una aserción ProtoCore antes de crear el XML de evaluaciones. No se considera evidencia de ejecución. |

@@ -24,6 +24,8 @@ Para probar la generación MCP de una rutina temporal, sin abrir Revit ni ejecut
 python tests/run_routine_builder_mcp_smoke.py
 ```
 
+Este smoke crea un grafo de solo lectura con nombre aleatorio, verifica el manifiesto y los hashes, y elimina los tres archivos que generó.
+
 Con el puente instalado, Revit abierto y un documento guardado/sin cambios pendientes, la prueba viva ejecuta únicamente la rutina de lectura con hashes fijados:
 
 ```powershell
@@ -32,4 +34,10 @@ python tests/run_dynamo_runner_mcp_smoke.py --live
 
 No prueba escrituras ni habilita otras rutinas.
 
-Este test crea un grafo de solo lectura con nombre aleatorio, verifica el manifiesto y los hashes, y elimina los tres archivos que generó.
+Para probar solo el transporte MCP ↔ named pipe sin abrir Revit:
+
+```powershell
+python tests/run_dynamo_runner_pipe_smoke.py
+```
+
+Este test crea un pipe de nombre aleatorio y un fake bridge temporal. Comprueba mensajes, el timeout cuando no hay servidor y el rechazo/éxito del cliente, no la ejecución de Dynamo en Revit.

@@ -48,16 +48,17 @@ function Invoke-RevitBridge([string]$Operation, [string]$RoutineId) {
     $writer = $null
     try {
         $client = New-Object System.IO.Pipes.NamedPipeClientStream('.', $pipeName, [System.IO.Pipes.PipeDirection]::InOut, [System.IO.Pipes.PipeOptions]::None)
-        $client.Connect(2500)
-        $client.ReadTimeout = 95000
-        $client.WriteTimeout = 5000
+        try { $client.Connect(2500) } catch [System.TimeoutException] { throw 'bridge_connect_timeout' }
         $reader = New-Object System.IO.StreamReader($client, $utf8NoBom, $false, 1024, $true)
         $writer = New-Object System.IO.StreamWriter($client, $utf8NoBom, 1024, $true)
         $writer.AutoFlush = $true
         $request = [ordered]@{ operation = $Operation }
         if ($RoutineId) { $request.routineId = $RoutineId }
-        $writer.WriteLine((ConvertTo-Json -InputObject $request -Depth 4 -Compress))
-        $line = $reader.ReadLine()
+        $writeTask = $writer.WriteLineAsync((ConvertTo-Json -InputObject $request -Depth 4 -Compress))
+        if (-not $writeTask.Wait(5000)) { throw 'bridge_write_timeout' }
+        $readTask = $reader.ReadLineAsync()
+        if (-not $readTask.Wait(95000)) { throw 'bridge_response_timeout' }
+        $line = $readTask.Result
         if ([string]::IsNullOrWhiteSpace($line) -or $line.Length -gt 65536) { throw 'Invalid bridge response.' }
         $response = $line | ConvertFrom-Json
         return ,$response
@@ -105,7 +106,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                     New-ToolReply -RequestId $requestId -Text (ConvertTo-Json -InputObject $bridge -Depth 10 -Compress)
                 } catch {
                     $status = 'bridge_unavailable_or_rejected'
-                    if ($_.Exception.Message -in @('no_active_document','document_must_be_saved_and_idle','routine_not_allowed','routine_integrity_check_failed','unsupported_revit_version','dynamo_command_failed','dynamo_result_missing','post_run_verification_failed')) {
+                    if ($_.Exception.Message -in @('bridge_connect_timeout','bridge_write_timeout','bridge_response_timeout','no_active_document','document_must_be_saved_and_idle','routine_not_allowed','routine_integrity_check_failed','unsupported_revit_version','dynamo_command_failed','dynamo_result_missing','post_run_verification_failed')) {
                         $status = $_.Exception.Message
                     }
                     New-ToolReply -RequestId $requestId -Text (@{ ok = $false; status = $status } | ConvertTo-Json -Compress) -IsError $true

@@ -62,16 +62,25 @@ El runner solo ejecuta el ID y los archivos exactos fijados en el prototipo, que
 
 ## Pruebas reproducibles
 
-Con Revit abierto y el POC conectado en Codex, ejecuta desde esta carpeta:
+Pruebas MCP que no modifican el modelo:
 
 ```powershell
 python -m unittest discover -s tests -v
 python tests/run_routine_builder_mcp_smoke.py
 python tests/run_revit_mcp_readonly_smoke.py
+python tests/run_dynamo_runner_mcp_smoke.py
+python tests/run_dynamo_runner_pipe_smoke.py
+```
+
+`run_revit_mcp_readonly_smoke.py` requiere Revit abierto. El test `run_dynamo_runner_pipe_smoke.py` usa un fake bridge temporal y valida el transporte, no Dynamo real.
+
+Con el add-in puente instalado, Codex conectado y un RVT descartable guardado y sin cambios pendientes, ejecuta la prueba integrada:
+
+```powershell
 python tests/run_dynamo_runner_mcp_smoke.py --live
 ```
 
-Las pruebas MCP usan nombres temporales o salidas PASS/FAIL; no guardan contenido del modelo. La última ejecuta una rutina Dynamo estrictamente de solo lectura. No pruebes escrituras en un modelo productivo; las operaciones tipadas de rvt-mcp pueden cambiar el documento al aprobar la llamada.
+Solo intenta la rutina fija de lectura. No pruebes escrituras en un modelo productivo; las operaciones tipadas de rvt-mcp pueden cambiar el documento al aprobar la llamada.
 
 Este paquete se creó con Dynamo 4.0.2. DynamoMCP aparece en la documentación de Dynamo 4.2.1, pero este POC todavía no ha comprobado conexión desde Codex a esa implementación. Autodesk documenta el Revit Public MCP Server como compatible solo con Revit 2027.2; no intentes instalarlo en un Revit 2027.0 en uso.
 
