@@ -82,6 +82,6 @@ python tests/run_dynamo_runner_mcp_smoke.py --live
 
 Solo intenta la rutina fija de lectura. No pruebes escrituras en un modelo productivo; las operaciones tipadas de rvt-mcp pueden cambiar el documento al aprobar la llamada.
 
-Este paquete se creó con Dynamo 4.0.2. DynamoMCP aparece en la documentación de Dynamo 4.2.1, pero este POC todavía no ha comprobado conexión desde Codex a esa implementación. Autodesk documenta el Revit Public MCP Server como compatible solo con Revit 2027.2; no intentes instalarlo en un Revit 2027.0 en uso.
+Este paquete se creó con Dynamo 4.0.2. Dynamo Core 4.2 incluye Autodesk Assistant y DynamoMCP para trabajar con grafos; la publicación oficial indica que la integración con aplicaciones anfitrionas llegaría después y que el Assistant de Dynamo no modifica directamente modelos Revit. No se ha demostrado una conexión de DynamoMCP con Codex en este POC. Autodesk documenta el Revit Public MCP Server como compatible solo con Revit 2027.2; no lo instales en Revit 2027.0. [Notas oficiales de Dynamo 4.2](https://dynamobim.org/dynamo-core-4-2-release/) · [Guía oficial del Revit Public MCP Server](https://help.autodesk.com/view/ADSKMCP/ENU/?guid=ADSKMCP_RevitMcp_setting_up_revit_mcp_server_html)
 
 Para desinstalar rvt-mcp, usa el `uninstall.ps1` incluido en el ZIP y lee primero su `-WhatIf`. Los archivos del POC y sus rutinas se conservan aparte.
