@@ -1,13 +1,13 @@
 # Decisión de arquitectura del POC
 
 **Actualizado:** 26 de septiembre de 2026
-**Estado:** generador y contrato MCP del runner probados offline; bridge genérico compilado e instalado por usuario. Se inició una sesión nueva con el RVT descartable, pero el ensamblado del bridge no se cargó y el ping devuelve timeout. Ejecución Dynamo dentro de Revit y carga desde Codex siguen pendientes de prueba viva.
+**Estado:** generador y contrato MCP del runner probados offline; bridge genérico compilado e instalado por usuario con hashes coincidentes. Se inició una sesión limpia con el RVT descartable y Revit muestra el aviso del DLL sin firma. La carga del add-in, el ping y la ejecución Dynamo en vivo siguen pendientes.
 
 ## Decisión
 
 Reutilizar `bimwright/rvt-mcp` para herramientas Revit tipadas y mantener un bridge propio para crear/listar y ejecutar rutinas guardadas Dynamo/PythonNet3. Codex interpreta pedidos, consulta el modelo, prefiere herramientas tipadas y prepara rutinas cuando no hay una acción adecuada. La configuración no habilita borrado ni ToolBaker; cada llamada solicita aprobación.
 
-El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; toda ejecución requiere autorización explícita de posible escritura y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. Los metadatos no demuestran que el código sea de solo lectura. El add-in está instalado por usuario. La sesión nueva de prueba no cargó el DLL; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
+El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; toda ejecución requiere autorización explícita de posible escritura y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. Los metadatos no demuestran que el código sea de solo lectura. El DLL endurecido está instalado por usuario y su hash coincide con `dist/`. Falta que el usuario elija **Load Once** en la sesión de prueba recién abierta; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
 
 ## Comparación
 
@@ -36,7 +36,7 @@ Autodesk también publica su Revit Public MCP Server, pero su página de configu
 
 ## Decisión de siguiente prueba
 
-Mantener `rvt-mcp` para herramientas tipadas y Codex como interfaz. El siguiente gate es conseguir que el add-in cargue en la sesión de prueba ya iniciada y que `ping_revit_dynamo_bridge` responda; luego ejecutar `read_test_model_summary` por MCP. Si Dynamo devuelve el resultado y el documento queda intacto, probar una escritura en el RVT descartable y volver a leer el parámetro. Revaluar DynamoMCP cuando su integración con Revit y conexión desde Codex estén disponibles. La prueba fallida con `DynamoCLI` no habilita ejecución.
+Mantener `rvt-mcp` para herramientas tipadas y Codex como interfaz. El siguiente gate es cargar el add-in en la nueva sesión de prueba y comprobar que `ping_revit_dynamo_bridge` responde; luego ejecutar `read_test_model_summary` por MCP. Si Dynamo devuelve el resultado y el documento queda intacto, probar una escritura en el RVT descartable y volver a leer el parámetro. Revaluar DynamoMCP cuando su integración con Revit y conexión desde Codex estén disponibles. La prueba fallida con `DynamoCLI` no habilita ejecución.
 
 ## Alcance configurado para Codex
 
