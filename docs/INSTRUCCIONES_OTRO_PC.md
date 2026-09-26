@@ -24,9 +24,9 @@ El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desd
    powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\bridge\install.ps1
    ```
 
-   Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. Si Revit permanece abierto, usa `-StageWhileRevitOpen`; el puente se cargará solo en la próxima sesión. Usa `-Force` solo para actualizar conscientemente una instalación previa.
+   Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. El DLL del POC no está firmado; al iniciar Revit, puede aparecer el aviso de complemento sin firma. Para la prueba, verifica que cargue “BIM-AI Dynamo Bridge” y elige **Load Once**. Usa **Always Load** solo si decidiste confiar permanentemente en este DLL e ID de complemento. Autodesk explica estas opciones en [Security: Unsigned File or Add-In](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm). Si Revit permanece abierto, usa `-StageWhileRevitOpen`; el puente se cargará solo en la próxima sesión. Usa `-Force` solo para actualizar conscientemente una instalación previa.
 4. Abre `BIM-AI-POC` como proyecto en Codex, confía el proyecto cuando Codex lo solicite y reinicia Codex.
-5. Inicia Revit 2027 con un modelo nuevo/desechable. No uses un proyecto de producción.
+5. Inicia Revit 2027 con un modelo nuevo/desechable. No uses un proyecto de producción. Si no aparece el aviso, comprueba el diario de Revit y verifica que el DLL está cargado antes de ejecutar una rutina.
 
 ## Prueba 1: conexión Codex → Revit (consulta)
 

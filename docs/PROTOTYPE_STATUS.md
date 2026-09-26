@@ -9,7 +9,7 @@
 - El proyecto Codex contiene tres MCP: rvt-mcp con una lista curada de herramientas tipadas, generador/listado de rutinas y runner Dynamo. Las llamadas tienen aprobación por herramienta.
 - El generador guarda fuente `.py`, un `.dyn` manual con un único nodo PythonNet3, wrapper de resultado JSON y un manifiesto con hashes.
 - El runner comprueba los hashes y el formato del grafo tanto en PowerShell como en el add-in. Las rutinas genéricas solo corren con un RVT local guardado dentro de `revit/test-models/`; las escrituras requieren `confirm_model_write=true` y el wrapper debe devolver `affected_ids` que coincidan con los elementos reportados por Revit `DocumentChanged`.
-- El add-in compila contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. Está instalado en el perfil de usuario. La sesión de Revit con el proyecto productivo sigue abierta e intacta. Se inició otra sesión con el RVT de prueba, pero el DLL del bridge no está cargado; no hay prueba viva.
+- El add-in compila contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. Está instalado en el perfil de usuario. El DLL no está firmado. La sesión de Revit con el proyecto productivo sigue abierta e intacta. Se inició otra sesión con el RVT de prueba, pero el DLL del bridge no está cargado; no hay prueba viva.
 - Hay una copia local, ignorada por Git, de `Snowdon Towers Sample HVAC.rvt` en `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Se puede descartar; proviene de los Samples instalados con Revit 2027.
 - Rutinas incluidas: `read_active_view_selection` (solo lectura y hash fijado), `read_test_model_summary` (solo lectura genérica) y `set_comments_on_selection` (borrador de escritura con protección interna de ruta).
 
@@ -25,7 +25,7 @@
 | `revit/bridge/build.ps1` | PASS | DLL de 30.720 bytes compilado contra las APIs locales. SHA-256 coincide con el archivo empaquetado y el instalado. |
 | `revit/bridge/install.ps1 -Force -StageWhileRevitOpen` | PASS, staged | Escribió el manifest y `bridge.json` por usuario. No cambió la sesión productiva. |
 | Copia del RVT de muestra | PASS | Tamaño y SHA-256 de la copia coinciden con el sample Autodesk instalado; el RVT está excluido de Git. |
-| Carga del add-in en sesión de prueba | PENDIENTE | Se inició una sesión con el RVT de prueba, pero el proceso no cargó `BimAiDynamoBridge.dll`; el ping devuelve `bridge_connect_timeout`. La instancia productiva sigue abierta e intacta. |
+| Carga del add-in en sesión de prueba | PENDIENTE | Se inició una sesión con el RVT de prueba, pero el proceso no cargó `BimAiDynamoBridge.dll`; el ping devuelve `bridge_connect_timeout`. El DLL no está firmado, por lo que Revit requiere confirmar la carga del complemento. La instancia productiva sigue abierta e intacta. |
 | Ejecución de Dynamo desde el bridge dentro de Revit | PENDIENTE | Requiere resolver la carga del add-in y completar el smoke read-only en el RVT de prueba. No se probó sobre el proyecto productivo. |
 | Escritura PythonNet3 y lectura posterior de Comments | PENDIENTE | Requiere completar primero la prueba genérica read-only en el test RVT. |
 | Herramientas de escritura tipadas rvt-mcp desde Codex | PARCIAL | El inventario y esquemas están revisados; las operaciones no se probaron una por una. |
@@ -40,7 +40,7 @@ Todavía **no** hay evidencia de que el loop genérico funcione en vivo ni de qu
 ## Siguiente prueba segura
 
 1. Conservar intacta la sesión productiva que está abierta.
-2. En la sesión de prueba ya iniciada, resolver por qué Revit no cargó `BimAiDynamoBridge.dll`; si aparece el aviso de confianza para este add-in local, aceptar la carga para esa sesión. No cambiar configuraciones globales de seguridad.
+2. En la sesión de prueba ya iniciada, si aparece el aviso de complemento sin firma, elegir **Load Once** para `BIM-AI Dynamo Bridge`. No cambiar configuraciones globales de seguridad.
 3. Comprobar `ping_revit_dynamo_bridge` y ejecutar `python tests/run_dynamo_runner_mcp_smoke.py --live-generic`. Esta rutina solo lee título/vista/selección/cantidad de elementos y comprueba que el documento queda sin cambios.
 4. Si la lectura genérica pasa, seleccionar en ese RVT un elemento descartable con Comments editable y ejecutar `set_comments_on_selection` con aprobación. Confirmar que el resultado y `DocumentChanged` enumeran el mismo ID, luego releer Comments mediante rvt-mcp.
 5. Si el add-in falla, conservar salida de Revit y status del runner, corregir el bridge y repetir solo en el RVT de prueba.
