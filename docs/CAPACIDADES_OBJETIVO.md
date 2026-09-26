@@ -61,7 +61,7 @@ El inventario local es una lectura del esquema de herramientas, no una prueba de
 2. **Creación tipada:** enseñar plan y objetivos; ejecutar solo después de confirmar la llamada concreta en un modelo descartable.
 3. **Edición:** identificar IDs, valores anteriores/nuevos, unidades y alcance de instancia/tipo; confirmar antes de aplicar.
 4. **Borrado, archivos, guardado y exportación:** permiso por acción, previa y efecto claramente visibles.
-5. **Rutina Dynamo:** guardar fuente, wrapper, manifiesto y hashes; revisar cada rutina antes de correrla. El bridge limita el modelo y requiere aprobación explícita para escritura. PythonNet3 sigue ejecutándose con permisos del proceso Revit; la validación de ruta no sandboxea archivos ni red.
+5. **Rutina Dynamo:** guardar fuente, wrapper, manifiesto y hashes; revisar cada rutina antes de correrla. El bridge limita el modelo y exige aprobación explícita de posible escritura en toda ejecución genérica, porque la etiqueta del manifiesto no prueba que el código sea de solo lectura. PythonNet3 sigue ejecutándose con permisos del proceso Revit; la validación de ruta no sandboxea archivos ni red.
 6. **Errores:** cancelar o revertir el grupo transaccional cuando sea posible; reportar explícitamente resultados parciales cuando Revit no permita revertirlos.
 
 La configuración de Codex debe exponer herramientas por perfil y mantener `default_tools_approval_mode = "prompt"`. No se habilita el escape `revit_send_code_to_revit` como herramienta cotidiana. Un `dry-run` documentado debe probarse en el binario exacto antes de depender de él; la lista de herramientas por sí sola no demuestra que una acción sea reversible.

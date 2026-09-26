@@ -1,7 +1,7 @@
-"""Exercise the runner's named-pipe transport against a disposable fake bridge.
+"""Exercise Builder MCP -> saved routine -> Runner MCP against a disposable fake bridge.
 
-This validates only the MCP/PowerShell wire contract. It does not start Revit,
-Dynamo, or claim that the add-in works inside Revit.
+This validates the offline MCP/PowerShell routine lifecycle and fake named-pipe
+contract. It does not start Revit or Dynamo, or claim that the add-in works live.
 """
 
 from __future__ import annotations
@@ -100,19 +100,23 @@ class McpStdioClient:
             self.process.wait(timeout=2)
 
 
-def write_routine_fixture(directory: Path) -> None:
+def write_routine_fixture(
+    directory: Path, *, include_writer: bool = True, include_readonly: bool = True
+) -> None:
     routines = directory / "routines"
     dynamo = directory / "dynamo"
-    routines.mkdir(parents=True)
-    dynamo.mkdir(parents=True)
+    routines.mkdir(parents=True, exist_ok=True)
+    dynamo.mkdir(parents=True, exist_ok=True)
     wrapper = ROOT / "dynamo" / "pythonnet3_result_wrapper.py"
     wrapper_copy = dynamo / wrapper.name
     wrapper_copy.write_bytes(wrapper.read_bytes())
     wrapper_text = wrapper.read_text(encoding="utf-8")
-    for name, writes_model, source in (
-        ("pipe_smoke_writer", True, 'OUT = {"status": "ok", "affected_ids": ["42"]}\n'),
-        ("pipe_smoke_readonly", False, 'OUT = {"status": "ok", "affected_ids": []}\n'),
-    ):
+    fixtures = []
+    if include_writer:
+        fixtures.append(("pipe_smoke_writer", True, 'OUT = {"status": "ok", "affected_ids": ["42"]}\n'))
+    if include_readonly:
+        fixtures.append(("pipe_smoke_readonly", False, 'OUT = {"status": "ok", "affected_ids": []}\n'))
+    for name, writes_model, source in fixtures:
         graph = {
             "Nodes": [
                 {
@@ -180,7 +184,7 @@ for ($index = 0; $index -lt 4; $index++) {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_read_only'; routineId = 'read_active_view_selection'; viewType = 'FloorPlan'; selectionCount = 0; modelChangeCheck = 'unchanged'; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
     }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_writer' -and $request.confirmModelWrite -eq $true) {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_change'; routineId = $request.routineId; modelChangeCheck = 'document_changed_ids_match_routine_result'; changedElementIds = @(42); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @('42') }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
-    }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_readonly' -and $request.confirmModelWrite -eq $false) {{
+    }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_readonly' -and $request.confirmModelWrite -eq $true) {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_read_only'; routineId = $request.routineId; modelChangeCheck = 'unchanged'; changedElementIds = @(); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @() }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
     }} else {{
         $response = [ordered]@{{ ok = $false; status = 'routine_not_allowed' }}
@@ -208,6 +212,7 @@ def main() -> int:
 
     pipe_name = "BIM-AI-TEST-" + uuid.uuid4().hex
     client: McpStdioClient | None = None
+    builder_client: McpStdioClient | None = None
     fake_bridge: subprocess.Popen[str] | None = None
     try:
         with tempfile.TemporaryDirectory(prefix="bim-ai-pipe-smoke-") as temp_name:
@@ -223,7 +228,50 @@ def main() -> int:
                 runner_text.replace(old_pipe_line, f"$pipeName = '{pipe_name}'"),
                 encoding="utf-8",
             )
-            write_routine_fixture(directory)
+            builder_copy = directory / "mcp" / "RoutineBuilderMcp.ps1"
+            shutil.copy2(ROOT / "mcp" / "RoutineBuilderMcp.ps1", builder_copy)
+            write_routine_fixture(directory, include_writer=False)
+            shutil.copy2(ROOT / "dynamo" / "pythonnet3_template.dyn", directory / "dynamo" / "pythonnet3_template.dyn")
+
+            builder_client = McpStdioClient(powershell, builder_copy)
+            builder_initialized = builder_client.request(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "routine-builder-pipe-smoke", "version": "1.0"},
+                },
+            )
+            if not builder_initialized.get("result"):
+                print("FULL_LOOP_BUILDER_INITIALIZE=FAIL")
+                return 1
+            builder_client.notify_initialized()
+            generated = builder_client.request(
+                "tools/call",
+                {
+                    "name": "create_dynamo_routine",
+                    "arguments": {
+                        "name": "pipe_smoke_writer",
+                        "description": "Temporary full-loop writer for the fake Revit bridge.",
+                        "python_code": 'OUT = {"status": "ok", "affected_ids": ["42"]}',
+                        "scope": "active_selection",
+                        "writes_model": True,
+                        "confirm_model_write": True,
+                    },
+                },
+            )
+            generated_result = generated.get("result", {})
+            generated_manifest_path = directory / "routines" / "pipe_smoke_writer.manifest.json"
+            generated_manifest = json.loads(generated_manifest_path.read_text(encoding="utf-8")) if generated_manifest_path.is_file() else {}
+            generated_ok = (
+                not generated_result.get("isError")
+                and generated_manifest.get("status") == "draft_not_validated"
+                and generated_manifest.get("writes_model") is True
+            )
+            if not generated_ok:
+                print("FULL_LOOP_ROUTINE_GENERATION=FAIL")
+                return 1
+            print("FULL_LOOP_ROUTINE_GENERATION=PASS")
             fake_script = write_fake_bridge(directory, pipe_name)
             fake_bridge = subprocess.Popen(
                 [powershell, "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(fake_script)],
@@ -258,15 +306,29 @@ def main() -> int:
                 "tools/call",
                 {
                     "name": "execute_saved_routine",
-                    "arguments": {"routine_id": "pipe_smoke_writer", "confirm_model_write": False},
+                    "arguments": {"routine_id": "pipe_smoke_writer", "authorize_possible_model_writes": False},
                 },
             )
             denied_items = denied.get("result", {}).get("content", [])
             denied_payload = json.loads(denied_items[0]["text"]) if denied_items else {}
-            if not denied.get("result", {}).get("isError") or denied_payload.get("status") != "model_write_confirmation_required":
+            if not denied.get("result", {}).get("isError") or denied_payload.get("status") != "generic_execution_confirmation_required":
                 print("RUNNER_GENERIC_CONFIRM=FAIL missing write gate")
                 return 1
             print("RUNNER_GENERIC_CONFIRM=PASS")
+
+            denied_readonly = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine",
+                    "arguments": {"routine_id": "pipe_smoke_readonly", "authorize_possible_model_writes": False},
+                },
+            )
+            denied_readonly_items = denied_readonly.get("result", {}).get("content", [])
+            denied_readonly_payload = json.loads(denied_readonly_items[0]["text"]) if denied_readonly_items else {}
+            if not denied_readonly.get("result", {}).get("isError") or denied_readonly_payload.get("status") != "generic_execution_confirmation_required":
+                print("RUNNER_GENERIC_READONLY_CONFIRM=FAIL missing universal execution gate")
+                return 1
+            print("RUNNER_GENERIC_READONLY_CONFIRM=PASS")
 
             ping = client.request(
                 "tools/call", {"name": "ping_revit_dynamo_bridge", "arguments": {}}
@@ -301,7 +363,7 @@ def main() -> int:
                 "tools/call",
                 {
                     "name": "execute_saved_routine",
-                    "arguments": {"routine_id": "pipe_smoke_writer", "confirm_model_write": True},
+                    "arguments": {"routine_id": "pipe_smoke_writer", "authorize_possible_model_writes": True},
                 },
             )
             generic_items = generic.get("result", {}).get("content", [])
@@ -321,7 +383,7 @@ def main() -> int:
                 "tools/call",
                 {
                     "name": "execute_saved_routine",
-                    "arguments": {"routine_id": "pipe_smoke_readonly", "confirm_model_write": False},
+                    "arguments": {"routine_id": "pipe_smoke_readonly", "authorize_possible_model_writes": True},
                 },
             )
             generic_readonly_items = generic_readonly.get("result", {}).get("content", [])
@@ -335,8 +397,26 @@ def main() -> int:
                 print("RUNNER_GENERIC_READONLY=FAIL")
                 return 1
             print("RUNNER_GENERIC_READONLY=PASS manifest_promoted=true")
+
+            saved_listing = builder_client.request(
+                "tools/call", {"name": "list_saved_routines", "arguments": {}}
+            )
+            saved_items = saved_listing.get("result", {}).get("content", [])
+            saved_payload = json.loads(saved_items[0]["text"]) if saved_items else {}
+            saved_routines = saved_payload.get("routines", []) if isinstance(saved_payload, dict) else []
+            saved_writer = next(
+                (item for item in saved_routines if item.get("name") == "pipe_smoke_writer"),
+                {},
+            )
+            if saved_writer.get("status") != "validated":
+                print("FULL_LOOP_ROUTINE_REUSE=FAIL")
+                return 1
+            print("FULL_LOOP_ROUTINE_REUSE=PASS status=validated")
+
             fake_bridge.wait(timeout=5)
             fake_bridge = None
+            builder_client.close()
+            builder_client = None
             client.close()
             client = None
 
@@ -378,6 +458,8 @@ def main() -> int:
         print(f"RUNNER_PIPE_SMOKE=FAIL ({type(exc).__name__})")
         return 1
     finally:
+        if builder_client is not None:
+            builder_client.close()
         if client is not None:
             client.close()
         if fake_bridge is not None:

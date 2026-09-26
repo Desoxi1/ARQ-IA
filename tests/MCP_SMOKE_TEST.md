@@ -8,9 +8,9 @@
 | rvt-mcp read-only repetido hoy | TIMEOUT | `initialize` y `tools/list` responden; ninguna consulta de vista/selección respondió dentro del timeout de 60 s. El proceso Revit sigue abierto. No se llamó ninguna escritura ni se guardó contenido del modelo. |
 | Builder MCP stdio | PASS | `tests/run_routine_builder_mcp_smoke.py` creó una rutina temporal, comprobó PythonNet3/Manual/result wrapper/hashes y limpió los archivos. Escritura sin confirmación se rechazó. |
 | Wrapper JSON PythonNet3 | PASS | Limita salida a 64 KiB, exige correlation ID válido y rechaza tipos no JSON. |
-| Rutinas y modelos de prueba | PASS offline | 21 pruebas cubren fakes, alcance de Comments, estructura `.py/.dyn/manifest`, hashes, expiración de cola y protección contra documentos fuera de `revit/test-models/`. |
+| Rutinas y modelos de prueba | PASS offline | 22 pruebas cubren fakes, alcance de Comments, estructura `.py/.dyn/manifest`, hashes, expiración de cola, autorización de toda ejecución genérica y protección contra documentos fuera de `revit/test-models/`. |
 | Runner MCP stdio | PASS | `tests/run_dynamo_runner_mcp_smoke.py` descubre tres tools: ping, lectura fijada y ejecución de rutina guardada. |
-| Named pipe del runner | PASS con fake | `tests/run_dynamo_runner_pipe_smoke.py` cubre ping, lectura, ejecución genérica, rechazo sin confirmación, promoción del manifiesto y timeout sin bridge. No inicia Revit/Dynamo. |
+| Loop Builder → Runner | PASS con fake | `tests/run_dynamo_runner_pipe_smoke.py` crea una rutina con Builder MCP, rechaza llamadas genéricas sin autorización (incluida una rutina marcada read-only), la ejecuta contra un pipe y bridge falsos, promueve el manifiesto a `validated` y confirma que Builder vuelve a listarla. No inicia Revit/Dynamo. |
 | Build y paquete del add-in | PASS | Roslyn compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10; DLL distribuido e instalado coinciden por SHA-256. |
 | Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario de Revit registra `TaskDialog_Security_Unsigned_File_Loading`; falta elegir Load Once. La sesión productiva permanece intacta. |
 | RVT de prueba | PASS | Copia local de `Snowdon Towers Sample HVAC.rvt` incluida con Revit 2027; coincide en tamaño/hash y está ignorada por Git. |

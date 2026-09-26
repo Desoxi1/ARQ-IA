@@ -1,6 +1,6 @@
 # Validación
 
-El registro y el estado actual están en [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md). La suite offline comprueba rutinas, hashes, permisos de ejecución, wrapper JSON y transporte MCP/named pipe con un bridge simulado. No carga Revit ni Dynamo.
+El registro y el estado actual están en [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md). La suite offline comprueba generación MCP, guardado/reutilización de rutinas, hashes, autorización de ejecución, wrapper JSON y named pipe con un bridge simulado. No carga Revit ni Dynamo.
 
 Ejecuta las pruebas offline desde la raíz:
 
@@ -29,4 +29,4 @@ python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
 
 Después de aprobar el smoke read-only, selecciona un elemento de prueba y ejecuta `set_comments_on_selection` con aprobación MCP. Relee Comments con rvt-mcp y confirma que `affected_ids` coincide con los IDs reportados por Revit. No uses el bridge genérico sobre un proyecto productivo.
 
-El smoke MCP del runner sin flags valida solo el contrato. El smoke `run_dynamo_runner_pipe_smoke.py` usa un pipe aleatorio y un fake bridge; no es evidencia de ejecución Revit/Dynamo.
+El smoke MCP del runner sin flags valida solo el contrato. `run_dynamo_runner_pipe_smoke.py` recorre Builder MCP → rutina generada/guardada → Runner MCP → pipe aleatorio → fake bridge → manifiesto `validated` y listado de rutina reutilizable. No es evidencia de ejecución Revit/Dynamo.

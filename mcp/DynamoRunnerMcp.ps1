@@ -44,14 +44,14 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'execute_saved_routine'
-            description = 'Execute one hash-validated, saved PythonNet3 Manual graph through Revit/Dynamo. Generic routines run only in a saved, idle, non-workshared RVT under revit/test-models. A writer requires confirm_model_write=true and affected_ids exactly matching Revit DocumentChanged IDs. PythonNet3 has the Revit process user permissions; review the source because the model path gate is not an operating-system sandbox. If status is revit_execution_timeout_unknown, query the model before retrying. Tool approval is required.'
+            description = 'Execute one hash-validated, saved PythonNet3 Manual graph through Revit/Dynamo. Generic routines run only in a saved, idle, non-workshared RVT under revit/test-models. Every generic execution requires authorize_possible_model_writes=true because any PythonNet3 source may write the model regardless of its manifest. Review the source; PythonNet3 has Revit process user permissions and the model path gate is not an operating-system sandbox. If status is revit_execution_timeout_unknown, query the model before retrying. Tool approval is required.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
                     routine_id = [ordered]@{ type = 'string'; pattern = '^[a-z][a-z0-9_-]{1,47}$'; description = 'The slug of a saved routine under routines/.' }
-                    confirm_model_write = [ordered]@{ type = 'boolean'; description = 'Must be true when the saved routine writes the model and the user explicitly requested this execution; otherwise false.' }
+                    authorize_possible_model_writes = [ordered]@{ type = 'boolean'; description = 'Must be true for every generic PythonNet3 routine execution. The routine may write the model even if its manifest says read-only; review its source and explicitly authorize possible model changes.' }
                 }
-                required = @('routine_id', 'confirm_model_write')
+                required = @('routine_id', 'authorize_possible_model_writes')
                 additionalProperties = $false
             }
         }
@@ -82,8 +82,7 @@ function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite) {
         (Get-Item -LiteralPath $paths.dyn).Length -gt 524288 -or (Get-Item -LiteralPath $paths.manifest).Length -gt 16384) { throw 'routine_package_too_large' }
     $manifest = Get-Content -LiteralPath $paths.manifest -Raw | ConvertFrom-Json
     $isWriter = [bool]$manifest.writes_model
-    if ($isWriter -and -not $ConfirmModelWrite) { throw 'model_write_confirmation_required' }
-    if (-not $isWriter -and $ConfirmModelWrite) { throw 'routine_manifest_invalid' }
+    if (-not $ConfirmModelWrite) { throw 'generic_execution_confirmation_required' }
     if ([string]$manifest.name -ne $RoutineId -or [string]$manifest.python_engine -ne 'PythonNet3' -or
         [string]$manifest.result_contract -ne 'bim-ai-json-v1' -or
         [bool]$manifest.confirm_model_write -ne $isWriter) { throw 'routine_manifest_invalid' }
@@ -161,7 +160,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                         }
                         'execute_saved_routine' {
                             $routineId = [string]$request.params.arguments.routine_id
-                            $confirmModelWrite = [bool]$request.params.arguments.confirm_model_write
+                            $confirmModelWrite = [bool]$request.params.arguments.authorize_possible_model_writes
                             $manifest = Assert-SavedRoutine -RoutineId $routineId -ConfirmModelWrite $confirmModelWrite
                             $manifestPath = Join-Path $routinesRoot ($routineId + '.manifest.json')
                             $bridge = Invoke-RevitBridge -Operation 'run_saved_routine' -RoutineId $routineId -ConfirmModelWrite $confirmModelWrite

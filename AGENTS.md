@@ -11,7 +11,7 @@
 1. Usa primero las consultas `rvt-mcp` para identificar modelo, vista, selección, niveles, tipos, familias y parámetros existentes.
 2. Para tareas cubiertas por una herramienta Revit tipada, úsala con aprobación por llamada. Haz cambios unitarios y verifica con una consulta posterior.
 3. Para una tarea que requiere lógica propia, guarda una rutina con `create_dynamo_routine`. Usa `PythonNet3`, `RunType=Manual`, resultados JSON y valores de `affected_ids` exactos para escrituras.
-4. Ejecuta una rutina genérica solo con `execute_saved_routine`, en un RVT local, guardado y no workshared dentro de `revit/test-models/`. Para escribir, requiere aprobación de esa llamada y `confirm_model_write=true`.
+4. Ejecuta una rutina genérica solo con `execute_saved_routine`, en un RVT local, guardado y no workshared dentro de `revit/test-models/`. Toda ejecución requiere aprobación de esa llamada y `authorize_possible_model_writes=true`, aunque el manifiesto diga solo lectura; revisa el `.py` y explica que autoriza posibles cambios al modelo.
 5. Después de una ejecución correcta, consulta el modelo otra vez y compara el resultado con el pedido. Conserva la rutina para repetirla sin regenerar código.
 
 ## Límites de ejecución

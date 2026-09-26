@@ -7,7 +7,7 @@
 
 Reutilizar `bimwright/rvt-mcp` para herramientas Revit tipadas y mantener un bridge propio para crear/listar y ejecutar rutinas guardadas Dynamo/PythonNet3. Codex interpreta pedidos, consulta el modelo, prefiere herramientas tipadas y prepara rutinas cuando no hay una acción adecuada. La configuración no habilita borrado ni ToolBaker; cada llamada solicita aprobación.
 
-El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; las escrituras requieren aprobación explícita y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. El add-in está instalado por usuario. La sesión nueva de prueba no cargó el DLL; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
+El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; toda ejecución requiere autorización explícita de posible escritura y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. Los metadatos no demuestran que el código sea de solo lectura. El add-in está instalado por usuario. La sesión nueva de prueba no cargó el DLL; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
 
 ## Comparación
 
@@ -42,7 +42,7 @@ Mantener `rvt-mcp` para herramientas tipadas y Codex como interfaz. El siguiente
 
 - `rvt-mcp`: consultas y una lista explícita de creación/edición tipada; arranca con `--toolsets query,create,modify,view,annotation --disable-toolbaker`.
 - `bim-ai-routines`: `list_saved_routines`, `create_dynamo_routine`; crea fuente, grafo y manifiesto bajo `routines/`.
-- `bim-ai-dynamo-runner`: ping, rutina read-only fijada y `execute_saved_routine`; esta última solo opera en RVT locales bajo `revit/test-models/`. Las escrituras requieren confirmación y aprobación MCP.
+- `bim-ai-dynamo-runner`: ping, rutina read-only fijada y `execute_saved_routine`; esta última solo opera en RVT locales bajo `revit/test-models/`. Toda ejecución genérica requiere confirmación de posible escritura y aprobación MCP.
 - La configuración solicita aprobación de Codex por llamada. Al aprobar una operación Revit tipada, esta puede cambiar el documento en esa misma llamada; no se debe asumir una vista previa ni rollback general.
 - La rutina PythonNet3 corre dentro del proceso Revit con los permisos del usuario; la ruta de documento no es un sandbox de archivos o red. Revisa el script antes de ejecutarlo.
 

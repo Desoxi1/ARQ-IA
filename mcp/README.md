@@ -5,7 +5,7 @@
 - `list_saved_routines`: muestra nombre, alcance, efecto declarado y estado de validación.
 - `create_dynamo_routine`: escribe fuente PythonNet3, un grafo `.dyn` Manual con wrapper JSON fijado por hash y un manifiesto bajo `routines/`.
 
-El servidor rechaza rutas elegidas por el llamador, nombres fuera del slug permitido, scripts mayores a 32 KiB, rutinas que no asignan a `OUT`, y rutinas de escritura sin `confirm_model_write=true`. La aprobación de guardar una rutina no aprueba su ejecución. Para ejecutar se usa `DynamoRunnerMcp.ps1` y el add-in separado `revit/bridge/`.
+El servidor rechaza rutas elegidas por el llamador, nombres fuera del slug permitido, scripts mayores a 32 KiB, rutinas que no asignan a `OUT`, y escrituras declaradas sin `confirm_model_write=true` al guardar la rutina. La aprobación de guardar una rutina no aprueba su ejecución. `DynamoRunnerMcp.ps1` exige `authorize_possible_model_writes=true` en toda ejecución genérica porque el manifiesto no puede demostrar que PythonNet3 sea solo lectura. Revisa el código y autoriza la posible modificación del RVT antes de ejecutar. El runner usa el add-in separado `revit/bridge/`.
 
 El runner ofrece ping, la rutina fija `read_active_view_selection` y `execute_saved_routine`. El ejecutor genérico vuelve a validar hashes, PythonNet3, modo Manual y ausencia de conectores/dependencias. Solo acepta un RVT local guardado bajo `revit/test-models/`; exige aprobación por herramienta y una bandera adicional para escrituras. El bridge compara los IDs esperados con `DocumentChanged` y promueve el manifiesto después de una ejecución verificada.
 

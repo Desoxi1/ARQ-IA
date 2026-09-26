@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [string]$RevitRoot = (Join-Path $env:ProgramFiles 'Autodesk\Revit 2027'),
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [switch]$Package
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,6 +67,27 @@ foreach ($reference in $references) { $arguments += "/reference:$reference" }
 $arguments += $sourcePath
 & $compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw "Falló la compilación del puente (código $LASTEXITCODE)." }
+
+if ($Package) {
+    $packageDirectory = Join-Path $PSScriptRoot 'dist'
+    New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
+    $packageAssembly = Join-Path $packageDirectory 'BimAiDynamoBridge.dll'
+    $packageChecksum = Join-Path $packageDirectory 'BimAiDynamoBridge.sha256'
+    $packageAssemblyTemp = $packageAssembly + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    $packageChecksumTemp = $packageChecksum + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    try {
+        Copy-Item -LiteralPath $assemblyPath -Destination $packageAssemblyTemp
+        $packageHash = (Get-FileHash -LiteralPath $packageAssemblyTemp -Algorithm SHA256).Hash.ToLowerInvariant()
+        [IO.File]::WriteAllText($packageChecksumTemp, $packageHash + "`n", $utf8NoBom)
+        Move-Item -LiteralPath $packageAssemblyTemp -Destination $packageAssembly -Force
+        Move-Item -LiteralPath $packageChecksumTemp -Destination $packageChecksum -Force
+    } finally {
+        Remove-Item -LiteralPath $packageAssemblyTemp, $packageChecksumTemp -Force -ErrorAction SilentlyContinue
+    }
+    Write-Output 'BRIDGE_PACKAGE=PASS'
+    Write-Output ("PACKAGE_SHA256=" + $packageHash)
+}
 
 Write-Output 'BRIDGE_BUILD=PASS'
 Write-Output ("ASSEMBLY_BYTES=" + (Get-Item -LiteralPath $assemblyPath).Length)

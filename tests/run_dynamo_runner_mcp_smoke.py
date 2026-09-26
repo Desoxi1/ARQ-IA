@@ -148,6 +148,22 @@ def main() -> int:
         if not EXPECTED_TOOLS.issubset(names):
             print("DYNAMO_RUNNER_TOOLS=FAIL")
             return 1
+        execute_tool = next(
+            (
+                tool
+                for tool in tools
+                if isinstance(tool, dict) and tool.get("name") == "execute_saved_routine"
+            ),
+            {},
+        )
+        execute_schema = execute_tool.get("inputSchema", {})
+        if (
+            "authorize_possible_model_writes" not in execute_schema.get("properties", {})
+            or "authorize_possible_model_writes" not in execute_schema.get("required", [])
+        ):
+            print("DYNAMO_RUNNER_AUTHORIZATION_SCHEMA=FAIL")
+            return 1
+        print("DYNAMO_RUNNER_AUTHORIZATION_SCHEMA=PASS")
         print("DYNAMO_RUNNER_MCP_CONTRACT=PASS tools=3")
 
         if not args.live and not args.live_generic:
@@ -191,7 +207,10 @@ def main() -> int:
                 "tools/call",
                 {
                     "name": "execute_saved_routine",
-                    "arguments": {"routine_id": "read_test_model_summary", "confirm_model_write": False},
+                    "arguments": {
+                        "routine_id": "read_test_model_summary",
+                        "authorize_possible_model_writes": True,
+                    },
                 },
             )
             result = run.get("result", {})

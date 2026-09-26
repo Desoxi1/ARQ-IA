@@ -408,9 +408,9 @@ namespace BimAiDynamoBridge
             {
                 return BridgeResponse.Fail("routine_integrity_check_failed");
             }
-            if (writesModel && !request.ConfirmModelWrite) return BridgeResponse.Fail("model_write_confirmation_required");
-            if (!writesModel && request.ConfirmModelWrite) return BridgeResponse.Fail("routine_manifest_invalid");
-            if (writesModel && document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");
+            // PythonNet3 is full trust; manifest metadata cannot prove that a script is read-only.
+            if (!request.ConfirmModelWrite) return BridgeResponse.Fail("generic_execution_confirmation_required");
+            if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");
 
             var beforeViewId = uiDocument.ActiveView.Id.Value;
             var beforeSelection = uiDocument.Selection.GetElementIds().Select(id => id.Value).OrderBy(id => id).ToArray();

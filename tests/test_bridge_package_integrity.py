@@ -57,6 +57,19 @@ class BridgePackageIntegrityTests(unittest.TestCase):
         self.assertIn("revit_execution_timeout_unknown", source)
         self.assertIn("TryCancelBeforeStart", source)
 
+    def test_generic_pythonnet3_execution_requires_confirmation_even_if_manifest_says_readonly(
+        self,
+    ):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        self.assertIn(
+            'if (!request.ConfirmModelWrite) return BridgeResponse.Fail("generic_execution_confirmation_required");',
+            source,
+        )
+        self.assertIn(
+            'if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");',
+            source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
