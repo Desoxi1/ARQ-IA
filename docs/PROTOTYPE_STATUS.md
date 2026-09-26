@@ -31,7 +31,7 @@
 | Ejecución de Dynamo desde el bridge dentro de Revit | PENDIENTE | Requiere resolver la carga del add-in y completar el smoke read-only en el RVT de prueba. No se probó sobre el proyecto productivo. |
 | Escritura PythonNet3 y lectura posterior de Comments | PENDIENTE | Requiere completar primero la prueba genérica read-only en el test RVT. |
 | Herramientas de escritura tipadas rvt-mcp desde Codex | PARCIAL | El inventario y esquemas están revisados; las operaciones no se probaron una por una. |
-| Carga de `.codex/config.toml` desde Codex | PENDIENTE | Debe abrirse y confiarse esta carpeta como proyecto y confirmar que Codex cargó las herramientas. |
+| Carga de `.codex/config.toml` desde Codex | PARCIAL | Se añadió confianza local para esta ruta y `codex mcp list` muestra los tres servidores del proyecto habilitados. La sesión `codex exec` consultada no expuso esos tools; falta comprobarlos en el proyecto abierto desde la app Codex. |
 
 ## Qué puede hacer hoy
 
