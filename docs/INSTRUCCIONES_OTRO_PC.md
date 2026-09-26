@@ -38,6 +38,14 @@ Compara la respuesta con la interfaz. Este perfil también incluye herramientas 
 
 ## Prueba 2: ejecutar rutina genérica de solo lectura
 
+El RVT descartable está excluido del ZIP/repositorio. En el PC de prueba prepara una copia del sample local incluido con Revit:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1
+```
+
+El script copia `Samples\Snowdon Towers Sample HVAC.rvt` a `revit/test-models/BIM-AI-Dynamo-Test.rvt`, verifica SHA-256 y no sobrescribe un destino existente distinto. Si no está instalado ese sample, pasa `-SourceModelPath` con otro RVT local y desechable.
+
 En la carpeta del proyecto ejecuta:
 
 ```powershell
