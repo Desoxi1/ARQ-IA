@@ -11,7 +11,7 @@ El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desd
    powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
    ```
 
-   El script verifica SHA-256 antes de instalar. Instala rvt-mcp solo para Revit 2027 y el usuario actual; no registra un MCP global. Crea `.codex/config.toml` para este proyecto con una lista acotada de consultas y operaciones tipadas. Codex solicita aprobación en cada llamada. El runner expone una sola rutina de lectura fijada por hashes; no acepta código arbitrario ni escrituras Dynamo.
+   El script verifica SHA-256 antes de instalar. Instala rvt-mcp solo para Revit 2027 y el usuario actual; no registra un MCP global. Crea `.codex/config.toml` para este proyecto con una lista acotada de consultas y operaciones tipadas, generador/listado de rutinas y runner. Cada herramienta pide aprobación en Codex.
 
    Si rvt-mcp ya está instalado, puedes actualizar solo el cableado del proyecto sin reinstalar add-ins:
 
@@ -24,7 +24,7 @@ El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desd
    powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\bridge\install.ps1
    ```
 
-   Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. No uses `-Force` salvo que vayas a actualizar conscientemente una instalación previa.
+   Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. Si Revit permanece abierto, usa `-StageWhileRevitOpen`; el puente se cargará solo en la próxima sesión. Usa `-Force` solo para actualizar conscientemente una instalación previa.
 4. Abre `BIM-AI-POC` como proyecto en Codex, confía el proyecto cuando Codex lo solicite y reinicia Codex.
 5. Inicia Revit 2027 con un modelo nuevo/desechable. No uses un proyecto de producción.
 
@@ -36,15 +36,15 @@ Selecciona unos pocos elementos en Revit y pídele a Codex:
 
 Compara la respuesta con la interfaz. Este perfil también incluye herramientas tipadas de creación y edición; por eso, primero valida la lectura y trabaja solo en un modelo nuevo o descartable. Si solicitas una escritura, pide a Codex que describa elemento, ubicación, tipo/valores y resultado esperado. La herramienta aprobada puede aplicar el cambio inmediatamente: el MCP no ofrece una vista previa/rollback general.
 
-## Prueba 2: ejecutar rutina Dynamo de solo lectura
+## Prueba 2: ejecutar rutina genérica de solo lectura
 
 En la carpeta del proyecto ejecuta:
 
 ```powershell
-python tests/run_dynamo_runner_mcp_smoke.py --live
+python tests/run_dynamo_runner_mcp_smoke.py --live-generic
 ```
 
-El resultado esperado incluye `REVIT_BRIDGE_PING=PASS` y `DYNAMO_READONLY_RUN=PASS`. Si el primer paso falla, revisa que el add-in cargó al iniciar Revit y que Codex abrió el proyecto correcto. La rutina informa la vista y selección, verifica que el documento no cambió y elimina el resultado temporal. No modifica el RVT.
+Abre primero `revit/test-models/BIM-AI-Dynamo-Test.rvt`, o una copia descartable local, en Revit 2027; guárdala y espera a que no haya operaciones pendientes. El resultado esperado incluye `REVIT_BRIDGE_PING=PASS` y `DYNAMO_GENERIC_READONLY_RUN=PASS`. La rutina consulta título, vista, selección y cantidad de elementos; verifica que el documento no cambió y elimina el resultado temporal. Si falla, revisa que el add-in cargó en esa sesión y que `bridge.json` apunta a esta carpeta.
 
 ## Prueba 3: Codex prepara una rutina Dynamo
 
@@ -52,15 +52,15 @@ Pídele:
 
 > Crea una rutina Dynamo PythonNet3 de solo lectura llamada `read_active_view_selection` que informe nombre/tipo de vista activa, cantidad de elementos seleccionados, IDs y categorías. Guarda el `.py` y el `.dyn` en `routines/`. No ejecutes el grafo.
 
-El MCP local guarda fuente, grafo y manifiesto en `routines/`. Revisa los tres archivos. Abre el `.dyn` en Dynamo desde Revit 2027; comprueba que el Python node diga PythonNet3 y que el modo sea Manual. Ejecuta solo sobre el modelo desechable.
+El MCP local guarda fuente, grafo y manifiesto en `routines/`. El `.dyn` incluye un wrapper de resultados JSON limitado a 64 KiB; el bridge vuelve a comprobar hashes, engine PythonNet3, grafo Manual y estructura sin conectores/dependencias. Revisa el código antes de ejecutarlo.
 
-El paquete también incluye `routines/set_comments_on_selection.dyn`, un borrador que escribe `PRUEBA_IA` en Comments para los elementos seleccionados. Sus pruebas actuales usan dobles de Revit y no demuestran que Dynamo lo ejecute. No lo ejecutes en un proyecto productivo; aún falta validarlo en una copia desechable y comprobar el cambio con una consulta posterior.
+El paquete incluye `routines/set_comments_on_selection.dyn`, un borrador que escribe `PRUEBA_IA` en Comments para los elementos seleccionados. Está protegido tanto en el bridge como en el propio script: solo acepta un RVT local guardado y no workshared dentro de `revit/test-models/`. Para validarlo, abre el RVT desechable, selecciona un elemento de prueba con Comments editable y pide a Codex que ejecute esa rutina. Codex debe mostrar la rutina y solicitar aprobación de esa llamada. Después comprueba el ID devuelto y vuelve a leer el parámetro con `rvt-mcp`.
 
 ## Alcance y limitación actual
 
 El perfil de Revit incluye herramientas tipadas para niveles, ejes, muros u otros elementos lineales, pisos/superficies, recintos, instancias de familias, parámetros, tipos, textos, cotas y etiquetas. No se han verificado individualmente todas las operaciones del servidor y la lista se mantiene deliberadamente acotada. Las tareas complejas se deben dividir en pasos verificables y aprobar llamada por llamada.
 
-El runner solo ejecuta el ID y los archivos exactos fijados en el prototipo, que son de solo lectura. Rutinas nuevas se revisan y ejecutan manualmente en Dynamo; aún no pueden registrarse para ejecución automática. No pedir a Codex que use `revit_send_code_to_revit` como reemplazo.
+El runner ejecuta rutinas guardadas genéricas, pero solo desde este proyecto y dentro de `revit/test-models/`. Para cada escritura exige `confirm_model_write=true` y aprobación de la llamada MCP. El resultado `affected_ids` debe coincidir exactamente con los IDs reportados por `DocumentChanged`; entonces marca el manifiesto `validated`. La rutina PythonNet3 corre dentro del proceso Revit con los permisos del usuario, por lo que la carpeta de modelo no es un sandbox para acceso a archivos/red. Revisa el código generado. No pidas a Codex que use `revit_send_code_to_revit` como reemplazo.
 
 ## Pruebas reproducibles
 

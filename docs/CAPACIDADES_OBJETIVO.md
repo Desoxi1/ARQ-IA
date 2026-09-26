@@ -31,7 +31,7 @@ Volver a consultar el modelo y comparar con el plan
 Informar resultados y guardar el procedimiento reutilizable
 ```
 
-Para las tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede preparar PythonNet3/Dynamo. El runner compilado solo admite una rutina de lectura; aún no se probó dentro de Revit.
+Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario, pero aún falta probarlo dentro de una sesión Revit nueva con el RVT descartable.
 
 ## Conocimiento técnico reutilizable
 
@@ -49,8 +49,8 @@ Una rutina entra a la biblioteca común después de revisión y prueba en un mod
 
 - La consulta directa Revit 2027 ↔ rvt-mcp pasó en solo lectura: se obtuvo la vista activa y la selección de un muro. Los IDs y nombres del modelo se omitieron de la versión pública.
 - La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. La integración de ese perfil desde Codex aún no se ha validado.
-- El MCP de rutinas genera un `.py`, un `.dyn` de un nodo PythonNet3 y un manifiesto. El runner MCP presenta una sola rutina read-only con hashes fijos, pero el smoke vivo no encontró el add-in en Revit; su ejecución aún no está validada.
-- Hay un borrador de escritura `set_comments_on_selection` que asigna `PRUEBA_IA` a Comments en los elementos seleccionados. La lógica pasa pruebas con dobles de Revit; no se ha ejecutado en un RVT y el runner actual no permite ejecutarla.
+- El MCP de rutinas genera el fuente `.py`, un `.dyn` de un nodo PythonNet3 Manual con wrapper de resultado y un manifiesto con hashes. El runner genérico vuelve a validar ambos y se limita a RVT de `revit/test-models/`.
+- El borrador `set_comments_on_selection` escribe `PRUEBA_IA` en Comments de los elementos seleccionados. El propio script también comprueba que el documento sea un RVT local guardado bajo el directorio desechable. Aún no se ha ejecutado en Revit.
 - La app Codex todavía debe abrir esta carpeta como proyecto confiable y confirmar que cargó los MCP. La consulta viva de Revit aún no se ha hecho desde esa configuración de Codex.
 
 El inventario local es una lectura del esquema de herramientas, no una prueba de cada comando. Antes de aprobar una escritura, Codex debe explicar el objetivo y consultar los datos relevantes del proyecto. Cada herramienta aprobada puede aplicar el cambio inmediatamente; el MCP no proporciona una vista previa o rollback general. Las tareas compuestas se ejecutan en pasos pequeños sobre un modelo descartable y se verifican con consultas posteriores. Borrado, guardado, exportación y ejecución libre requieren controles separados.
@@ -61,7 +61,7 @@ El inventario local es una lectura del esquema de herramientas, no una prueba de
 2. **Creación tipada:** enseñar plan y objetivos; ejecutar solo después de confirmar la llamada concreta en un modelo descartable.
 3. **Edición:** identificar IDs, valores anteriores/nuevos, unidades y alcance de instancia/tipo; confirmar antes de aplicar.
 4. **Borrado, archivos, guardado y exportación:** permiso por acción, previa y efecto claramente visibles.
-5. **Rutina Dynamo:** almacenar código y huellas; revisar y probar en modelo descartable. El runner prototipo acepta solo el ID/hash fijado de una rutina read-only. Antes de habilitar escrituras debe añadirse una lista permitida explícita, aprobación, comprobación de documento/sesión y verificación posterior.
+5. **Rutina Dynamo:** guardar fuente, wrapper, manifiesto y hashes; revisar cada rutina antes de correrla. El bridge limita el modelo y requiere aprobación explícita para escritura. PythonNet3 sigue ejecutándose con permisos del proceso Revit; la validación de ruta no sandboxea archivos ni red.
 6. **Errores:** cancelar o revertir el grupo transaccional cuando sea posible; reportar explícitamente resultados parciales cuando Revit no permita revertirlos.
 
 La configuración de Codex debe exponer herramientas por perfil y mantener `default_tools_approval_mode = "prompt"`. No se habilita el escape `revit_send_code_to_revit` como herramienta cotidiana. Un `dry-run` documentado debe probarse en el binario exacto antes de depender de él; la lista de herramientas por sí sola no demuestra que una acción sea reversible.
@@ -79,11 +79,11 @@ No se instalarán varias implementaciones de puente Revit simultáneamente hasta
 ## Ruta propuesta
 
 1. Abrir esta carpeta como proyecto confiable en Codex y validar las consultas de vista/selección; confirmar qué herramientas del perfil se cargaron.
-2. Instalar el add-in con Revit cerrado y ejecutar la única rutina Dynamo de lectura en una plantilla descartable.
-3. En modelo desechable, probar una única creación tipada y una edición de parámetro: plan, aprobación de la llamada, operación y verificación.
+2. Iniciar Revit con el RVT desechable y probar `read_test_model_summary` mediante el runner genérico; verificar que el documento no cambie.
+3. En modelo desechable, probar una edición acotada de Comments con aprobación y lectura posterior del parámetro. Luego probar una acción tipada y comparar ambas rutas.
 4. Evaluar un lote de operaciones en una transacción y manejo de rollback antes de probar flujos compuestos.
 5. Revisar y seleccionar qué capacidades externas se adoptan tras inspeccionar código, licencia, dependencias, releases y evidencia de pruebas.
-6. Ampliar el runner por IDs y hashes aprobados, empezando con una escritura muy acotada en archivo descartable; mantener la ejecución arbitraria deshabilitada.
+6. Ampliar las evaluaciones de tareas y el manejo de fallos parciales; ejecutar rutinas PythonNet3 solo con revisión de código y dentro del RVT descartable.
 7. Añadir glosario bilingüe, manuales de tareas y evaluaciones con resultados esperados; ampliar arquitectura hacia estructura/MEP según los casos de uso reales.
 
 ## Interfaz recomendada

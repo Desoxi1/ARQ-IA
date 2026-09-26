@@ -26,7 +26,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 105
-EXPECTED_TOOLS = {"ping_revit_dynamo_bridge", "execute_saved_readonly_routine"}
+EXPECTED_TOOLS = {"ping_revit_dynamo_bridge", "execute_saved_readonly_routine", "execute_saved_routine"}
 
 
 def parse_tool_payload(response: dict[str, Any]) -> dict[str, Any]:
@@ -119,6 +119,7 @@ class McpStdioClient:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Run the hash-pinned read-only graph in Revit.")
+    parser.add_argument("--live-generic", action="store_true", help="Run the saved generic read-only routine on the disposable test RVT.")
     args = parser.parse_args()
 
     powershell = shutil.which("powershell.exe")
@@ -147,9 +148,9 @@ def main() -> int:
         if not EXPECTED_TOOLS.issubset(names):
             print("DYNAMO_RUNNER_TOOLS=FAIL")
             return 1
-        print("DYNAMO_RUNNER_MCP_CONTRACT=PASS tools=2")
+        print("DYNAMO_RUNNER_MCP_CONTRACT=PASS tools=3")
 
-        if not args.live:
+        if not args.live and not args.live_generic:
             print("DYNAMO_RUNNER_LIVE=NOT_REQUESTED")
             return 0
 
@@ -162,29 +163,57 @@ def main() -> int:
             return 1
         print("REVIT_BRIDGE_PING=PASS")
 
-        run = client.request(
-            "tools/call",
-            {
-                "name": "execute_saved_readonly_routine",
-                "arguments": {"routine_id": "read_active_view_selection"},
-            },
-        )
-        result = run.get("result", {})
-        if result.get("isError"):
-            status = parse_tool_payload(run).get("status", "unknown")
-            print(f"DYNAMO_READONLY_RUN=FAIL status={status}")
-            return 1
-        payload = parse_tool_payload(run)
-        if not payload:
-            print("DYNAMO_READONLY_RUN=FAIL")
-            return 1
-        ok = (
-            payload.get("ok") is True
-            and payload.get("status") == "executed_and_verified_read_only"
-            and payload.get("modelChangeCheck") == "unchanged"
-        )
-        print(f"DYNAMO_READONLY_RUN={'PASS' if ok else 'FAIL'}")
-        return 0 if ok else 1
+        if args.live:
+            run = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_readonly_routine",
+                    "arguments": {"routine_id": "read_active_view_selection"},
+                },
+            )
+            result = run.get("result", {})
+            if result.get("isError"):
+                status = parse_tool_payload(run).get("status", "unknown")
+                print(f"DYNAMO_READONLY_RUN=FAIL status={status}")
+                return 1
+            payload = parse_tool_payload(run)
+            ok = (
+                payload.get("ok") is True
+                and payload.get("status") == "executed_and_verified_read_only"
+                and payload.get("modelChangeCheck") == "unchanged"
+            )
+            print(f"DYNAMO_READONLY_RUN={'PASS' if ok else 'FAIL'}")
+            if not ok:
+                return 1
+
+        if args.live_generic:
+            run = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine",
+                    "arguments": {"routine_id": "read_test_model_summary", "confirm_model_write": False},
+                },
+            )
+            result = run.get("result", {})
+            if result.get("isError"):
+                status = parse_tool_payload(run).get("status", "unknown")
+                print(f"DYNAMO_GENERIC_READONLY_RUN=FAIL status={status}")
+                return 1
+            payload = parse_tool_payload(run)
+            routine_result = payload.get("routineResult", {})
+            result_value = routine_result.get("routine_result", {}) if isinstance(routine_result, dict) else {}
+            ok = (
+                payload.get("ok") is True
+                and payload.get("status") == "executed_and_verified_read_only"
+                and payload.get("modelChangeCheck") == "unchanged"
+                and result_value.get("status") == "ok"
+                and isinstance(result_value.get("element_count"), int)
+            )
+            print(f"DYNAMO_GENERIC_READONLY_RUN={'PASS' if ok else 'FAIL'}")
+            if not ok:
+                return 1
+
+        return 0
     except (OSError, RuntimeError, TimeoutError, json.JSONDecodeError) as exc:
         print(f"DYNAMO_RUNNER_MCP=FAIL ({type(exc).__name__})")
         return 1

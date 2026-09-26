@@ -4,9 +4,11 @@ PoC local para evaluar ChatGPT/GPT → MCP/bridge → Dynamo + PythonNet3 → Re
 
 ## Estado
 
-El POC ya tiene la configuración MCP local para Codex y un generador que guarda scripts `.py` y grafos `.dyn` de Dynamo con engine PythonNet3. En este PC se instaló rvt-mcp v0.6.2 para Revit 2027 en el perfil del usuario. La descarga oficial pasó la verificación SHA-256 publicada.
+El POC tiene configuración MCP local para Codex y un generador que guarda scripts `.py`, grafos `.dyn` manuales PythonNet3 y manifiestos con hashes. rvt-mcp v0.6.2 está instalado para Revit 2027 en el perfil del usuario. La descarga oficial pasó la verificación SHA-256 publicada.
 
-La conexión directa Revit 2027 ↔ rvt-mcp ya respondió consultas de solo lectura en este PC (vista activa y un muro seleccionado). El perfil preparado para Codex habilita un conjunto acotado de herramientas tipadas para consultar, crear elementos y editar parámetros/tipos; Codex pide aprobación para cada llamada. No se exponen borrado ni ejecución arbitraria C#/Python. El puente propio compila y empaqueta un add-in que ofrece solo una rutina de lectura fijada por hash; el smoke vivo falló porque el add-in aún no está instalado/cargado. No se declara probado el loop de ejecución Dynamo. Este perfil aún debe cargarse y probarse desde Codex con esta carpeta abierta como proyecto confiable. El generador guarda nuevas rutinas `.py` y `.dyn` dentro de `routines/`; **el usuario todavía debe revisarlas y ejecutarlas manualmente en Dynamo**.
+La conexión directa Revit 2027 ↔ rvt-mcp respondió consultas de solo lectura en una prueba histórica; la repetición actual agota 60 s. El perfil de Codex habilita una lista acotada de operaciones tipadas de consulta, creación y edición, con aprobación por llamada; no expone borrado ni ToolBaker. El bridge propio tiene un ejecutor de rutinas guardadas PythonNet3, separado de la rutina read-only fijada por hash. La ejecución genérica exige aprobación de la llamada, comprueba hashes y grafo, se limita a RVT locales dentro de `revit/test-models/` y verifica los IDs reportados frente a `DocumentChanged` de Revit. El add-in está instalado por usuario y se inició otra sesión de Revit con el RVT desechable; el ensamblado del bridge no se cargó y el ping MCP agota el tiempo. La ejecución viva Dynamo → Revit sigue sin demostrarse.
+
+Las pruebas offline ya pasan: 21 pruebas unitarias, integración stdio del generador, transporte MCP/named pipe con bridge falso y compilación del add-in contra RevitAPI/DynamoRevitDS/.NET 10. Estas pruebas no demuestran que `DynamoRevit.ExecuteCommand` ejecute PythonNet3 dentro de Revit. El directorio `revit/test-models/BIM-AI-Dynamo-Test.rvt` contiene una copia local e ignorada por Git de un modelo de muestra incluido con Autodesk Revit 2027.
 
 La preparación del entorno está documentada en [docs/ENV_AUDIT.md](docs/ENV_AUDIT.md), la decisión de arquitectura en [docs/ARCHITECTURE_DECISION.md](docs/ARCHITECTURE_DECISION.md) y la ruta de prueba en [docs/PROTOTYPE_STATUS.md](docs/PROTOTYPE_STATUS.md).
 
@@ -18,7 +20,7 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 - revit/: notas del host Revit y del add-in.
 - dynamo/: plantilla PythonNet3 manual para Dynamo 4.0.2.
 - routines/: destino de rutinas revisadas, versionadas y reutilizables.
-- mcp/: MCP local para crear y enumerar rutinas Dynamo.
+- mcp/: MCP local para crear/listar rutinas y ejecutar las guardadas desde el bridge.
 - revit/bridge/: add-in fuente, DLL precompilado para la prueba y script de instalación local.
 - vendor/: referencia y caché local ignorada del instalador oficial rvt-mcp v0.6.2.
 - logs/: ubicación local para logs minimizados.
@@ -27,14 +29,16 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 ## Límites del experimento
 
 - Usar un modelo de prueba local y descartable cuando empiece la fase siguiente.
-- Empieza con consultas de lectura en un modelo desechable; antes de cualquier cambio, Codex debe explicar el objetivo, los elementos y valores afectados y pedir aprobación para la llamada.
+- Las rutinas genéricas solo se ejecutan en un RVT guardado, idle, local y no workshared dentro de `revit/test-models/`. Cada escritura requiere aprobación de herramienta y `confirm_model_write=true`.
+- PythonNet3 corre dentro del proceso Revit con los permisos del usuario. La comprobación de carpeta limita qué documento puede escribir, pero no crea un sandbox de sistema operativo para el script. Revisa cada `.py` antes de ejecutar y no guardes secretos en los resultados.
+- Para herramientas Revit tipadas, Codex debe describir objetivo, elementos y valores afectados y pedir aprobación para cada llamada concreta.
 - Las herramientas de escritura tipadas en este perfil pueden modificar el documento al aprobarse; no hay garantía general de previsualización o rollback. Haz primero operaciones unitarias en un modelo descartable.
-- Guardar una rutina solo después de revisar su código y resultado en un modelo de prueba.
+- El generador guarda la fuente, el `.dyn` con un wrapper JSON acotado y el manifiesto. Una rutina se promueve a `validated` solo después de una ejecución correcta del runner en el modelo de prueba.
 - No guardar archivos RVT/RFA, credenciales, tokens, rutas de proyectos productivos ni datos personales en este repositorio.
 - Una rutina guardada debe poder volver a ejecutarse sin llamar a GPT; GPT participa al crear o cambiar la rutina.
 
 ## Preparar el equipo
 
-Ejecuta `setup.ps1` desde esta carpeta con Revit cerrado. Si falta el instalador, el script descarga rvt-mcp v0.6.2 desde su release oficial, verifica el SHA-256 y recién entonces lo instala para Revit 2027. Crea una configuración MCP de proyecto en `.codex/config.toml`; no modifica la configuración global de Codex. Si rvt-mcp ya está instalado, `setup.ps1 -ConfigureOnly` actualiza solo esa configuración y puede ejecutarse con Revit abierto. Luego ejecuta `revit/bridge/install.ps1` con Revit cerrado para instalar el add-in puente. Abre esta carpeta como proyecto confiable en Codex y reinicia Codex para cargar los MCP. La prueba viva del runner requiere Revit con un RVT descartable.
+Ejecuta `setup.ps1` para instalar/configurar rvt-mcp. Si solo hace falta actualizar la configuración local del proyecto, usa `setup.ps1 -ConfigureOnly`. `revit/bridge/install.ps1` instala el puente por usuario; si Revit sigue abierto, `-StageWhileRevitOpen` prepara los archivos para una sesión nueva y no afecta las sesiones ya iniciadas. Abre esta carpeta como proyecto confiable en Codex y reinicia Codex para cargar los MCP. La primera prueba viva es solo lectura en el RVT desechable de `revit/test-models/`; confirma que Revit cargó el add-in y que `ping_revit_dynamo_bridge` responde antes de ejecutar una rutina.
 
 Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para replicar el POC en otro PC.

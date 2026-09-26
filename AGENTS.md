@@ -1,28 +1,25 @@
-# Instrucciones del asistente BIM para este POC
+# Guía de trabajo del asistente BIM
 
-## Entender el pedido
+## Interpretación del pedido
 
-- Interpreta español cotidiano y términos técnicos en ambos sentidos con el glosario de `docs/GLOSARIO_BIM_REVIT_ES_EN.md`.
-- Antes de una escritura, consulta en el modelo activo IDs, tipos, niveles, parámetros, anfitriones y unidades pertinentes. Usa los datos del proyecto; no inventes IDs, nombres de tipos ni coordenadas.
-- Pregunta cuando falten datos que cambian geometría, ubicación, selección, tipo, anfitrión, nivel, alcance de instancia/tipo o resultado esperado.
-- Explica el plan en lenguaje simple y deja los nombres técnicos y unidades visibles para que el arquitecto pueda revisarlos.
-- Sigue las etapas de interpretar → leer → resolver alcance → planificar → aprobar → ejecutar → verificar → reutilizar definidas en `docs/ASSISTANT_EXECUTION_LOOP.md`.
-- Para pedidos compuestos, divide la ejecución en pasos pequeños con dependencias explícitas; verifica el modelo después de cada paso que cambie elementos.
-- Si una capacidad no aparece en las herramientas MCP habilitadas, dilo y ofrece generar una rutina Dynamo como borrador. No afirmes que se ejecutó si solo se guardaron archivos.
+- Entiende sinónimos cotidianos y términos BIM/Revit en español usando `docs/GLOSARIO_BIM_REVIT_ES_EN.md` y `docs/CAPACIDADES_OBJETIVO.md`.
+- Si faltan datos que cambian el resultado —nivel, tipo, ubicación, unidades, elementos objetivo, valor de parámetro— consulta primero Revit con las herramientas de lectura y pregunta lo mínimo necesario.
+- Antes de una acción, resume en lenguaje simple qué cambiará, qué elementos toca y cómo se comprobará.
 
-## Cambios en Revit
+## Elegir la forma de operar
 
-- Este POC trabaja en un modelo temporal o descartable hasta que el equipo valide el flujo.
-- Mantén la aprobación MCP en `prompt`. Antes de cada llamada que cree o modifique, explica los elementos objetivo, valores/unidades, resultado esperado y posible efecto. Espera la aprobación que Codex muestre para esa llamada.
-- Empieza con operaciones acotadas a IDs o selección explícita. No amplíes una solicitud a todo el proyecto sin que el usuario lo haya pedido claramente.
-- No borres elementos, no guardes/sobrescribas modelos y no exportes archivos desde herramientas MCP en este perfil.
-- No llames herramientas de evaluación C#, Python arbitrario, `send_code`, ToolBaker o herramientas fuera de la lista habilitada.
-- Tras una escritura aprobada, consulta de nuevo el modelo y reporta IDs creados/afectados y diferencias observadas. Si la verificación falla o difiere del plan, detente y explícalo.
+1. Usa primero las consultas `rvt-mcp` para identificar modelo, vista, selección, niveles, tipos, familias y parámetros existentes.
+2. Para tareas cubiertas por una herramienta Revit tipada, úsala con aprobación por llamada. Haz cambios unitarios y verifica con una consulta posterior.
+3. Para una tarea que requiere lógica propia, guarda una rutina con `create_dynamo_routine`. Usa `PythonNet3`, `RunType=Manual`, resultados JSON y valores de `affected_ids` exactos para escrituras.
+4. Ejecuta una rutina genérica solo con `execute_saved_routine`, en un RVT local, guardado y no workshared dentro de `revit/test-models/`. Para escribir, requiere aprobación de esa llamada y `confirm_model_write=true`.
+5. Después de una ejecución correcta, consulta el modelo otra vez y compara el resultado con el pedido. Conserva la rutina para repetirla sin regenerar código.
 
-## Dynamo y rutinas
+## Límites de ejecución
 
-- `create_dynamo_routine` guarda código `.py`, grafo `.dyn` y manifiesto; no los ejecuta.
-- Muestra la ruta y resume el alcance de la rutina. Pide revisar el código y probar en modelo descartable antes de usarla en un proyecto real.
-- Dynamo usa milímetros en las herramientas que así lo declaran; confirma unidades antes de convertir o calcular.
-- La biblioteca común incorpora una rutina solo después de revisión y prueba documentadas.
-- No marques una rutina como reutilizable/validada hasta ejecutarla en un modelo descartable y verificar el resultado con una lectura posterior.
+- Nunca ejecutes rutinas generadas sobre modelos productivos. El bridge genérico debe rechazarlos.
+- No asumas que la aprobación de guardar una rutina también aprueba ejecutarla; la ejecución requiere otra aprobación.
+- Revisa el `.py` antes de ejecutarlo. PythonNet3 se ejecuta con los permisos del proceso Revit; la protección del documento no sandboxea archivos, red ni el resto del sistema.
+- No habilites `revit_send_code_to_revit`, ToolBaker, borrado ni ejecución libre como atajos.
+- Si el runner devuelve `revit_execution_timeout_unknown`, vuelve a consultar el modelo antes de reintentar: Revit pudo haber terminado la rutina aunque el cliente dejó de esperar.
+- No declares una rutina validada si el runner no confirma cambios de documento y el resultado esperado.
+- Si falla la verificación posterior, informa que pudo haber cambios parciales; no digas que Revit hizo rollback automáticamente.

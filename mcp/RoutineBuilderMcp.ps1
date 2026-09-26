@@ -8,6 +8,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $routinesRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'routines'))
 $templatePath = [IO.Path]::GetFullPath((Join-Path $repoRoot 'dynamo\pythonnet3_template.dyn'))
+$resultWrapperPath = [IO.Path]::GetFullPath((Join-Path $repoRoot 'dynamo\pythonnet3_result_wrapper.py'))
 
 function Write-JsonLine([object]$Value) {
     $json = ConvertTo-Json -InputObject $Value -Depth 80 -Compress
@@ -35,7 +36,7 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'create_dynamo_routine'
-            description = 'Save a reviewed PythonNet3 script and Manual-run Dynamo graph under routines/. The code is saved only; this tool never executes it in Revit or Dynamo. For model-writing scripts, writes_model and confirm_model_write must both be true.'
+            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. Model-writing routines can run only through the approved runner on a disposable local RVT under revit/test-models; writes_model and confirm_model_write must both be true.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -65,6 +66,8 @@ function Get-SavedRoutines {
                 scope = [string]$manifest.scope
                 writes_model = [bool]$manifest.writes_model
                 status = [string]$manifest.status
+                last_validated_utc = [string]$manifest.last_validated_utc
+                last_validation_status = [string]$manifest.last_validation_status
                 python_file = ($baseName + '.py')
                 dynamo_file = ($baseName + '.dyn')
                 created_utc = [string]$manifest.created_utc
@@ -97,6 +100,8 @@ function Save-DynamoRoutine([object]$Payload) {
     $name = [string]$Payload.name
     $description = ([string]$Payload.description).Trim()
     $code = ([string]$Payload.python_code).Replace("`r`n", "`n").Replace("`r", "`n")
+    $wrapper = (Get-Content -LiteralPath $resultWrapperPath -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+    $runtimeCode = $code.TrimEnd() + "`n`n" + $wrapper.TrimStart()
     $scope = [string]$Payload.scope
     $writesModel = [bool]$Payload.writes_model
     $confirmModelWrite = [bool]$Payload.confirm_model_write
@@ -112,6 +117,7 @@ function Save-DynamoRoutine([object]$Payload) {
         if (Test-Path -LiteralPath (Join-Path $routinesRoot ($name + $suffix))) { throw "Ya existe $name$suffix. Elige otro name para no sobrescribir una rutina guardada." }
     }
     if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) { throw 'No existe dynamo/pythonnet3_template.dyn; ejecuta setup.ps1 o restaura la plantilla.' }
+    if (-not (Test-Path -LiteralPath $resultWrapperPath -PathType Leaf)) { throw 'No existe dynamo/pythonnet3_result_wrapper.py; restaura el wrapper de resultados.' }
 
     if ($code -notmatch '(?m)^\s*OUT\s*=') { throw 'El script debe asignar el resultado del nodo Dynamo a OUT.' }
 
@@ -120,7 +126,7 @@ function Save-DynamoRoutine([object]$Payload) {
     $node = $graph.Nodes[0]
     $nodeId = [Guid]::NewGuid().ToString('N')
     $node.Id = $nodeId
-    $node.Code = $code
+    $node.Code = $runtimeCode
     $node.Description = $description
     $node.Engine = 'PythonNet3'
     $node.EngineName = 'PythonNet3'
@@ -153,12 +159,14 @@ function Save-DynamoRoutine([object]$Payload) {
     $manifestPath = Join-Path $routinesRoot ($name + '.manifest.json')
     $tempToken = [Guid]::NewGuid().ToString('N')
     $tempPy = $pyPath + '.' + $tempToken + '.tmp'
+    $tempSource = $pyPath + '.source.' + $tempToken + '.tmp'
     $tempDyn = $dynPath + '.' + $tempToken + '.tmp'
     $tempManifest = $manifestPath + '.' + $tempToken + '.tmp'
     $created = New-Object 'System.Collections.Generic.List[string]'
 
     try {
         Write-Utf8NoBom -Path $tempPy -Content $code
+        Write-Utf8NoBom -Path $tempSource -Content $code
         Write-Utf8NoBom -Path $tempDyn -Content (ConvertTo-Json -InputObject $graph -Depth 80)
         $manifest = [ordered]@{
             schema_version = 1
@@ -166,11 +174,15 @@ function Save-DynamoRoutine([object]$Payload) {
             description = $description
             scope = $scope
             writes_model = $writesModel
+            confirm_model_write = $confirmModelWrite
             status = 'draft_not_validated'
-            execution = 'manual_in_dynamo_only'
+            execution = 'mcp_runner_test_model_only'
             revit_version = '2027'
             dynamo_version = '4.0.2.3852'
             python_engine = 'PythonNet3'
+            result_contract = 'bim-ai-json-v1'
+            runtime_wrapper_sha256 = Get-Sha256Hex $resultWrapperPath
+            source_sha256 = Get-Sha256Hex $tempSource
             created_utc = [DateTime]::UtcNow.ToString('o')
             python_sha256 = Get-Sha256Hex $tempPy
             dynamo_sha256 = Get-Sha256Hex $tempDyn
@@ -186,7 +198,7 @@ function Save-DynamoRoutine([object]$Payload) {
         foreach ($file in $created) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
         throw
     } finally {
-        foreach ($file in @($tempPy, $tempDyn, $tempManifest)) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
+        foreach ($file in @($tempPy, $tempSource, $tempDyn, $tempManifest)) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
     }
 
     return [ordered]@{
@@ -195,7 +207,7 @@ function Save-DynamoRoutine([object]$Payload) {
         files = @("routines/$name.py", "routines/$name.dyn", "routines/$name.manifest.json")
         writes_model = $writesModel
         status = 'draft_not_validated'
-        next_step = 'Review the Python source and open the .dyn in Dynamo. The graph is Manual-run and this MCP did not execute it.'
+        next_step = 'Review the complete Python source including the result wrapper. The graph is Manual-run; execute_saved_routine is restricted to a disposable RVT under revit/test-models and requests approval.'
     }
 }
 

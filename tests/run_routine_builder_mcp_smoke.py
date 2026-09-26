@@ -196,9 +196,17 @@ def main() -> int:
 
         manifest = json.loads(files[2].read_text(encoding="utf-8"))
         graph = json.loads(files[1].read_text(encoding="utf-8"))
+        wrapper_path = ROOT / "dynamo" / "pythonnet3_result_wrapper.py"
+        source = files[0].read_text(encoding="utf-8")
+        wrapper = wrapper_path.read_text(encoding="utf-8")
         integrity_ok = (
             manifest.get("status") == "draft_not_validated"
             and manifest.get("writes_model") is False
+            and manifest.get("confirm_model_write") is False
+            and manifest.get("result_contract") == "bim-ai-json-v1"
+            and manifest.get("runtime_wrapper_sha256")
+            == hashlib.sha256(wrapper_path.read_bytes()).hexdigest()
+            and manifest.get("source_sha256") == hashlib.sha256(files[0].read_bytes()).hexdigest()
             and hashlib.sha256(files[0].read_bytes()).hexdigest()
             == manifest.get("python_sha256")
             and hashlib.sha256(files[1].read_bytes()).hexdigest()
@@ -207,7 +215,7 @@ def main() -> int:
             and len(graph.get("Nodes", [])) == 1
             and graph["Nodes"][0].get("Engine") == "PythonNet3"
             and graph.get("View", {}).get("Dynamo", {}).get("RunType") == "Manual"
-            and graph["Nodes"][0].get("Code") == files[0].read_text(encoding="utf-8")
+            and graph["Nodes"][0].get("Code") == source.rstrip() + "\n\n" + wrapper.lstrip()
         )
         print(f"GENERATED_PACKAGE_INTEGRITY={'PASS' if integrity_ok else 'FAIL'}")
         passed = integrity_ok

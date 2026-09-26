@@ -1,11 +1,12 @@
 #requires -Version 5.1
 [CmdletBinding(SupportsShouldProcess = $true)]
-param([switch]$Force)
+param([switch]$Force, [switch]$StageWhileRevitOpen)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $runningRevit = Get-Process -Name Revit -ErrorAction SilentlyContinue
-if ($runningRevit) { throw 'Cierra Revit después de guardar el trabajo antes de instalar el puente. No se modificó la instalación.' }
+if ($runningRevit -and -not $StageWhileRevitOpen) { throw 'Cierra Revit después de guardar el trabajo antes de instalar el puente. O usa -StageWhileRevitOpen para preparar archivos que solo cargará una sesión nueva.' }
+$requiresRestart = [bool]$runningRevit
 
 $assemblySource = Join-Path $PSScriptRoot 'dist\BimAiDynamoBridge.dll'
 if (Test-Path -LiteralPath $assemblySource -PathType Leaf) {
@@ -28,6 +29,7 @@ $assemblyTarget = Join-Path $installRoot 'BimAiDynamoBridge.dll'
 $manifestTarget = Join-Path $addinsRoot 'BimAiDynamoBridge.addin'
 $settingsRoot = Join-Path $env:APPDATA 'BIM-AI-POC'
 $settingsTarget = Join-Path $settingsRoot 'bridge.json'
+$testModelsRoot = Join-Path $repoRoot 'revit\test-models'
 
 if (-not $Force -and ((Test-Path -LiteralPath $installRoot) -or (Test-Path -LiteralPath $manifestTarget))) {
     throw 'Ya existe un puente instalado. Revisa sus archivos; usa -Force solo para actualizar esta instalación.'
@@ -36,12 +38,12 @@ if (-not $Force -and (Test-Path -LiteralPath $settingsTarget)) {
     throw 'Ya existe bridge.json; se conserva para evitar cambiar una ruta local sin revisión.'
 }
 
-$targets = @($installRoot, $manifestTarget, $settingsRoot, $settingsTarget)
+$targets = @($installRoot, $manifestTarget, $settingsRoot, $settingsTarget, $testModelsRoot)
 foreach ($target in $targets) {
     if (-not $PSCmdlet.ShouldProcess($target, 'Instalar puente local BIM-AI para Revit 2027')) { return }
 }
 
-New-Item -ItemType Directory -Force -Path $installRoot, $settingsRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $installRoot, $settingsRoot, $testModelsRoot | Out-Null
 Copy-Item -LiteralPath $assemblySource -Destination $assemblyTarget -Force:$Force
 $escapedAssembly = [Security.SecurityElement]::Escape($assemblyTarget)
 $manifest = @"
@@ -53,14 +55,19 @@ $manifest = @"
     <AddInId>85279988-3BB1-4200-8DA5-E2FD521EA7A8</AddInId>
     <FullClassName>BimAiDynamoBridge.BridgeApplication</FullClassName>
     <VendorId>BMAI</VendorId>
-    <VendorDescription>BIM-AI-POC local read-only Dynamo runner</VendorDescription>
+    <VendorDescription>BIM-AI-POC local test-model Dynamo runner</VendorDescription>
   </AddIn>
 </RevitAddIns>
 "@
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($manifestTarget, $manifest, $utf8NoBom)
-$settings = [ordered]@{ routinesRoot = (Join-Path $repoRoot 'routines') }
+$settings = [ordered]@{ routinesRoot = (Join-Path $repoRoot 'routines'); testModelsRoot = $testModelsRoot }
 [IO.File]::WriteAllText($settingsTarget, (ConvertTo-Json -InputObject $settings -Depth 4), $utf8NoBom)
 
-Write-Output 'BRIDGE_INSTALL=PASS'
-Write-Output 'Reinicia Revit y acepta la carga del add-in BIM-AI Dynamo Bridge para probarlo.'
+if ($requiresRestart) {
+    Write-Output 'BRIDGE_INSTALL=STAGED_RESTART_REQUIRED'
+    Write-Output 'Los archivos quedaron preparados para una sesión nueva; la instancia Revit abierta no cargó el add-in.'
+} else {
+    Write-Output 'BRIDGE_INSTALL=PASS'
+    Write-Output 'Reinicia Revit y acepta la carga del add-in BIM-AI Dynamo Bridge para probarlo.'
+}

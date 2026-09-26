@@ -19,13 +19,14 @@ Este documento define cómo Codex convierte una solicitud libre en una operació
 |---|---|---|
 | Vista activa, selección y contexto de elementos | `rvt-mcp` con herramientas `query` | Solo lectura; comprobado en la sesión Revit abierta. |
 | Crear o editar operaciones tipadas habilitadas | `rvt-mcp` con aprobación `prompt` | El inventario/esquemas está revisado; cada operación de escritura aún requiere un modelo descartable y verificación real. |
-| Crear y conservar una rutina | MCP `bim_ai_routines` | Guarda `.py`, `.dyn` Manual y manifiesto bajo `routines/`; la nueva rutina requiere revisión/ejecución manual. |
-| Ejecutar un grafo desde MCP | MCP `bim_ai_dynamo_runner` + add-in local | Solo permite la rutina fija `read_active_view_selection`, con hashes esperados. El contrato pasa; la ejecución viva está pendiente porque el add-in aún no está cargado. |
+| Crear y conservar una rutina | MCP `bim_ai_routines` | Guarda fuente `.py`, grafo `.dyn` Manual, wrapper JSON y manifiesto con hashes bajo `routines/`. |
+| Ejecutar una rutina personalizada | MCP `bim_ai_dynamo_runner` + add-in local | `execute_saved_routine` valida el paquete y opera solo en un RVT local bajo `revit/test-models/`; una escritura requiere aprobación y verificación de `affected_ids`. El protocolo fake pasa; falta la ejecución viva. |
 
 ## Límites que no debe ocultar el asistente
 
 - “Cualquier pedido” significa que Codex interpreta solicitudes y compone operaciones disponibles; no implica que toda API o herramienta exista ni que el sistema pueda adivinar decisiones de diseño.
-- Una rutina PythonNet3 es código ejecutable con acceso al proceso Dynamo/Revit. El runner actual solo ejecuta el paquete fijo de lectura; el usuario debe revisar y ejecutar manualmente las rutinas nuevas.
+- Una rutina PythonNet3 es código ejecutable con los permisos del proceso Dynamo/Revit. La protección del documento no es un sandbox de archivos o red; revisa el código antes de aprobarlo.
+- Si el runner devuelve `revit_execution_timeout_unknown`, consulta el modelo antes de reintentar porque Revit pudo haber terminado la rutina.
 - Una rutina guardada no constituye aprendizaje automático. Se vuelve reutilizable por versión y revisión explícita; no se incorpora sola a estándares de oficina.
 - El asistente debe detener la ejecución ante un elemento ambiguo, una referencia no válida, una unidad desconocida o una diferencia entre el resultado y el plan.
 
@@ -39,4 +40,4 @@ Este documento define cómo Codex convierte una solicitud libre en una operació
 | Aprobación | Codex pide aprobación para cada llamada que pueda cambiar el modelo. |
 | Ejecución | La operación ocurre en una copia descartable identificada. |
 | Verificación | Consultas posteriores coinciden con el plan; resultado o error queda informado. |
-| Reutilización | Rutina revisada con hash, versión y prueba documentada; se repite sin GPT. |
+| Reutilización | Rutina revisada con hash, versión y prueba en RVT descartable; se repite sin GPT. |

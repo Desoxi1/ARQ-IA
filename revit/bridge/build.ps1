@@ -45,7 +45,7 @@ if (-not $compiler) { throw 'No se encontró Roslyn csc.exe. Instala Visual Stud
 $referenceNames = @(
     'System.Private.CoreLib.dll', 'System.Runtime.dll', 'System.Console.dll',
     'System.Collections.dll', 'System.Collections.Concurrent.dll', 'System.IO.FileSystem.dll',
-    'System.IO.Pipes.dll', 'System.Security.Cryptography.dll', 'System.Text.Json.dll',
+    'System.IO.Pipes.dll', 'System.Security.Cryptography.dll', 'System.Text.Json.dll', 'System.Text.RegularExpressions.dll',
     'System.Text.Encoding.Extensions.dll', 'System.Threading.dll', 'System.Threading.Tasks.dll',
     'System.Runtime.Extensions.dll', 'System.Linq.dll', 'System.Memory.dll'
 )

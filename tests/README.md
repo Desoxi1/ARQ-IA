@@ -1,44 +1,32 @@
 # Validación
 
-El registro de instalación y de pruebas está en [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md). Primero se validan consultas MCP/Revit en un proyecto local descartable. El perfil curado permite también herramientas tipadas de creación y edición bajo aprobación por llamada; la primera escritura debe ser una operación acotada, aprobada con sus argumentos visibles y verificada después. El runner add-in solo intenta ejecutar la rutina fija de lectura; su ejecución en Revit todavía está pendiente.
+El registro y el estado actual están en [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md). La suite offline comprueba rutinas, hashes, permisos de ejecución, wrapper JSON y transporte MCP/named pipe con un bridge simulado. No carga Revit ni Dynamo.
 
-Ejecuta las pruebas offline desde la raíz del repositorio:
-
-```powershell
-python -m unittest discover -s tests -v
-```
-
-Estas pruebas simulan `RevitServices` y comprueban la rutina de solo lectura, la correspondencia entre `.py`, `.dyn` y manifiesto, y los hashes. No cargan Dynamo ni acceden a un modelo RVT.
-
-Para comprobar la conexión viva MCP → Revit sin modificar el documento activo, abre Revit y ejecuta:
+Ejecuta las pruebas offline desde la raíz:
 
 ```powershell
-python tests/run_revit_mcp_readonly_smoke.py
+python -B -m unittest discover -s tests -v
+python -B tests/run_routine_builder_mcp_smoke.py
+python -B tests/run_dynamo_runner_pipe_smoke.py
+python -B tests/run_dynamo_runner_mcp_smoke.py
 ```
 
-El smoke test solo consulta la vista activa y la selección. No imprime nombres, parámetros ni identificadores del modelo. Requiere el servidor `rvt-mcp` v0.6.2 instalado y una sesión abierta de Revit.
-
-Para probar la generación MCP de una rutina temporal, sin abrir Revit ni ejecutar código Dynamo:
+Para comprobar rvt-mcp en una sesión Revit activa, ejecuta:
 
 ```powershell
-python tests/run_routine_builder_mcp_smoke.py
+python -B tests/run_revit_mcp_readonly_smoke.py
 ```
 
-Este smoke crea un grafo de solo lectura con nombre aleatorio, verifica el manifiesto y los hashes, y elimina los tres archivos que generó.
+Consulta solo vista y selección y no imprime datos del modelo. Si agota el timeout, no repite escrituras: es un smoke solo de lectura.
 
-Con el puente instalado, Revit abierto y un documento guardado/sin cambios pendientes, la prueba viva ejecuta únicamente la rutina de lectura con hashes fijados:
+La primera integración viva después de cargar el add-in debe usar el RVT desechable dentro de `revit/test-models/`:
 
 ```powershell
-python tests/run_dynamo_runner_mcp_smoke.py --live
+python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
 ```
 
-No prueba escrituras ni habilita otras rutinas.
-Si el bridge no está cargado, el smoke informa `bridge_connect_timeout` y termina sin llamar a la rutina.
+`read_test_model_summary` lee título, vista, selección y cantidad de elementos; Revit debe quedar sin cambios. El modo `--live` ejecuta la rutina fija `read_active_view_selection` de solo lectura.
 
-Para probar solo el transporte MCP ↔ named pipe sin abrir Revit:
+Después de aprobar el smoke read-only, selecciona un elemento de prueba y ejecuta `set_comments_on_selection` con aprobación MCP. Relee Comments con rvt-mcp y confirma que `affected_ids` coincide con los IDs reportados por Revit. No uses el bridge genérico sobre un proyecto productivo.
 
-```powershell
-python tests/run_dynamo_runner_pipe_smoke.py
-```
-
-Este test crea un pipe de nombre aleatorio y un fake bridge temporal. Comprueba mensajes, el timeout cuando no hay servidor y el rechazo/éxito del cliente, no la ejecución de Dynamo en Revit.
+El smoke MCP del runner sin flags valida solo el contrato. El smoke `run_dynamo_runner_pipe_smoke.py` usa un pipe aleatorio y un fake bridge; no es evidencia de ejecución Revit/Dynamo.

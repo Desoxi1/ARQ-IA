@@ -1,62 +1,48 @@
 # Estado del prototipo
 
-## Preparado en este PC
+**Actualizado:** 26 de septiembre de 2026
+**Objetivo:** Codex → MCP → rutina guardada → bridge Revit → Dynamo/PythonNet3 → verificación y reutilización.
 
-- Paquete oficial `rvt-mcp` v0.6.2 descargado y verificado con SHA-256.
-- .NET Runtime 10.0.0 está instalado y es la versión usada por Revit 2027. El SDK .NET no está instalado; Visual Studio Build Tools aporta Roslyn `csc`, con el que el add-in propio ya compila. Aún no se ha instalado ni cargado en Revit.
-- Add-in RvtMcp instalado en `%APPDATA%\Autodesk\Revit\Addins\2027`; servidor self-contained instalado en `%LOCALAPPDATA%\RvtMcp\rvt\server\0.6.2`.
-- `setup.ps1` instala para Revit 2027 solamente y genera configuración local del proyecto, sin escribir en la configuración global de Codex.
-- Configuración de proyecto preparada con herramientas Revit tipadas de lectura, creación y edición bajo aprobación por llamada, más crear/listar rutinas locales. La configuración de este paquete debe cargarse y validarse en Codex.
-- MCP propio de rutinas implementado en Windows PowerShell: escribe fuente PythonNet3, un `.dyn` manual y un manifiesto con alcance, versión y hashes.
-- Rutina de escritura base `set_comments_on_selection` preparada como `draft_not_validated`: asigna `PRUEBA_IA` al parámetro integrado Comments de los elementos seleccionados. Las pruebas offline cubren solo dobles de Revit; aún no se ha ejecutado en Revit ni se habilitó el runner para ejecutarla.
-- Puente add-in/MCP implementado y compilado: named pipe local por usuario, despacho en Revit mediante `ExternalEvent` y solo dos operaciones. Permite consultar estado y ejecutar una única rutina de solo lectura, fijada por hashes. Aún no se ha instalado en Revit ni probado su ejecución en Dynamo.
-- Plantilla Dynamo: un nodo PythonNet3, sin conectores, sin dependencias de paquetes y `RunType=Manual`.
-- Intercambio MCP stdio rvt-mcp probado: inicializa v0.6.2 y lista 51 herramientas para los grupos `query,create,modify,view,annotation`. El perfil Codex permite solo una lista curada; no incluye borrado, ejecución arbitraria, ToolBaker ni autoejecución Dynamo.
-- Smoke MCP de solo lectura repetible añadido en `tests/run_revit_mcp_readonly_smoke.py`.
-- Smoke MCP repetible del generador de rutinas añadido en `tests/run_routine_builder_mcp_smoke.py`.
+## Estado actual
 
-## Límite funcional actual
+- Revit 2027 build 27.0.20.10 y Dynamo 4.0.2.3852 están instalados. rvt-mcp v0.6.2 ya respondió consultas de solo lectura en este PC.
+- El proyecto Codex contiene tres MCP: rvt-mcp con una lista curada de herramientas tipadas, generador/listado de rutinas y runner Dynamo. Las llamadas tienen aprobación por herramienta.
+- El generador guarda fuente `.py`, un `.dyn` manual con un único nodo PythonNet3, wrapper de resultado JSON y un manifiesto con hashes.
+- El runner comprueba los hashes y el formato del grafo tanto en PowerShell como en el add-in. Las rutinas genéricas solo corren con un RVT local guardado dentro de `revit/test-models/`; las escrituras requieren `confirm_model_write=true` y el wrapper debe devolver `affected_ids` que coincidan con los elementos reportados por Revit `DocumentChanged`.
+- El add-in compila contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. Está instalado en el perfil de usuario. La sesión de Revit con el proyecto productivo sigue abierta e intacta. Se inició otra sesión con el RVT de prueba, pero el DLL del bridge no está cargado; no hay prueba viva.
+- Hay una copia local, ignorada por Git, de `Snowdon Towers Sample HVAC.rvt` en `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Se puede descartar; proviene de los Samples instalados con Revit 2027.
+- Rutinas incluidas: `read_active_view_selection` (solo lectura y hash fijado), `read_test_model_summary` (solo lectura genérica) y `set_comments_on_selection` (borrador de escritura con protección interna de ruta).
 
-Codex puede consultar Revit por `rvt-mcp`, crear rutinas y solicitar al runner una ejecución de solo lectura de `read_active_view_selection`. El runner está compilado, pero el smoke vivo repetido el 25-09-2026 terminó en `REVIT_BRIDGE_PING=FAIL`: el add-in no está instalado/cargado en la sesión actual. No hay evidencia todavía de que el runner haya abierto Dynamo o ejecutado el `.dyn`.
+## Evidencia de pruebas
 
-El producto no puede recibir y ejecutar con seguridad “cualquier pedido” todavía. Las escrituras tipadas de `rvt-mcp` están disponibles bajo aprobación, pero falta probarlas en un RVT descartable. El runner no acepta código nuevo, no ejecuta rutinas de escritura y solo admite la rutina fija de lectura. La rutina sigue siendo PythonNet3 con `RunType=Manual`; el runner intenta abrirla mediante la API de Dynamo dentro de Revit.
+| Prueba | Resultado | Alcance |
+|---|---|---|
+| `python -B -m unittest discover -s tests -v` | PASS, 21 pruebas | Fakes de Revit, límites del wrapper JSON, integridad de paquetes `.py/.dyn/manifest`, hashes, timeout de cola y rechazo de modelos fuera de `test-models`. No ejecuta Revit. |
+| `python -B tests/run_routine_builder_mcp_smoke.py` | PASS | MCP stdio, confirmación al guardar una escritura, rutina temporal, estructura PythonNet3/Manual, hashes y limpieza. |
+| `python -B tests/run_dynamo_runner_pipe_smoke.py` | PASS | MCP y named pipe contra bridge falso; deniega escritura sin confirmación y promueve rutina tras respuesta simulada. No ejecuta Revit ni Dynamo. |
+| `python -B tests/run_dynamo_runner_mcp_smoke.py` | PASS | Contrato stdio y descubrimiento de los tres tools del runner. No conecta con Revit si no se usa un modo live. |
+| `python -B tests/run_revit_mcp_readonly_smoke.py` | FAIL, timeout actual | `initialize` y `tools/list` pasan; las consultas de vista/selección no respondieron dentro del timeout de 60 s. El proceso Revit sigue abierto y no se llamó ninguna escritura. El smoke histórico del 24-09-2026 sí había respondido. |
+| `revit/bridge/build.ps1` | PASS | DLL de 30.720 bytes compilado contra las APIs locales. SHA-256 coincide con el archivo empaquetado y el instalado. |
+| `revit/bridge/install.ps1 -Force -StageWhileRevitOpen` | PASS, staged | Escribió el manifest y `bridge.json` por usuario. No cambió la sesión productiva. |
+| Copia del RVT de muestra | PASS | Tamaño y SHA-256 de la copia coinciden con el sample Autodesk instalado; el RVT está excluido de Git. |
+| Carga del add-in en sesión de prueba | PENDIENTE | Se inició una sesión con el RVT de prueba, pero el proceso no cargó `BimAiDynamoBridge.dll`; el ping devuelve `bridge_connect_timeout`. La instancia productiva sigue abierta e intacta. |
+| Ejecución de Dynamo desde el bridge dentro de Revit | PENDIENTE | Requiere resolver la carga del add-in y completar el smoke read-only en el RVT de prueba. No se probó sobre el proyecto productivo. |
+| Escritura PythonNet3 y lectura posterior de Comments | PENDIENTE | Requiere completar primero la prueba genérica read-only en el test RVT. |
+| Herramientas de escritura tipadas rvt-mcp desde Codex | PARCIAL | El inventario y esquemas están revisados; las operaciones no se probaron una por una. |
+| Carga de `.codex/config.toml` desde Codex | PENDIENTE | Debe abrirse y confiarse esta carpeta como proyecto y confirmar que Codex cargó las herramientas. |
 
-La conexión Codex se escribe como configuración de proyecto en `.codex/config.toml`, que Codex carga solo si se abre y confía este directorio. La configuración curada ofrece consultas y algunas acciones tipadas de creación/edición con aprobación por llamada. La integración MCP→herramientas desde Codex sigue pendiente de una prueba dentro de la app.
+## Qué puede hacer hoy
 
-## Evidencia de validación
+El paquete ya puede preparar rutinas a partir de código PythonNet3, guardarlas con su grafo Dynamo y manifiesto, y exponerlas para ejecución mediante MCP con aprobación. Para otras acciones, rvt-mcp aporta herramientas Revit tipadas de lectura, creación y edición dentro de una lista curada. El próximo gate comprueba que Dynamo 4.0.2 realmente inicia y retorna resultados desde Revit 2027.
 
-| Comprobación | Resultado |
-|---|---|
-| Hash publicado de rvt-mcp v0.6.2 | Coincide: `0d6239afcab47c729c30b8c5b763214c20c38c4b72de7e30c5a7191b4131b1ae`. |
-| `install.ps1 -WhatIf -Years 2027 -Client none` | Solo previsualizó R27 + servidor en carpetas de usuario; no tocó Revit ni Codex. |
-| Instalación real | Add-in y ejecutable presentes en perfil de usuario. Revit no estaba en ejecución durante la instalación. |
-| .NET Runtime/SDK y compilación | Runtime 10 presente; SDK ausente. Roslyn de VS Build Tools compiló el add-in (`BimAiDynamoBridge.dll`, 20.992 bytes). Esto confirma compilación, no carga ni ejecución en Revit. |
-| MCP de rutinas | Aprobado: initialize, tools/list, create y list; generó `.py`, `.dyn` y manifiesto; el grafo valida como un nodo PythonNet3 Manual. Python 3.14 compiló el script de muestra. |
-| Rutinas y paquete: pruebas offline | Aprobado: 12 pruebas cubren vista/selección, lógica simulada de Comments, estructura/hash `.py/.dyn/manifest`, hash del DLL distribuido y coherencia de los hashes fijados en C#. Usa dobles de Revit; no demuestra ejecución real en Dynamo. |
-| Protección al guardar escritura | Aprobada: `writes_model=true` sin `confirm_model_write=true` devuelve error y no crea archivos. |
-| Revit 2027 con sesión/modelo de prueba | Consulta directa de solo lectura aprobada el 24-09-2026: vista activa y un muro seleccionado respondieron correctamente. No se modificó el documento. Se omitieron IDs/nombres del modelo de esta copia pública. Falta comprobar el MCP desde Codex con el proyecto confiable abierto. |
-| Rutina de escritura PythonNet3 `set_comments_on_selection` | Preparada, sin ejecución: asigna `PRUEBA_IA` solo a los elementos de la selección activa. El `.py`, `.dyn` Manual y manifiesto están versionados como borrador; pruebas con dobles de Revit pasan, pero no se probó en modelo ni en Dynamo. |
-| Esquemas MCP para perfil inicial | Revisados nombres y esquemas de consultas y operaciones tipadas de nivel, eje, línea (incluye muro), superficie (incluye piso), recinto, instancia, parámetro, tipo, texto, cotas y etiquetas. No equivale a una prueba de ejecución en el modelo. |
-| MCP/Revit solo lectura, repetido en esta fase | Aprobado: initialize, descubrimiento de 16 herramientas `query`, vista activa y selección respondieron desde el MCP local. El smoke test solo imprime PASS/FAIL; no guarda contenido del modelo. |
-| MCP generador de rutinas, integración viva | Aprobado: initialize/tools/list/create; el test temporal generó `.py`, `.dyn` y manifiesto, validó PythonNet3/Manual y hashes, y limpió los tres archivos. No ejecutó el grafo. |
-| Build del bridge propio | Aprobado: `revit/bridge/build.ps1` compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. No se instaló en Addins. |
-| Hash estable de grafos para Git | Aprobado: el generador normaliza scripts y grafos a UTF-8/LF; los grafos versionados, sus manifiestos y el hash fijado por C# coinciden tras normalizar finales de línea. El DLL fue recompilado y su archivo SHA-256 actualizado. |
-| Contrato MCP del runner Dynamo | Aprobado: initialize/tools/list; anuncia solo ping y ejecución del identificador fijo de lectura. |
-| Transporte MCP↔named pipe simulado | Aprobado: ping y respuesta de la rutina permitida cruzaron el cliente PowerShell y un fake bridge con nombre aleatorio; también verificó que un pipe ausente termina en `bridge_connect_timeout`. No carga Revit ni Dynamo y no sustituye el smoke vivo. |
-| Runner vivo, repetido tras el test de transporte | Pendiente por instalación: el contrato MCP pasó y respondió `bridge_connect_timeout`; no existe el manifest/DLL del puente en Addins y Revit sigue abierto. La prueba solo hizo ping, no intentó ejecutar Dynamo. |
-| Arranque desde `.codex/config.toml` local | Aprobado: los tres procesos (`rvt_mcp`, generador y runner) iniciaron desde sus comandos configurados y respondieron initialize/tools/list; 51/2/2 herramientas. No se invocaron operaciones ni se probó la carga desde la app Codex. |
-| Runner MCP → Revit, smoke vivo | Fallido/pendiente: el contrato MCP respondió, pero `REVIT_BRIDGE_PING=FAIL`; el puente no está cargado en la sesión. No se ejecutó Dynamo ni se cambió el modelo. |
-| DynamoCLI 4.0.2 con grafo PythonNet3 sintético | Fallido: el proceso inició el perfil aislado, pero lanzó una aserción ProtoCore antes de crear el XML de evaluaciones. No se considera evidencia de ejecución. |
-| Cargar y correr `.dyn` PythonNet3 en Dynamo dentro de Revit | Pendiente de prueba visual. |
-| Instalar y cargar el add-in puente | Pendiente; el instalador exige cerrar Revit y el usuario tiene una sesión abierta. |
-| Ejecutar `.dyn` PythonNet3 desde el runner | Pendiente; aún no se ha cargado el add-in ni iniciado Dynamo desde Revit. |
-| Descargar SDK .NET oficial para compilar runner | Pendiente: la conexión TLS de PowerShell/curl falló con `SEC_E_NO_CREDENTIALS`; no se usaron espejos alternativos. |
+Todavía **no** hay evidencia de que el loop genérico funcione en vivo ni de que cubra cualquier solicitud BIM. El código PythonNet3 se ejecuta dentro del proceso Revit con permisos del usuario: la restricción a `test-models` protege el documento objetivo, pero no sandboxea el acceso del script a archivos o red. El usuario debe revisar código y aprobar cada ejecución de escritura.
 
-## Prueba integrada que falta
+## Siguiente prueba segura
 
-1. Guardar el trabajo y cerrar Revit. Ejecutar `revit/bridge/install.ps1` desde esta carpeta; el instalador compila y copia el add-in al perfil actual.
-2. Iniciar Revit 2027 con un RVT local nuevo/descartable; aceptar el aviso de confianza si Revit lo muestra.
-3. Ejecutar `python tests/run_dynamo_runner_mcp_smoke.py --live`. Primero debe aprobar el ping; después debe abrir la única rutina fijada por hash y devolver `executed_and_verified_read_only`.
-4. Si la prueba pasa, confirmar visualmente que Revit sigue estable y que el documento conserva su estado. Revisar el resultado y el log mínimo.
-5. Validar Codex con la configuración local; probar después una escritura tipada pequeña y aprobada en el RVT descartable, con consulta posterior de verificación.
-6. Solo tras estos gates ampliar el runner a rutinas adicionales; nunca aceptar código arbitrario o transformar la aprobación de una llamada en permiso general.
+1. Conservar intacta la sesión productiva que está abierta.
+2. En la sesión de prueba ya iniciada, resolver por qué Revit no cargó `BimAiDynamoBridge.dll`; si aparece el aviso de confianza para este add-in local, aceptar la carga para esa sesión. No cambiar configuraciones globales de seguridad.
+3. Comprobar `ping_revit_dynamo_bridge` y ejecutar `python tests/run_dynamo_runner_mcp_smoke.py --live-generic`. Esta rutina solo lee título/vista/selección/cantidad de elementos y comprueba que el documento queda sin cambios.
+4. Si la lectura genérica pasa, seleccionar en ese RVT un elemento descartable con Comments editable y ejecutar `set_comments_on_selection` con aprobación. Confirmar que el resultado y `DocumentChanged` enumeran el mismo ID, luego releer Comments mediante rvt-mcp.
+5. Si el add-in falla, conservar salida de Revit y status del runner, corregir el bridge y repetir solo en el RVT de prueba.
+
+La UI de Codex en la app sigue siendo la ventana de conversación. No hay un panel acoplable dentro de Revit todavía; se evalúa después de probar el flujo técnico y observar el uso real.

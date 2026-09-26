@@ -44,6 +44,19 @@ class BridgePackageIntegrityTests(unittest.TestCase):
     def test_pinned_graph_has_canonical_lf_line_endings(self):
         self.assertNotIn(b"\r\n", READ_ONLY_GRAPH.read_bytes())
 
+    def test_generated_result_wrapper_hash_matches_bridge_pin(self):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        wrapper = ROOT / "dynamo" / "pythonnet3_result_wrapper.py"
+        expected = re.search(r'ExpectedResultWrapperHash = "([0-9a-f]{64})"', source)
+        self.assertIsNotNone(expected)
+        self.assertEqual(expected.group(1), hashlib.sha256(wrapper.read_bytes()).hexdigest())
+
+    def test_bridge_distinguishes_expired_queue_from_unknown_in_progress_timeout(self):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("revit_dispatch_timeout_before_execution", source)
+        self.assertIn("revit_execution_timeout_unknown", source)
+        self.assertIn("TryCancelBeforeStart", source)
+
 
 if __name__ == "__main__":
     unittest.main()

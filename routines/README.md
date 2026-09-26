@@ -5,6 +5,9 @@ El MCP crea tres archivos por rutina: `<nombre>.py`, `<nombre>.dyn` y `<nombre>.
 El código queda guardado, no ejecutado. Revisa el Python, el manifiesto y los nodos del grafo. Ejecuta solo desde Dynamo sobre un modelo de prueba.
 
 - `read_active_view_selection`: consulta la vista y selección activas. Tiene pruebas offline con dobles de Revit; falta ejecutar el `.dyn` dentro de Dynamo.
+- `read_test_model_summary`: rutina genérica de solo lectura para validar título, vista activa, selección y cantidad de elementos en el RVT de laboratorio.
 - `set_comments_on_selection`: borrador de escritura que asigna `PRUEBA_IA` al parámetro integrado Comments de los elementos seleccionados. Omite parámetros ausentes o de solo lectura y devuelve IDs actualizados, sin cambios y omitidos. Las pruebas usan dobles de Revit; **no se ha ejecutado en un modelo**. Solo probar en una copia desechable.
 
-Las pruebas automáticas offline validan la lógica simulada, la estructura de los grafos y sus hashes; no sustituyen la ejecución real dentro de Revit/Dynamo. El runner MCP solo admite actualmente `read_active_view_selection`; la ejecución por identificador de rutinas nuevas sigue pendiente.
+El Builder MCP puede guardar código PythonNet3 nuevo como `.py`, `.dyn` Manual y manifiesto con hashes. `execute_saved_routine` valida el paquete y lo manda al bridge; el bridge solo lo ejecuta con un RVT guardado bajo `revit/test-models/`. Las escrituras requieren confirmación del tool y `confirm_model_write=true`; el bridge verifica los cambios mediante `DocumentChanged`. El prototipo aún no ha completado esa ejecución dentro de Revit/Dynamo en vivo.
+
+Las pruebas automáticas offline validan la lógica simulada, la estructura de los grafos y sus hashes; no sustituyen la ejecución real dentro de Revit/Dynamo. Revisa el Python antes de ejecutarlo: PythonNet3 corre con todos los permisos del proceso Revit y el límite de ruta protege el documento activo, no los archivos ni la red.

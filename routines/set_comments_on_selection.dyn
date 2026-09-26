@@ -1,161 +1,139 @@
 {
-    "Uuid":  "30bf826f-e3e1-436f-9509-5c935f2114dc",
-    "IsCustomNode":  false,
-    "Description":  "Set built-in instance Comments to PRUEBA_IA for the current selection. Test only on a disposable RVT.",
-    "Name":  "set_comments_on_selection",
-    "ElementResolver":  {
-                            "ResolutionMap":  {
-                                                  "Point":  {
-                                                                "Key":  "Autodesk.DesignScript.Geometry.Point",
-                                                                "Value":  "ProtoGeometry.dll"
-                                                            },
-                                                  "Rectangle":  {
-                                                                    "Key":  "Autodesk.DesignScript.Geometry.Rectangle",
-                                                                    "Value":  "ProtoGeometry.dll"
-                                                                },
-                                                  "Surface":  {
-                                                                  "Key":  "Autodesk.DesignScript.Geometry.Surface",
-                                                                  "Value":  "ProtoGeometry.dll"
-                                                              },
-                                                  "Sphere":  {
-                                                                 "Key":  "Autodesk.DesignScript.Geometry.Sphere",
-                                                                 "Value":  "ProtoGeometry.dll"
-                                                             },
-                                                  "Cylinder":  {
-                                                                   "Key":  "Autodesk.DesignScript.Geometry.Cylinder",
-                                                                   "Value":  "ProtoGeometry.dll"
-                                                               },
-                                                  "Line":  {
-                                                               "Key":  "Autodesk.DesignScript.Geometry.Line",
-                                                               "Value":  "ProtoGeometry.dll"
-                                                           },
-                                                  "Vector":  {
-                                                                 "Key":  "Autodesk.DesignScript.Geometry.Vector",
-                                                                 "Value":  "ProtoGeometry.dll"
-                                                             },
-                                                  "PolyCurve":  {
-                                                                    "Key":  "Autodesk.DesignScript.Geometry.PolyCurve",
-                                                                    "Value":  "ProtoGeometry.dll"
-                                                                },
-                                                  "PolySurface":  {
-                                                                      "Key":  "Autodesk.DesignScript.Geometry.PolySurface",
-                                                                      "Value":  "ProtoGeometry.dll"
-                                                                  }
-                                              }
-                        },
-    "Inputs":  [
-
-               ],
-    "Outputs":  [
-
-                ],
-    "Nodes":  [
-                  {
-                      "ConcreteType":  "PythonNodeModels.PythonNode, PythonNodeModels",
-                      "Code":  "import clr\nclr.AddReference(\"RevitServices\")\nclr.AddReference(\"RevitAPI\")\nfrom RevitServices.Persistence import DocumentManager\nfrom RevitServices.Transactions import TransactionManager\nfrom Autodesk.Revit.DB import BuiltInParameter, StorageType\n\nTARGET_VALUE = \"PRUEBA_IA\"\nuiapp = DocumentManager.Instance.CurrentUIApplication\nuidoc = uiapp.ActiveUIDocument if uiapp is not None else None\n\nif uidoc is None or uidoc.Document is None:\n    OUT = {\"status\": \"no_active_document\", \"updated_ids\": [], \"unchanged_ids\": [], \"skipped\": []}\nelse:\n    doc = uidoc.Document\n    if doc.IsReadOnly:\n        OUT = {\"status\": \"document_read_only\", \"updated_ids\": [], \"unchanged_ids\": [], \"skipped\": []}\n    else:\n        selected_ids = list(uidoc.Selection.GetElementIds())\n        updated_ids = []\n        unchanged_ids = []\n        skipped = []\n        writable = []\n\n        for element_id in selected_ids:\n            element = doc.GetElement(element_id)\n            element_id_text = str(element_id.Value)\n            if element is None:\n                skipped.append({\"id\": element_id_text, \"reason\": \"element_missing\"})\n                continue\n            parameter = element.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)\n            if parameter is None:\n                skipped.append({\"id\": element_id_text, \"reason\": \"comments_unavailable\"})\n                continue\n            if parameter.IsReadOnly or parameter.StorageType != StorageType.String:\n                skipped.append({\"id\": element_id_text, \"reason\": \"comments_not_writable_string\"})\n                continue\n            previous_value = parameter.AsString()\n            if previous_value == TARGET_VALUE:\n                unchanged_ids.append(element_id_text)\n            else:\n                writable.append((element_id_text, parameter))\n\n        if writable:\n            TransactionManager.Instance.EnsureInTransaction(doc)\n            try:\n                for element_id_text, parameter in writable:\n                    try:\n                        if parameter.Set(TARGET_VALUE):\n                            updated_ids.append(element_id_text)\n                        else:\n                            skipped.append({\"id\": element_id_text, \"reason\": \"revit_rejected_value\"})\n                    except Exception:\n                        skipped.append({\"id\": element_id_text, \"reason\": \"parameter_set_failed\"})\n            finally:\n                TransactionManager.Instance.TransactionTaskDone()\n\n        OUT = {\n            \"status\": \"ok\",\n            \"requested_value\": TARGET_VALUE,\n            \"selected_count\": len(selected_ids),\n            \"updated_ids\": updated_ids,\n            \"unchanged_ids\": unchanged_ids,\n            \"skipped\": skipped,\n        }",
-                      "Engine":  "PythonNet3",
-                      "EngineName":  "PythonNet3",
-                      "VariableInputPorts":  false,
-                      "Id":  "20f622fd8f214e5f958c1ba836d728a1",
-                      "NodeType":  "PythonScriptNode",
-                      "Inputs":  [
-
-                                 ],
-                      "Outputs":  [
-                                      {
-                                          "Id":  "2d4f062f8f3f4b94b823eb5f6ae72f82",
-                                          "Name":  "OUT",
-                                          "Description":  "Result of the python script",
-                                          "UsingDefaultValue":  false,
-                                          "Level":  2,
-                                          "UseLevels":  false,
-                                          "KeepListStructure":  false
-                                      }
-                                  ],
-                      "Replication":  "Disabled",
-                      "Description":  "Set built-in instance Comments to PRUEBA_IA for the current selection. Test only on a disposable RVT."
-                  }
-              ],
-    "Connectors":  [
-
-                   ],
-    "Dependencies":  [
-
-                     ],
-    "NodeLibraryDependencies":  [
-
-                                ],
-    "Thumbnail":  "",
-    "GraphDocumentationURL":  null,
-    "ExtensionWorkspaceData":  [
-                                   {
-                                       "ExtensionGuid":  "28992e1d-abb9-417f-8b1b-05e053bee670",
-                                       "Name":  "Properties",
-                                       "Version":  "2.17",
-                                       "Data":  {
-
-                                                }
-                                   },
-                                   {
-                                       "ExtensionGuid":  "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
-                                       "Name":  "Generative Design",
-                                       "Version":  "4.0",
-                                       "Data":  {
-
-                                                }
-                                   }
-                               ],
-    "Author":  "None provided",
-    "Linting":  {
-                    "activeLinter":  "None",
-                    "activeLinterId":  "7b75fb44-43fd-4631-a878-29f4d5d8399a",
-                    "warningCount":  0,
-                    "errorCount":  0
-                },
-    "Bindings":  [
-
-                 ],
-    "View":  {
-                 "Dynamo":  {
-                                "ScaleFactor":  1.0,
-                                "HasRunWithoutCrash":  false,
-                                "IsVisibleInDynamoLibrary":  true,
-                                "Version":  "4.0.2.3852",
-                                "RunType":  "Manual",
-                                "RunPeriod":  "1000"
-                            },
-                 "Camera":  {
-                                "Name":  "_Background Preview",
-                                "EyeX":  -5.3452959060668945,
-                                "EyeY":  22.243146896362305,
-                                "EyeZ":  4.974541664123535,
-                                "LookX":  -0.17156505584716797,
-                                "LookY":  -17.0781307220459,
-                                "LookZ":  -12.28675365447998,
-                                "UpX":  -0.004545882344245911,
-                                "UpY":  0.9455187916755676,
-                                "UpZ":  -0.32553616166114807
-                            },
-                 "ConnectorPins":  [
-
-                                   ],
-                 "NodeViews":  [
-                                   {
-                                       "Id":  "20f622fd8f214e5f958c1ba836d728a1",
-                                       "Name":  "Python Script",
-                                       "IsSetAsInput":  false,
-                                       "IsSetAsOutput":  false,
-                                       "Excluded":  false,
-                                       "ShowGeometry":  false,
-                                       "X":  300,
-                                       "Y":  250
-                                   }
-                               ],
-                 "Annotations":  [
-
-                                 ],
-                 "X":  -1897.82278109683,
-                 "Y":  -2864.4645680747544,
-                 "Zoom":  0.9697726550953407
-             }
+  "Uuid": "30bf826f-e3e1-436f-9509-5c935f2114dc",
+  "IsCustomNode": false,
+  "Description": "Set built-in instance Comments to PRUEBA_IA for the current selection. Test only on a disposable RVT.",
+  "Name": "set_comments_on_selection",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Point": {
+        "Key": "Autodesk.DesignScript.Geometry.Point",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Rectangle": {
+        "Key": "Autodesk.DesignScript.Geometry.Rectangle",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Surface": {
+        "Key": "Autodesk.DesignScript.Geometry.Surface",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Sphere": {
+        "Key": "Autodesk.DesignScript.Geometry.Sphere",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Cylinder": {
+        "Key": "Autodesk.DesignScript.Geometry.Cylinder",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Line": {
+        "Key": "Autodesk.DesignScript.Geometry.Line",
+        "Value": "ProtoGeometry.dll"
+      },
+      "Vector": {
+        "Key": "Autodesk.DesignScript.Geometry.Vector",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolyCurve": {
+        "Key": "Autodesk.DesignScript.Geometry.PolyCurve",
+        "Value": "ProtoGeometry.dll"
+      },
+      "PolySurface": {
+        "Key": "Autodesk.DesignScript.Geometry.PolySurface",
+        "Value": "ProtoGeometry.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import clr\nimport json\nimport os\nclr.AddReference(\"RevitServices\")\nclr.AddReference(\"RevitAPI\")\nfrom RevitServices.Persistence import DocumentManager\nfrom RevitServices.Transactions import TransactionManager\nfrom Autodesk.Revit.DB import BuiltInParameter, StorageType\n\nTARGET_VALUE = \"PRUEBA_IA\"\n\n\ndef is_disposable_test_document(doc):\n    try:\n        app_data = os.environ.get(\"APPDATA\", \"\")\n        settings_path = os.path.join(app_data, \"BIM-AI-POC\", \"bridge.json\")\n        with open(settings_path, \"r\", encoding=\"utf-8\") as settings_file:\n            test_models_root = os.path.realpath(json.load(settings_file)[\"testModelsRoot\"])\n        model_path = os.path.realpath(doc.PathName)\n        root = os.path.normcase(test_models_root)\n        model = os.path.normcase(model_path)\n        return (\n            bool(model_path)\n            and os.path.isfile(model_path)\n            and os.path.splitext(model_path)[1].lower() == \".rvt\"\n            and os.path.commonpath([root, model]) == root\n            and not doc.IsWorkshared\n            and not doc.IsModified\n            and not doc.IsModifiable\n        )\n    except (OSError, ValueError, KeyError, TypeError):\n        return False\n\n\nuiapp = DocumentManager.Instance.CurrentUIApplication\nuidoc = uiapp.ActiveUIDocument if uiapp is not None else None\n\nif uidoc is None or uidoc.Document is None:\n    OUT = {\"status\": \"no_active_document\", \"updated_ids\": [], \"unchanged_ids\": [], \"skipped\": []}\nelse:\n    doc = uidoc.Document\n    if not is_disposable_test_document(doc):\n        OUT = {\"status\": \"test_model_required\", \"updated_ids\": [], \"unchanged_ids\": [], \"skipped\": [], \"affected_ids\": []}\n    elif doc.IsReadOnly:\n        OUT = {\"status\": \"document_read_only\", \"updated_ids\": [], \"unchanged_ids\": [], \"skipped\": []}\n    else:\n        selected_ids = list(uidoc.Selection.GetElementIds())\n        updated_ids = []\n        unchanged_ids = []\n        skipped = []\n        writable = []\n\n        for element_id in selected_ids:\n            element = doc.GetElement(element_id)\n            element_id_text = str(element_id.Value)\n            if element is None:\n                skipped.append({\"id\": element_id_text, \"reason\": \"element_missing\"})\n                continue\n            parameter = element.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)\n            if parameter is None:\n                skipped.append({\"id\": element_id_text, \"reason\": \"comments_unavailable\"})\n                continue\n            if parameter.IsReadOnly or parameter.StorageType != StorageType.String:\n                skipped.append({\"id\": element_id_text, \"reason\": \"comments_not_writable_string\"})\n                continue\n            previous_value = parameter.AsString()\n            if previous_value == TARGET_VALUE:\n                unchanged_ids.append(element_id_text)\n            else:\n                writable.append((element_id_text, parameter))\n\n        if writable:\n            TransactionManager.Instance.EnsureInTransaction(doc)\n            try:\n                for element_id_text, parameter in writable:\n                    try:\n                        if parameter.Set(TARGET_VALUE):\n                            updated_ids.append(element_id_text)\n                        else:\n                            skipped.append({\"id\": element_id_text, \"reason\": \"revit_rejected_value\"})\n                    except Exception:\n                        skipped.append({\"id\": element_id_text, \"reason\": \"parameter_set_failed\"})\n            finally:\n                TransactionManager.Instance.TransactionTaskDone()\n\n        OUT = {\n            \"status\": \"ok\",\n            \"requested_value\": TARGET_VALUE,\n            \"selected_count\": len(selected_ids),\n            \"updated_ids\": updated_ids,\n            \"unchanged_ids\": unchanged_ids,\n            \"affected_ids\": updated_ids,\n            \"skipped\": skipped,\n        }\n\n# Appended verbatim after each generated routine's main script.\n# Routines must return a JSON-compatible OUT value; the bridge reads this\n# bounded result after Dynamo finishes and removes the per-run file.\nimport json as _bim_ai_json\nimport math as _bim_ai_math\nimport os as _bim_ai_os\nimport re as _bim_ai_re\n\n\ndef _bim_ai_normalize(value, depth=0):\n    if depth > 16:\n        raise ValueError(\"Routine result exceeds the maximum nesting depth\")\n    if value is None or isinstance(value, (str, bool, int)):\n        return value\n    if isinstance(value, float):\n        if not _bim_ai_math.isfinite(value):\n            raise ValueError(\"Routine result contains a non-finite number\")\n        return value\n    if isinstance(value, dict):\n        normalized = {}\n        for key, item in value.items():\n            if not isinstance(key, str):\n                raise TypeError(\"Routine result object keys must be strings\")\n            normalized[key] = _bim_ai_normalize(item, depth + 1)\n        return normalized\n    if isinstance(value, (list, tuple)):\n        return [_bim_ai_normalize(item, depth + 1) for item in value]\n    raise TypeError(\"OUT must contain only JSON-compatible values\")\n\n\n_bim_ai_result_path = _bim_ai_os.environ.get(\"BIM_AI_RESULT_PATH\", \"\")\nif not _bim_ai_re.fullmatch(r\"[0-9a-f]{32}\", _bim_ai_os.environ.get(\"BIM_AI_RUN_ID\", \"\")):\n    raise ValueError(\"Missing or invalid runner correlation id\")\nif not _bim_ai_os.path.isabs(_bim_ai_result_path) or not _bim_ai_result_path.lower().endswith(\".json\"):\n    raise ValueError(\"Missing or invalid runner result path\")\n\n_bim_ai_value = _bim_ai_normalize(OUT)\n_bim_ai_status = \"ok\"\nif isinstance(_bim_ai_value, dict):\n    _bim_ai_status = _bim_ai_value.get(\"status\", \"ok\")\n    if not isinstance(_bim_ai_status, str) or len(_bim_ai_status) > 80:\n        raise ValueError(\"Routine result status must be a short string\")\n_bim_ai_payload = _bim_ai_json.dumps(\n    {\"status\": _bim_ai_status, \"routine_result\": _bim_ai_value},\n    ensure_ascii=False,\n    allow_nan=False,\n    separators=(\",\", \":\"),\n)\nif len(_bim_ai_payload.encode(\"utf-8\")) > 65536:\n    raise ValueError(\"Routine result exceeds 64 KiB\")\n\n_bim_ai_temp_path = _bim_ai_result_path + \".tmp\"\nwith open(_bim_ai_temp_path, \"w\", encoding=\"utf-8\", newline=\"\\n\") as _bim_ai_file:\n    _bim_ai_file.write(_bim_ai_payload)\n_bim_ai_os.replace(_bim_ai_temp_path, _bim_ai_result_path)\n",
+      "Engine": "PythonNet3",
+      "EngineName": "PythonNet3",
+      "VariableInputPorts": false,
+      "Id": "20f622fd8f214e5f958c1ba836d728a1",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "2d4f062f8f3f4b94b823eb5f6ae72f82",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Set built-in instance Comments to PRUEBA_IA for the current selection. Test only on a disposable RVT."
+    }
+  ],
+  "Connectors": [],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "2.17",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "4.0",
+      "Data": {}
+    }
+  ],
+  "Author": "None provided",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": false,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "4.0.2.3852",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -5.3452959060668945,
+      "EyeY": 22.243146896362305,
+      "EyeZ": 4.974541664123535,
+      "LookX": -0.17156505584716797,
+      "LookY": -17.0781307220459,
+      "LookZ": -12.28675365447998,
+      "UpX": -0.004545882344245911,
+      "UpY": 0.9455187916755676,
+      "UpZ": -0.32553616166114807
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "20f622fd8f214e5f958c1ba836d728a1",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": false,
+        "X": 300,
+        "Y": 250
+      }
+    ],
+    "Annotations": [],
+    "X": -1897.82278109683,
+    "Y": -2864.4645680747544,
+    "Zoom": 0.9697726550953407
+  }
 }

@@ -1,13 +1,13 @@
 # Decisión de arquitectura del POC
 
-**Actualizado:** 24 de septiembre de 2026
-**Estado:** lectura directa Revit ↔ rvt-mcp comprobada; generador de rutinas aprobado offline; runner propio compilado pero no instalado. Ejecución MCP → Dynamo y la integración desde Codex siguen pendientes de prueba viva.
+**Actualizado:** 26 de septiembre de 2026
+**Estado:** generador y contrato MCP del runner probados offline; bridge genérico compilado e instalado por usuario. Se inició una sesión nueva con el RVT descartable, pero el ensamblado del bridge no se cargó y el ping devuelve timeout. Ejecución Dynamo dentro de Revit y carga desde Codex siguen pendientes de prueba viva.
 
 ## Decisión
 
-Reutilizar `bimwright/rvt-mcp` como autoridad de herramientas Revit tipadas y mantener una pieza propia pequeña para crear/listar rutinas Dynamo/PythonNet3. Codex recibe consultas y una lista curada de operaciones de creación/edición, con aprobación por llamada. El perfil no habilita borrado, código arbitrario, ToolBaker ni ejecución automática de grafos. Los MCP de otros repositorios se evalúan como referencias o servidores especializados separados; no se copian indiscriminadamente al puente principal.
+Reutilizar `bimwright/rvt-mcp` para herramientas Revit tipadas y mantener un bridge propio para crear/listar y ejecutar rutinas guardadas Dynamo/PythonNet3. Codex interpreta pedidos, consulta el modelo, prefiere herramientas tipadas y prepara rutinas cuando no hay una acción adecuada. La configuración no habilita borrado ni ToolBaker; cada llamada solicita aprobación.
 
-La rutina guardada queda como borrador. El grafo usa `PythonNet3` y modo `Manual`. El runner add-in compilado intenta ejecutarlo desde Revit, pero solo admite el paquete `read_active_view_selection` fijado por hashes y únicamente cuando el documento está guardado y sin cambios pendientes. El smoke vivo no encontró el puente instalado/cargado; por tanto no hay aún evidencia de que Dynamo se ejecute desde MCP. Esta entrega no es todavía un asistente que ejecute solicitudes complejas de extremo a extremo.
+El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; las escrituras requieren aprobación explícita y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. El add-in está instalado por usuario. La sesión nueva de prueba no cargó el DLL; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
 
 ## Comparación
 
@@ -16,7 +16,7 @@ La rutina guardada queda como borrador. El grafo usa `PythonNet3` y modo `Manual
 | Revit 2027 | El paquete v0.6.2 incluye plugin compilado R27 y se instaló en perfil de usuario en este PC. Falta cargarlo en una sesión real. | Habría que implementar, compilar, firmar y probar el add-in/IPC desde cero. |
 | Consultas y acciones tipadas | Ya incluye herramientas de lectura y varios grupos de creación/edición. La lista expuesta a Codex se limita a nombres conocidos y pide aprobación por llamada. | Habría que reconstruir y mantener las herramientas y probar compatibilidad. |
 | Guardar scripts PythonNet3 | Se cubre en el MCP de rutinas del POC; almacena fuente, grafo, alcance, hash y estado. | Se puede integrar todo en una sola solución, con más código de transporte y manejo de errores. |
-| Ejecución de `.dyn` desde MCP | No la ofrece rvt-mcp. Un add-in separado está compilado con `ExternalEvent` y `DynamoRevit.ExecuteCommand`; aún no se cargó ni probó. | Permite una lista explícita de rutinas conocidas, pero añade un add-in y requiere pruebas dentro de Revit. |
+| Ejecución de `.dyn` desde MCP | No la ofrece rvt-mcp. El add-in propio usa `ExternalEvent` y `DynamoRevit.ExecuteCommand`; está instalado y pendiente de carga/prueba en una sesión con RVT descartable. | Permite ejecutar rutinas guardadas con aprobación y verificación; añade un add-in y debe probarse en Revit real. |
 | Dependencias para el usuario | rvt-mcp es self-contained. El generador de rutinas usa Windows PowerShell integrado. | El puente propio usa la API Revit/Dynamo y .NET 10. Compila aquí con Roslyn `csc`; aún falta instalación, carga y prueba en Revit. El usuario no requiere SDK para ejecutar el DLL. |
 | Riesgo inicial | Bajo: dos consultas Revit en lectura; la rutina se guarda, no se ejecuta. | Mayor superficie propia y más rutas de ejecución antes de probar los casos básicos. |
 
@@ -36,18 +36,19 @@ Autodesk también publica su Revit Public MCP Server, pero su página de configu
 
 ## Decisión de siguiente prueba
 
-Mantener `rvt-mcp` para las herramientas tipadas y Codex como interfaz. El prototipo de runner propio ya está escrito y compilado; el siguiente gate es instalarlo cuando Revit esté cerrado y ejecutar la rutina de solo lectura en una sesión Revit 2027.0. Después se debe probar una única creación tipada en un RVT descartable, comprobar el cambio con una lectura posterior y decidir si Dynamo se necesita para esa clase de tarea. Revaluar DynamoMCP cuando su integración para Revit y conexión desde Codex estén disponibles. La prueba fallida con `DynamoCLI` no habilita ejecución.
+Mantener `rvt-mcp` para herramientas tipadas y Codex como interfaz. El siguiente gate es conseguir que el add-in cargue en la sesión de prueba ya iniciada y que `ping_revit_dynamo_bridge` responda; luego ejecutar `read_test_model_summary` por MCP. Si Dynamo devuelve el resultado y el documento queda intacto, probar una escritura en el RVT descartable y volver a leer el parámetro. Revaluar DynamoMCP cuando su integración con Revit y conexión desde Codex estén disponibles. La prueba fallida con `DynamoCLI` no habilita ejecución.
 
 ## Alcance configurado para Codex
 
 - `rvt-mcp`: consultas y una lista explícita de creación/edición tipada; arranca con `--toolsets query,create,modify,view,annotation --disable-toolbaker`.
-- `bim-ai-routines`: `list_saved_routines`, `create_dynamo_routine`; solo escribe archivos bajo `routines/`.
+- `bim-ai-routines`: `list_saved_routines`, `create_dynamo_routine`; crea fuente, grafo y manifiesto bajo `routines/`.
+- `bim-ai-dynamo-runner`: ping, rutina read-only fijada y `execute_saved_routine`; esta última solo opera en RVT locales bajo `revit/test-models/`. Las escrituras requieren confirmación y aprobación MCP.
 - La configuración solicita aprobación de Codex por llamada. Al aprobar una operación Revit tipada, esta puede cambiar el documento en esa misma llamada; no se debe asumir una vista previa ni rollback general.
-- El runner configurado expone únicamente `ping_revit_dynamo_bridge` y `execute_saved_readonly_routine`, con la rutina y hashes fijos. No acepta cuerpos C#, grafos arbitrarios o escrituras PythonNet3.
+- La rutina PythonNet3 corre dentro del proceso Revit con los permisos del usuario; la ruta de documento no es un sandbox de archivos o red. Revisa el script antes de ejecutarlo.
 
 ## Interfaz para arquitectos
 
-**Fase de prueba:** usar Codex como ventana de conversación separada, con esta carpeta abierta como proyecto confiable. El MCP local entrega a Codex las consultas y acciones tipadas de Revit; el MCP propio guarda rutinas y presenta una única ejecución de lectura por add-in. El add-in aún debe instalarse y probarse. Codex solo carga la configuración `.codex/config.toml` del proyecto cuando ese proyecto es confiable.
+**Fase de prueba:** usar Codex como ventana de conversación separada, con esta carpeta abierta como proyecto confiable. El MCP local entrega a Codex las consultas y acciones tipadas de Revit; el MCP propio guarda rutinas y presenta ejecución de lectura y rutinas guardadas por add-in. El add-in está instalado, pero falta resolver su carga y validarlo en vivo. Codex solo carga la configuración `.codex/config.toml` del proyecto cuando ese proyecto es confiable.
 
 **Interfaz futura:** si los arquitectos necesitan conversar sin salir del modelado, evaluar un panel acoplable dentro de Revit. Revit permite paneles WPF acoplables y requiere `ExternalEvent` para tramitar acciones desde una interfaz modeless hacia la API. Dynamo también admite extensiones de interfaz como paquetes; eso serviría para controles propios de Dynamo, mientras Revit sigue siendo el anfitrión del modelo.
 
@@ -55,6 +56,6 @@ El panel sería una interfaz nueva para el agente y sus MCP, no una ventana embe
 
 ## Próximo incremento técnico
 
-Para cerrar GPT → MCP → Dynamo → Revit falta cargar y probar el runner ya compilado sobre un archivo descartable; comprobar que Dynamo devuelve la vista/selección y que Revit queda sin modificaciones. Después se puede diseñar una rutina de escritura mínima con lista de permitidos, aprobación explícita, verificación posterior y registro reducido. Las solicitudes complejas deben componerse como pasos aprobados y verificados, no como código arbitrario. No habilitar `revit_send_code_to_revit` como sustituto del runner.
+Para cerrar GPT → MCP → Dynamo → Revit falta resolver la carga del add-in en la sesión abierta con el RVT descartable y validar el ping. Después se prueba el resumen read-only y una escritura con lectura posterior. Las solicitudes complejas se componen en pasos verificados y aprobados. No habilitar `revit_send_code_to_revit` como sustituto del runner.
 
 Referencias técnicas: [Autodesk Revit 2027 .NET 10](https://help.autodesk.com/cloudhelp/2027/ENU/Revit-WhatsNew/files/GUID-8D7A4715-EAF8-4BD1-BE78-061F900D0BCE.htm), [Dynamo Core 4.0 / PythonNet3](https://dynamobim.org/dynamo-core-4-0-release/), [Revit dockable panes y modeless UI](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Advanced_Topics/Revit_API_Revit_API_Developers_Guide_Advanced_Topics_Dockable_Dialog_Panes_html.html), [Dynamo extensions as packages](https://primer2.dynamobim.org/1_developer_primer_intro/3_developing_for_dynamo/2-extensions-as-packages) y [Codex project MCP config / confianza](https://developers.openai.com/plugins/build/plugins).

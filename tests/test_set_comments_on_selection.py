@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 import sys
 import types
 import unittest
@@ -16,6 +18,7 @@ ROUTINE = ROOT / "routines" / "set_comments_on_selection.py"
 GRAPH = ROOT / "routines" / "set_comments_on_selection.dyn"
 MANIFEST = ROOT / "routines" / "set_comments_on_selection.manifest.json"
 SOURCE = ROUTINE.read_text(encoding="utf-8")
+WRAPPER = (ROOT / "dynamo" / "pythonnet3_result_wrapper.py").read_text(encoding="utf-8")
 
 
 class FakeTransactionManager:
@@ -86,16 +89,46 @@ def execute_routine(uidoc=None, transaction_manager=None):
         "Autodesk.Revit": revit,
         "Autodesk.Revit.DB": revit_db,
     }
-    with patch.dict(sys.modules, modules):
-        namespace = {"__name__": "__main__"}
-        exec(compile(SOURCE, str(ROUTINE), "exec"), namespace)
-    return namespace["OUT"], transaction_manager
+    with tempfile.TemporaryDirectory(prefix="bim-ai-comments-test-") as temp_name:
+        temp_root = Path(temp_name)
+        test_models_root = temp_root / "revit" / "test-models"
+        test_models_root.mkdir(parents=True)
+        settings_root = temp_root / "appdata" / "BIM-AI-POC"
+        settings_root.mkdir(parents=True)
+        (settings_root / "bridge.json").write_text(
+            json.dumps({"testModelsRoot": str(test_models_root)}), encoding="utf-8"
+        )
+        if uidoc is not None:
+            doc = uidoc.Document
+            if getattr(doc, "OutsideTestModels", False):
+                model_path = temp_root / "production" / "architectural-model.rvt"
+            else:
+                model_path = Path(doc.PathName) if getattr(doc, "PathName", "") else test_models_root / "test.rvt"
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            model_path.touch(exist_ok=True)
+            doc.PathName = str(model_path)
+            if not hasattr(doc, "IsWorkshared"):
+                doc.IsWorkshared = False
+            if not hasattr(doc, "IsModified"):
+                doc.IsModified = False
+            if not hasattr(doc, "IsModifiable"):
+                doc.IsModifiable = False
+        with patch.dict(sys.modules, modules), patch.dict(
+            os.environ, {"APPDATA": str(temp_root / "appdata")}
+        ):
+            namespace = {"__name__": "__main__"}
+            exec(compile(SOURCE, str(ROUTINE), "exec"), namespace)
+        return namespace["OUT"], transaction_manager
 
 
 class SetCommentsRoutineTests(unittest.TestCase):
     def make_document(self, elements, selected, read_only=False):
         doc = types.SimpleNamespace(
             IsReadOnly=read_only,
+            IsWorkshared=False,
+            IsModified=False,
+            IsModifiable=False,
+            PathName="",
             GetElement=lambda element_id: elements.get(element_id),
         )
         uidoc = types.SimpleNamespace(
@@ -135,6 +168,7 @@ class SetCommentsRoutineTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["selected_count"], 2)
         self.assertEqual(result["updated_ids"], ["21"])
+        self.assertEqual(result["affected_ids"], ["21"])
         self.assertEqual(result["unchanged_ids"], ["22"])
         self.assertEqual(result["skipped"], [])
         self.assertEqual(p_update.value, "PRUEBA_IA")
@@ -175,17 +209,32 @@ class SetCommentsRoutineTests(unittest.TestCase):
         self.assertEqual(result["status"], "document_read_only")
         self.assertEqual((manager.started, manager.finished), (0, 0))
 
+    def test_document_outside_disposable_test_models_is_rejected(self):
+        doc, uidoc = self.make_document({}, [])
+        doc.OutsideTestModels = True
+
+        result, manager = execute_routine(uidoc)
+
+        self.assertEqual(result["status"], "test_model_required")
+        self.assertEqual((manager.started, manager.finished), (0, 0))
+
     def test_package_hashes_and_manual_pythonnet3_graph_match(self):
         graph = json.loads(GRAPH.read_text(encoding="utf-8"))
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(len(graph["Nodes"]), 1)
         self.assertEqual(graph["Nodes"][0]["Engine"], "PythonNet3")
-        self.assertEqual(graph["Nodes"][0]["Code"], SOURCE)
+        self.assertEqual(graph["Nodes"][0]["Code"], SOURCE.rstrip() + "\n\n" + WRAPPER.lstrip())
         self.assertEqual(graph["View"]["Dynamo"]["RunType"], "Manual")
         self.assertEqual(graph["Connectors"], [])
         self.assertNotIn(b"\r\n", GRAPH.read_bytes())
         self.assertTrue(manifest["writes_model"])
+        self.assertTrue(manifest["confirm_model_write"])
         self.assertEqual(manifest["status"], "draft_not_validated")
+        self.assertEqual(manifest["result_contract"], "bim-ai-json-v1")
+        self.assertEqual(
+            manifest["runtime_wrapper_sha256"],
+            hashlib.sha256((ROOT / "dynamo" / "pythonnet3_result_wrapper.py").read_bytes()).hexdigest(),
+        )
         self.assertEqual(
             manifest["python_sha256"], hashlib.sha256(ROUTINE.read_bytes()).hexdigest()
         )

@@ -7,6 +7,7 @@ Dynamo, or claim that the add-in works inside Revit.
 from __future__ import annotations
 
 import json
+import hashlib
 import queue
 import shutil
 import subprocess
@@ -99,12 +100,68 @@ class McpStdioClient:
             self.process.wait(timeout=2)
 
 
+def write_routine_fixture(directory: Path) -> None:
+    routines = directory / "routines"
+    dynamo = directory / "dynamo"
+    routines.mkdir(parents=True)
+    dynamo.mkdir(parents=True)
+    wrapper = ROOT / "dynamo" / "pythonnet3_result_wrapper.py"
+    wrapper_copy = dynamo / wrapper.name
+    wrapper_copy.write_bytes(wrapper.read_bytes())
+    wrapper_text = wrapper.read_text(encoding="utf-8")
+    for name, writes_model, source in (
+        ("pipe_smoke_writer", True, 'OUT = {"status": "ok", "affected_ids": ["42"]}\n'),
+        ("pipe_smoke_readonly", False, 'OUT = {"status": "ok", "affected_ids": []}\n'),
+    ):
+        graph = {
+            "Nodes": [
+                {
+                    "Engine": "PythonNet3",
+                    "Code": source.rstrip() + "\n\n" + wrapper_text.lstrip(),
+                }
+            ],
+            "Connectors": [],
+            "Dependencies": [],
+            "View": {"Dynamo": {"RunType": "Manual"}},
+        }
+        python_path = routines / f"{name}.py"
+        graph_path = routines / f"{name}.dyn"
+        manifest_path = routines / f"{name}.manifest.json"
+        python_bytes = source.encode("utf-8")
+        graph_bytes = (json.dumps(graph, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        python_path.write_bytes(python_bytes)
+        graph_path.write_bytes(graph_bytes)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                "schema_version": 1,
+                "name": name,
+                "description": "Disposable pipe smoke writer",
+                "scope": "active_selection",
+                "writes_model": writes_model,
+                "confirm_model_write": writes_model,
+                "status": "draft_not_validated",
+                "execution": "mcp_runner_test_model_only",
+                "python_engine": "PythonNet3",
+                "result_contract": "bim-ai-json-v1",
+                "runtime_wrapper_sha256": hashlib.sha256(wrapper_copy.read_bytes()).hexdigest(),
+                "source_sha256": hashlib.sha256(python_bytes).hexdigest(),
+                "python_sha256": hashlib.sha256(python_bytes).hexdigest(),
+                "dynamo_sha256": hashlib.sha256(graph_bytes).hexdigest(),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+
 def write_fake_bridge(directory: Path, pipe_name: str) -> Path:
     server_path = directory / "fake_bridge.ps1"
     source = rf"""$ErrorActionPreference = 'Stop'
 $pipeName = '{pipe_name}'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-for ($index = 0; $index -lt 2; $index++) {{
+for ($index = 0; $index -lt 4; $index++) {{
     $pipe = [System.IO.Pipes.NamedPipeServerStream]::new(
         $pipeName,
         [System.IO.Pipes.PipeDirection]::InOut,
@@ -121,6 +178,10 @@ for ($index = 0; $index -lt 2; $index++) {{
         $response = [ordered]@{{ ok = $true; status = 'ready'; revitMajor = '2027'; routineId = 'read_active_view_selection' }}
     }} elseif ($request.operation -eq 'run_saved_readonly_routine' -and $request.routineId -eq 'read_active_view_selection') {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_read_only'; routineId = 'read_active_view_selection'; viewType = 'FloorPlan'; selectionCount = 0; modelChangeCheck = 'unchanged'; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
+    }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_writer' -and $request.confirmModelWrite -eq $true) {{
+        $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_change'; routineId = $request.routineId; modelChangeCheck = 'document_changed_ids_match_routine_result'; changedElementIds = @(42); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @('42') }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
+    }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_readonly' -and $request.confirmModelWrite -eq $false) {{
+        $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_read_only'; routineId = $request.routineId; modelChangeCheck = 'unchanged'; changedElementIds = @(); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @() }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
     }} else {{
         $response = [ordered]@{{ ok = $false; status = 'routine_not_allowed' }}
     }}
@@ -151,7 +212,8 @@ def main() -> int:
     try:
         with tempfile.TemporaryDirectory(prefix="bim-ai-pipe-smoke-") as temp_name:
             directory = Path(temp_name).resolve()
-            runner_copy = directory / "DynamoRunnerMcp.ps1"
+            (directory / "mcp").mkdir()
+            runner_copy = directory / "mcp" / "DynamoRunnerMcp.ps1"
             runner_text = runner_source.read_text(encoding="utf-8")
             old_pipe_line = "$pipeName = 'BIM-AI-POC-Revit-27'"
             if runner_text.count(old_pipe_line) != 1:
@@ -161,6 +223,7 @@ def main() -> int:
                 runner_text.replace(old_pipe_line, f"$pipeName = '{pipe_name}'"),
                 encoding="utf-8",
             )
+            write_routine_fixture(directory)
             fake_script = write_fake_bridge(directory, pipe_name)
             fake_bridge = subprocess.Popen(
                 [powershell, "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(fake_script)],
@@ -183,6 +246,27 @@ def main() -> int:
                 print("RUNNER_PIPE_INITIALIZE=FAIL")
                 return 1
             client.notify_initialized()
+
+            tool_list = client.request("tools/list")
+            available_tools = [tool.get("name") for tool in tool_list.get("result", {}).get("tools", [])]
+            if "execute_saved_routine" not in available_tools:
+                print("RUNNER_GENERIC_TOOL=FAIL missing tool definition")
+                return 1
+            print("RUNNER_GENERIC_TOOL=PASS")
+
+            denied = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine",
+                    "arguments": {"routine_id": "pipe_smoke_writer", "confirm_model_write": False},
+                },
+            )
+            denied_items = denied.get("result", {}).get("content", [])
+            denied_payload = json.loads(denied_items[0]["text"]) if denied_items else {}
+            if not denied.get("result", {}).get("isError") or denied_payload.get("status") != "model_write_confirmation_required":
+                print("RUNNER_GENERIC_CONFIRM=FAIL missing write gate")
+                return 1
+            print("RUNNER_GENERIC_CONFIRM=PASS")
 
             ping = client.request(
                 "tools/call", {"name": "ping_revit_dynamo_bridge", "arguments": {}}
@@ -212,6 +296,45 @@ def main() -> int:
                 print("RUNNER_PIPE_ROUTINE=FAIL")
                 return 1
             print("RUNNER_PIPE_ROUTINE=PASS")
+
+            generic = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine",
+                    "arguments": {"routine_id": "pipe_smoke_writer", "confirm_model_write": True},
+                },
+            )
+            generic_items = generic.get("result", {}).get("content", [])
+            generic_payload = json.loads(generic_items[0]["text"]) if generic_items else {}
+            manifest = json.loads((directory / "routines" / "pipe_smoke_writer.manifest.json").read_text(encoding="utf-8"))
+            if (
+                generic.get("result", {}).get("isError")
+                or generic_payload.get("status") != "executed_and_verified_change"
+                or generic_payload.get("changedElementIds") != [42]
+                or manifest.get("status") != "validated"
+            ):
+                print(f"RUNNER_GENERIC_EXECUTION=FAIL payload={generic_payload} manifest_status={manifest.get('status')}")
+                return 1
+            print("RUNNER_GENERIC_EXECUTION=PASS manifest_promoted=true")
+
+            generic_readonly = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine",
+                    "arguments": {"routine_id": "pipe_smoke_readonly", "confirm_model_write": False},
+                },
+            )
+            generic_readonly_items = generic_readonly.get("result", {}).get("content", [])
+            generic_readonly_payload = json.loads(generic_readonly_items[0]["text"]) if generic_readonly_items else {}
+            readonly_manifest = json.loads((directory / "routines" / "pipe_smoke_readonly.manifest.json").read_text(encoding="utf-8"))
+            if (
+                generic_readonly.get("result", {}).get("isError")
+                or generic_readonly_payload.get("status") != "executed_and_verified_read_only"
+                or readonly_manifest.get("status") != "validated"
+            ):
+                print("RUNNER_GENERIC_READONLY=FAIL")
+                return 1
+            print("RUNNER_GENERIC_READONLY=PASS manifest_promoted=true")
             fake_bridge.wait(timeout=5)
             fake_bridge = None
             client.close()
