@@ -33,8 +33,8 @@ else:
 
 # The Revit-hosted runner sets these for a single approved smoke execution.
 # The side-channel contains no view name, element id, or parameter value.
-run_id = os.environ.get("BIM_AI_RUN_ID")
-result_dir = os.environ.get("BIM_AI_RESULT_DIR")
+run_id = globals().get("_BIM_AI_RUN_ID") or os.environ.get("BIM_AI_RUN_ID")
+result_dir = globals().get("_BIM_AI_RESULT_DIR") or os.environ.get("BIM_AI_RESULT_DIR")
 if run_id and result_dir and len(run_id) == 32 and all(c in "0123456789abcdef" for c in run_id):
     from pathlib import Path
 

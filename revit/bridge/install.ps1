@@ -25,7 +25,8 @@ $assemblyHash = (Get-FileHash -LiteralPath $assemblySource -Algorithm SHA256).Ha
 Write-Output "BRIDGE_ASSEMBLY_SHA256=$assemblyHash"
 $addinsRoot = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
 $installRoot = Join-Path $addinsRoot 'BimAiDynamoBridge'
-$assemblyTarget = Join-Path $installRoot 'BimAiDynamoBridge.dll'
+$assemblyFileName = 'BimAiDynamoBridge.' + $assemblyHash.Substring(0, 16) + '.dll'
+$assemblyTarget = Join-Path $installRoot $assemblyFileName
 $manifestTarget = Join-Path $addinsRoot 'BimAiDynamoBridge.addin'
 $settingsRoot = Join-Path $env:APPDATA 'BIM-AI-POC'
 $settingsTarget = Join-Path $settingsRoot 'bridge.json'
@@ -38,13 +39,28 @@ if (-not $Force -and (Test-Path -LiteralPath $settingsTarget)) {
     throw 'Ya existe bridge.json; se conserva para evitar cambiar una ruta local sin revisión.'
 }
 
-$targets = @($installRoot, $manifestTarget, $settingsRoot, $settingsTarget, $testModelsRoot)
+$targets = @($installRoot, $assemblyTarget, $manifestTarget, $settingsRoot, $settingsTarget, $testModelsRoot)
 foreach ($target in $targets) {
     if (-not $PSCmdlet.ShouldProcess($target, 'Instalar puente local BIM-AI para Revit 2027')) { return }
 }
 
 New-Item -ItemType Directory -Force -Path $installRoot, $settingsRoot, $testModelsRoot | Out-Null
-Copy-Item -LiteralPath $assemblySource -Destination $assemblyTarget -Force:$Force
+if (Test-Path -LiteralPath $assemblyTarget -PathType Leaf) {
+    $installedHash = (Get-FileHash -LiteralPath $assemblyTarget -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($installedHash -ne $assemblyHash) {
+        throw "El DLL de destino $assemblyFileName no coincide con su hash de nombre. Se conserva para revisión manual."
+    }
+} else {
+    $assemblyTemp = $assemblyTarget + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    try {
+        Copy-Item -LiteralPath $assemblySource -Destination $assemblyTemp
+        $stagedHash = (Get-FileHash -LiteralPath $assemblyTemp -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($stagedHash -ne $assemblyHash) { throw 'El DLL copiado no coincide con el hash del paquete.' }
+        Move-Item -LiteralPath $assemblyTemp -Destination $assemblyTarget
+    } finally {
+        Remove-Item -LiteralPath $assemblyTemp -Force -ErrorAction SilentlyContinue
+    }
+}
 $escapedAssembly = [Security.SecurityElement]::Escape($assemblyTarget)
 $manifest = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -60,14 +76,21 @@ $manifest = @"
 </RevitAddIns>
 "@
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[IO.File]::WriteAllText($manifestTarget, $manifest, $utf8NoBom)
+$manifestTemp = $manifestTarget + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+try {
+    [IO.File]::WriteAllText($manifestTemp, $manifest, $utf8NoBom)
+    Move-Item -LiteralPath $manifestTemp -Destination $manifestTarget -Force
+} finally {
+    Remove-Item -LiteralPath $manifestTemp -Force -ErrorAction SilentlyContinue
+}
 $settings = [ordered]@{ routinesRoot = (Join-Path $repoRoot 'routines'); testModelsRoot = $testModelsRoot }
 [IO.File]::WriteAllText($settingsTarget, (ConvertTo-Json -InputObject $settings -Depth 4), $utf8NoBom)
 
 if ($requiresRestart) {
     Write-Output 'BRIDGE_INSTALL=STAGED_RESTART_REQUIRED'
-    Write-Output 'Los archivos quedaron preparados para una sesión nueva; la instancia Revit abierta no cargó el add-in.'
+    Write-Output 'El manifiesto apunta a un DLL con nombre basado en su hash para que la siguiente sesión cargue esta versión. Las sesiones abiertas conservan su ensamblado cargado.'
 } else {
     Write-Output 'BRIDGE_INSTALL=PASS'
     Write-Output 'Reinicia Revit y acepta la carga del add-in BIM-AI Dynamo Bridge para probarlo.'
 }
+Write-Output ("BRIDGE_ASSEMBLY_PATH=" + $assemblyTarget)

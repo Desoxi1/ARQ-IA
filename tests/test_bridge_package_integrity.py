@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_SOURCE = ROOT / "revit" / "bridge" / "BimAiDynamoBridge.cs"
+BRIDGE_INSTALLER = ROOT / "revit" / "bridge" / "install.ps1"
 BRIDGE_DLL = ROOT / "revit" / "bridge" / "dist" / "BimAiDynamoBridge.dll"
 BRIDGE_CHECKSUM = ROOT / "revit" / "bridge" / "dist" / "BimAiDynamoBridge.sha256"
 READ_ONLY_MANIFEST = ROOT / "routines" / "read_active_view_selection.manifest.json"
@@ -69,6 +70,39 @@ class BridgePackageIntegrityTests(unittest.TestCase):
             'if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");',
             source,
         )
+
+    def test_runtime_graph_injects_result_context_without_process_environment(self):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath)", source)
+        self.assertIn('"_BIM_AI_RUN_ID = " + JsonSerializer.Serialize(runId)', source)
+        self.assertIn('"_BIM_AI_RESULT_PATH = " + JsonSerializer.Serialize(absoluteResultPath)', source)
+        self.assertIn("FileMode.CreateNew", source)
+        self.assertIn("Delete(runtimeGraphPath)", source)
+        self.assertIn("_BIM_AI_PYTHON_STARTED_PATH", source)
+        self.assertIn("dynamo_python_node_started_without_result", source)
+        self.assertIn("dynamo_python_node_not_started", source)
+
+    def test_bridge_initializes_ui_less_dynamo_before_opening_the_graph(self):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: true)", source)
+        self.assertIn("disableTransactions: !writesModel", source)
+        self.assertIn("EnsureDynamoInitialized(application)", source)
+        self.assertIn('return modelState == "StartedUIless" || modelState == "StartedUI" ? Result.Succeeded : Result.Failed;', source)
+        self.assertIn("initializationJournal", source)
+        self.assertIn('GetProperty("RevitDynamoModel", BindingFlags.Public | BindingFlags.Static)', source)
+        self.assertIn('GetProperty("State", BindingFlags.Public | BindingFlags.Instance)', source)
+        self.assertIn('GetProperty("CurrentWorkspace", BindingFlags.Public | BindingFlags.Instance)', source)
+        self.assertIn('GetMethod("Run", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null)', source)
+        self.assertIn('GetType("RevitServices.Transactions.TransactionManager", false)', source)
+        self.assertIn('GetProperty("DisableTransactions", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)', source)
+        self.assertIn('post_run_document_changed_" + changedIds.Count', source)
+        self.assertIn("post_run_document_modified_without_element_changes", source)
+
+    def test_installer_uses_hash_named_assemblies_for_open_revit_sessions(self):
+        installer = BRIDGE_INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("BimAiDynamoBridge.' + $assemblyHash.Substring(0, 16) + '.dll", installer)
+        self.assertIn("$stagedHash -ne $assemblyHash", installer)
+        self.assertIn("Move-Item -LiteralPath $manifestTemp -Destination $manifestTarget -Force", installer)
 
 
 if __name__ == "__main__":

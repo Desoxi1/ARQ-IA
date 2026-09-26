@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -18,7 +20,7 @@ MANIFEST = ROOT / "routines" / "read_active_view_selection.manifest.json"
 SOURCE = ROUTINE.read_text(encoding="utf-8")
 
 
-def execute_with_fake_revit(uidoc):
+def execute_with_fake_revit(uidoc, runtime_context=None):
     clr = types.ModuleType("clr")
     clr.AddReference = lambda _name: None
 
@@ -40,7 +42,7 @@ def execute_with_fake_revit(uidoc):
         "RevitServices.Persistence": persistence,
     }
     with patch.dict(sys.modules, modules):
-        namespace = {}
+        namespace = dict(runtime_context or {})
         exec(compile(SOURCE, str(ROUTINE), "exec"), namespace)
     return namespace["OUT"]
 
@@ -73,6 +75,26 @@ class ReadOnlyRoutineTests(unittest.TestCase):
                 "selection_count": 0,
                 "selected_elements": [],
             },
+        )
+
+    def test_runtime_context_globals_write_summary_without_environment_variables(self):
+        uidoc = types.SimpleNamespace(
+            Document=object(),
+            ActiveView=types.SimpleNamespace(Name="Level 1", ViewType="FloorPlan"),
+            Selection=types.SimpleNamespace(GetElementIds=lambda: []),
+        )
+        run_id = "b" * 32
+        with tempfile.TemporaryDirectory(prefix="bim-ai-readonly-test-") as temp_name:
+            with patch.dict(os.environ, {"BIM_AI_RUN_ID": "", "BIM_AI_RESULT_DIR": ""}):
+                execute_with_fake_revit(
+                    uidoc,
+                    {"_BIM_AI_RUN_ID": run_id, "_BIM_AI_RESULT_DIR": temp_name},
+                )
+            result_path = Path(temp_name) / f"{run_id}.json"
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            payload,
+            {"status": "ok", "view_type": "FloorPlan", "selection_count": 0},
         )
 
     def test_selected_elements_include_ids_and_nullable_categories(self):

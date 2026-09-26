@@ -1,13 +1,13 @@
 # Decisión de arquitectura del POC
 
 **Actualizado:** 26 de septiembre de 2026
-**Estado:** generador y contrato MCP del runner probados offline; bridge genérico compilado e instalado por usuario con hashes coincidentes. Se inició una sesión limpia con el RVT descartable y Revit muestra el aviso del DLL sin firma. La carga del add-in, el ping y la ejecución Dynamo en vivo siguen pendientes.
+**Estado:** 27 pruebas unitarias y contratos MCP probados offline; la consulta rvt-mcp de vista/selección pasó hoy. Bridge genérico compilado e instalado por usuario con hashes coincidentes. Se inició una sesión limpia con el RVT descartable; la carga del add-in, el ping y la ejecución Dynamo en vivo siguen pendientes.
 
 ## Decisión
 
 Reutilizar `bimwright/rvt-mcp` para herramientas Revit tipadas y mantener un bridge propio para crear/listar y ejecutar rutinas guardadas Dynamo/PythonNet3. Codex interpreta pedidos, consulta el modelo, prefiere herramientas tipadas y prepara rutinas cuando no hay una acción adecuada. La configuración no habilita borrado ni ToolBaker; cada llamada solicita aprobación.
 
-El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; toda ejecución requiere autorización explícita de posible escritura y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. Los metadatos no demuestran que el código sea de solo lectura. El DLL endurecido está instalado por usuario y su hash coincide con `dist/`. Falta que el usuario elija **Load Once** en la sesión de prueba recién abierta; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
+El generador guarda fuente, grafo de un nodo `PythonNet3` en modo `Manual`, wrapper de resultado JSON y manifiesto con hashes. El bridge acepta rutinas genéricas solo en un RVT local dentro de `revit/test-models/`; toda ejecución requiere autorización explícita de posible escritura y sus `affected_ids` deben coincidir con los IDs de `DocumentChanged`. Los metadatos no demuestran que el código sea de solo lectura. El DLL `9205c035…` está instalado por usuario y su hash coincide con `dist/`. Falta cargarlo en la sesión de prueba recién abierta; no hay todavía evidencia de ejecución Dynamo en vivo ni de tareas complejas de extremo a extremo.
 
 ## Comparación
 

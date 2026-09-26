@@ -28,8 +28,9 @@ def _bim_ai_normalize(value, depth=0):
     raise TypeError("OUT must contain only JSON-compatible values")
 
 
-_bim_ai_result_path = _bim_ai_os.environ.get("BIM_AI_RESULT_PATH", "")
-if not _bim_ai_re.fullmatch(r"[0-9a-f]{32}", _bim_ai_os.environ.get("BIM_AI_RUN_ID", "")):
+_bim_ai_run_id = globals().get("_BIM_AI_RUN_ID") or _bim_ai_os.environ.get("BIM_AI_RUN_ID", "")
+_bim_ai_result_path = globals().get("_BIM_AI_RESULT_PATH") or _bim_ai_os.environ.get("BIM_AI_RESULT_PATH", "")
+if not _bim_ai_re.fullmatch(r"[0-9a-f]{32}", _bim_ai_run_id):
     raise ValueError("Missing or invalid runner correlation id")
 if not _bim_ai_os.path.isabs(_bim_ai_result_path) or not _bim_ai_result_path.lower().endswith(".json"):
     raise ValueError("Missing or invalid runner result path")
