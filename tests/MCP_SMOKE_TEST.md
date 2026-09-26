@@ -12,7 +12,7 @@
 | Runner MCP stdio | PASS | `tests/run_dynamo_runner_mcp_smoke.py` descubre tres tools: ping, lectura fijada y ejecución de rutina guardada. |
 | Named pipe del runner | PASS con fake | `tests/run_dynamo_runner_pipe_smoke.py` cubre ping, lectura, ejecución genérica, rechazo sin confirmación, promoción del manifiesto y timeout sin bridge. No inicia Revit/Dynamo. |
 | Build y paquete del add-in | PASS | Roslyn compiló contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10; DLL distribuido e instalado coinciden por SHA-256. |
-| Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El DLL está sin firma; se inició otra sesión de Revit con el RVT desechable, pero el proceso no lo cargó. La sesión productiva permanece intacta. |
+| Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario de Revit registra `TaskDialog_Security_Unsigned_File_Loading`; falta elegir Load Once. La sesión productiva permanece intacta. |
 | RVT de prueba | PASS | Copia local de `Snowdon Towers Sample HVAC.rvt` incluida con Revit 2027; coincide en tamaño/hash y está ignorada por Git. |
 | Smoke vivo bridge → Revit | PENDIENTE | `--live-generic` devolvió `bridge_connect_timeout`; el proceso de prueba sigue sin el DLL cargado. Ningún modelo cambió. |
 | Ejecución Dynamo PythonNet3 en Revit | PENDIENTE | Requiere cargar el add-in en la sesión del RVT de prueba y pasar primero el smoke read-only. |
