@@ -1,4 +1,4 @@
-# Registro de pruebas MCP — 26 de septiembre de 2026
+# Registro de pruebas MCP — actualizado el 28 de septiembre de 2026
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
@@ -12,9 +12,9 @@
 | Runner MCP stdio | PASS | `tests/run_dynamo_runner_mcp_smoke.py` descubre tres tools: ping, lectura fijada y ejecución de rutina guardada. |
 | Loop Builder → Runner | PASS con fake | `tests/run_dynamo_runner_pipe_smoke.py` crea una rutina con Builder MCP, rechaza llamadas genéricas sin autorización (incluida una rutina marcada read-only), la ejecuta contra un pipe y bridge falsos, promueve el manifiesto a `validated` y confirma que Builder vuelve a listarla. No inicia Revit/Dynamo. |
 | Build y paquete del add-in | PASS | Roslyn compiló un DLL de 36.352 bytes contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10; DLL distribuido e instalado coinciden por SHA-256 `9205c035…`. |
-| Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario de Revit registra `TaskDialog_Security_Unsigned_File_Loading`; falta elegir Load Once. La sesión productiva permanece intacta. |
+| Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario registró el aviso `TaskDialog_Security_Unsigned_File_Loading`; después, el pipe aceptó una llamada. La sesión productiva permanece intacta. El `ExternalEvent` sigue sin verificarse. |
 | RVT de prueba | PASS | Copia local de `Snowdon Towers Sample HVAC.rvt` incluida con Revit 2027; coincide en tamaño/hash y está ignorada por Git. |
-| Smoke vivo bridge → Revit | PENDIENTE | `--live-generic` respondió `bridge_connect_timeout` porque el proceso de prueba aún no ha cargado el add-in. Se cerró una sesión de prueba anterior sin guardar y el hash del RVT en disco no cambió. |
+| Smoke vivo bridge → Revit, 28-09-2026 | FAIL | `--live-generic` conectó al named pipe, pero `ping_revit_dynamo_bridge` terminó con `revit_dispatch_timeout_before_execution` tras 90 s. La captura de Revit muestra el cuadro de cinco referencias sin resolver. La rutina no llegó a ejecutarse y el hash del RVT se mantuvo `3368FDBB…`. La automatización de escritorio no expone ventanas nativas en esta sesión. |
 | Ejecución Dynamo PythonNet3 en Revit | PENDIENTE | Requiere cargar el add-in en la sesión del RVT de prueba y pasar primero el smoke read-only. |
 | Escritura Comments + lectura posterior | PENDIENTE | Se hará en el RVT de prueba con un elemento seleccionado y aprobación explícita. |
 | Herramientas Codex desde esta carpeta | PENDIENTE | Abrir esta carpeta como proyecto confiable y comprobar `tools/list` en la app Codex. |
@@ -30,7 +30,7 @@ python -B tests/run_dynamo_runner_mcp_smoke.py
 
 ## Prueba viva read-only
 
-Con el add-in cargado en Revit 2027 y el RVT desechable abierto, guardado y sin cambios pendientes:
+Con el add-in cargado en Revit 2027 y el RVT desechable abierto, guardado y sin cuadros modales pendientes:
 
 ```powershell
 python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
