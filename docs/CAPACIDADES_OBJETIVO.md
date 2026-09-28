@@ -1,6 +1,6 @@
 # Capacidad objetivo del asistente BIM
 
-**Fecha:** 24 de septiembre de 2026
+**Actualizado:** 28 de septiembre de 2026
 **Estado:** arquitectura y ruta de desarrollo; todavía no es la capacidad instalada completa.
 
 ## Objetivo
@@ -31,7 +31,7 @@ Volver a consultar el modelo y comparar con el plan
 Informar resultados y guardar el procedimiento reutilizable
 ```
 
-Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario, pero aún falta probarlo dentro de una sesión Revit nueva con el RVT descartable.
+Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario; el pipe acepta conexiones, pero el `ExternalEvent` no se despachó y la rutina aún no llegó a Dynamo/PythonNet3.
 
 ## Conocimiento técnico reutilizable
 
@@ -48,10 +48,10 @@ Una rutina entra a la biblioteca común después de revisión y prueba en un mod
 ## Capacidad disponible hoy
 
 - La consulta directa Revit 2027 ↔ rvt-mcp pasó en solo lectura: se obtuvo la vista activa y la selección de un muro. Los IDs y nombres del modelo se omitieron de la versión pública.
-- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. La integración de ese perfil desde Codex aún no se ha validado.
+- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. `codex mcp list` muestra habilitados los tres MCP del proyecto; falta comprobarlos en la app Codex con esta carpeta abierta.
 - El MCP de rutinas genera el fuente `.py`, un `.dyn` de un nodo PythonNet3 Manual con wrapper de resultado y un manifiesto con hashes. El runner genérico vuelve a validar ambos y se limita a RVT de `revit/test-models/`.
 - El borrador `set_comments_on_selection` escribe `PRUEBA_IA` en Comments de los elementos seleccionados. El propio script también comprueba que el documento sea un RVT local guardado bajo el directorio desechable. Aún no se ha ejecutado en Revit.
-- La app Codex todavía debe abrir esta carpeta como proyecto confiable y confirmar que cargó los MCP. La consulta viva de Revit aún no se ha hecho desde esa configuración de Codex.
+- La consulta real de rvt-mcp a Revit pasó por separado desde la CLI. La app Codex todavía debe abrir esta carpeta como proyecto confiable y confirmar que cargó los MCP desde la interfaz.
 
 El inventario local es una lectura del esquema de herramientas, no una prueba de cada comando. Antes de aprobar una escritura, Codex debe explicar el objetivo y consultar los datos relevantes del proyecto. Cada herramienta aprobada puede aplicar el cambio inmediatamente; el MCP no proporciona una vista previa o rollback general. Las tareas compuestas se ejecutan en pasos pequeños sobre un modelo descartable y se verifican con consultas posteriores. Borrado, guardado, exportación y ejecución libre requieren controles separados.
 
