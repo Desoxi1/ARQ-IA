@@ -2,10 +2,11 @@
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
+| Revalidación offline, 28-09-2026 | PASS | 27 pruebas unitarias; Builder MCP; Runner MCP; loop completo contra bridge falso. Confirma integridad, autorización de escritura, ejecución simulada y reutilización; no ejecuta Revit/Dynamo. |
 | rvt-mcp v0.6.2: SHA-256 oficial | PASS | ZIP coincide con el hash fijado en el instalador. |
 | rvt-mcp `initialize` + `tools/list` | PASS | 51 herramientas para los toolsets configurados; perfil Codex filtra una lista acotada y no habilita ToolBaker ni send-code. |
 | rvt-mcp vista/selección en Revit | PASS, histórico | Consultas de solo lectura respondieron en la sesión iniciada por el usuario; no se modificó el documento. El detalle del proyecto se omitió. |
-| rvt-mcp read-only, 26-09-2026 | PASS | `initialize`, descubrimiento de 16 herramientas y consultas de vista/selección respondieron. No se llamó ninguna escritura ni se imprimió información del modelo. |
+| rvt-mcp read-only, 28-09-2026 | PASS | `initialize`, descubrimiento de 16 herramientas y consultas de vista/selección respondieron. No se llamó ninguna escritura ni se imprimió información del modelo. |
 | Builder MCP stdio | PASS | `tests/run_routine_builder_mcp_smoke.py` creó una rutina temporal, comprobó PythonNet3/Manual/result wrapper/hashes y limpió los archivos. Escritura sin confirmación se rechazó. |
 | Wrapper JSON PythonNet3 | PASS | Limita salida a 64 KiB, exige correlation ID válido y rechaza tipos no JSON. |
 | Rutinas y modelos de prueba | PASS offline | 27 pruebas cubren fakes, alcance de Comments, estructura `.py/.dyn/manifest`, hashes, expiración de cola, autorización de toda ejecución genérica y protección contra documentos fuera de `revit/test-models/`. |
