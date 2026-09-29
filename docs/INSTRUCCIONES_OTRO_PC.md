@@ -2,6 +2,8 @@
 
 El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desde un release del repositorio o transfiérela como ZIP. Si el instalador no está en `vendor/`, `setup.ps1` lo descarga desde el release oficial v0.6.2 y verifica el SHA-256 antes de ejecutarlo.
 
+Para generar el ZIP desde el PC de desarrollo, guarda los cambios en un commit y ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\package.ps1`. El archivo se crea en `artifacts/` con el hash corto del commit; el script comprueba que no incluya RVT ni configuración/secrets locales.
+
 ## Instalación
 
 1. Cierra Revit.

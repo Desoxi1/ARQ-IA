@@ -44,3 +44,5 @@ Ejecuta `setup.ps1` para instalar/configurar rvt-mcp. Si solo hace falta actuali
 Para revisar la instalación sin modificarla, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1`. El diagnóstico valida Revit/Dynamo, los MCP, el add-in y sus hashes, las rutas locales y si el RVT de prueba y el pipe están disponibles. `WAIT` indica que falta abrir la sesión de prueba; `FAIL` señala una instalación o configuración que requiere corregirse.
 
 Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para replicar el POC en otro PC.
+
+Para crear un ZIP portable del commit actual, primero guarda todos los cambios en Git y ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\package.ps1`. El empaquetador excluye los modelos y la configuración local, y valida secretos/rutas antes de escribir el archivo en `artifacts/`.

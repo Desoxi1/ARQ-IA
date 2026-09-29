@@ -1,0 +1,78 @@
+#requires -Version 5.1
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$projectRoot = [IO.Path]::GetFullPath($PSScriptRoot)
+$artifactsRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
+$prefix = 'BIM-AI-POC/'
+
+if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.git') -PathType Container)) {
+    throw 'Ejecuta este empaquetador desde un checkout Git del proyecto.'
+}
+$status = @(& git -C $projectRoot status --porcelain)
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo consultar el estado de Git.' }
+if ($status.Count -gt 0) { throw 'Guarda los cambios en un commit antes de empaquetar.' }
+
+$revision = (& git -C $projectRoot rev-parse --short HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[0-9a-f]{7,40}$') { throw 'No se pudo resolver el commit actual.' }
+New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
+$archivePath = Join-Path $artifactsRoot ('BIM-AI-POC-' + $revision + '.zip')
+$tempArchive = Join-Path $artifactsRoot ('.BIM-AI-POC-' + [Guid]::NewGuid().ToString('N') + '.tmp.zip')
+if (Test-Path -LiteralPath $archivePath) { throw 'Ya existe un paquete para este commit; no se sobrescribio.' }
+
+try {
+    & git -C $projectRoot archive --format=zip ('--prefix=' + $prefix) --output=$tempArchive HEAD
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $tempArchive -PathType Leaf)) {
+        throw 'git archive no pudo crear el paquete.'
+    }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($tempArchive)
+    try {
+        $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
+        $requiredFiles = @(
+            'BIM-AI-POC/README.md',
+            'BIM-AI-POC/setup.ps1',
+            'BIM-AI-POC/doctor.ps1',
+            'BIM-AI-POC/.codex/config.toml.example'
+        )
+        $entryNames = @($entries | ForEach-Object { $_.FullName })
+        foreach ($requiredFile in $requiredFiles) {
+            if ($requiredFile -notin $entryNames) { throw "Falta un archivo requerido: $requiredFile" }
+        }
+
+        $tokenPattern = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b'
+        $privatePathPattern = '(?i)[A-Z]:[\\/]+Users[\\/]+Branko(?:[\\/]|$)'
+        foreach ($entry in $entries) {
+            $name = $entry.FullName
+            $extension = [IO.Path]::GetExtension($name).ToLowerInvariant()
+            if ($extension -in @('.rvt', '.rfa', '.rte') -or
+                $name -eq 'BIM-AI-POC/.codex/config.toml' -or
+                $name -match '(?i)(^|/)\.env(\.(?!example$)[^/]+)?$' -or
+                $name -match '(?i)(^|/)logs/runner-results/') {
+                throw "El paquete incluye un artefacto local no permitido: $name"
+            }
+
+            $stream = $entry.Open()
+            $reader = New-Object System.IO.StreamReader($stream, [Text.Encoding]::UTF8, $true)
+            try { $content = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            if ($content -match $tokenPattern) { throw "Se detecto un patron de token en: $name" }
+            if ($content -match $privatePathPattern) { throw "Se detecto una ruta privada local en: $name" }
+        }
+
+        Move-Item -LiteralPath $tempArchive -Destination $archivePath
+    } finally {
+        $zip.Dispose()
+    }
+
+    $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Output 'PACKAGE=PASS'
+    Write-Output ("REVISION=" + $revision)
+    Write-Output ("FILES=" + $entries.Count)
+    Write-Output 'SECRETS_AND_LOCAL_ARTIFACTS=PASS'
+    Write-Output ("ARCHIVE=" + $archivePath)
+    Write-Output ("SHA256=" + $hash)
+} finally {
+    Remove-Item -LiteralPath $tempArchive -Force -ErrorAction SilentlyContinue
+}
