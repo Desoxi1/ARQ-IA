@@ -1,6 +1,6 @@
 # Capacidad objetivo del asistente BIM
 
-**Actualizado:** 28 de septiembre de 2026
+**Actualizado:** 29 de septiembre de 2026
 **Estado:** arquitectura y ruta de desarrollo; todavía no es la capacidad instalada completa.
 
 ## Objetivo
@@ -31,7 +31,7 @@ Volver a consultar el modelo y comparar con el plan
 Informar resultados y guardar el procedimiento reutilizable
 ```
 
-Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario; el pipe acepta conexiones, pero el `ExternalEvent` no se despachó y la rutina aún no llegó a Dynamo/PythonNet3.
+Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario, pero la sesión de prueba está cerrada y la rutina aún no llegó a Dynamo/PythonNet3. En el intento vivo anterior, Revit no despachó el `ExternalEvent`.
 
 ## Conocimiento técnico reutilizable
 

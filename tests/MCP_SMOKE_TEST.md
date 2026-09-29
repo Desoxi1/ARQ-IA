@@ -1,4 +1,4 @@
-# Registro de pruebas MCP — actualizado el 28 de septiembre de 2026
+# Registro de pruebas MCP — actualizado el 29 de septiembre de 2026
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
@@ -15,6 +15,7 @@
 | Build y paquete del add-in | PASS | Roslyn compiló un DLL de 36.352 bytes contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10; DLL distribuido e instalado coinciden por SHA-256 `9205c035…`. |
 | Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario registró el aviso `TaskDialog_Security_Unsigned_File_Loading`; después, el pipe aceptó una llamada. La sesión productiva permanece intacta. El `ExternalEvent` sigue sin verificarse. |
 | RVT de prueba | PASS | Copia local de `Snowdon Towers Sample HVAC.rvt` incluida con Revit 2027; coincide en tamaño/hash y está ignorada por Git. |
+| Estado Revit, 29-09-2026 | PENDIENTE | La sesión de prueba se cerró; solo está abierto el proyecto productivo y no existe el pipe de prueba. El SHA-256 del RVT descartable sigue igual. |
 | Smoke vivo bridge → Revit, 28-09-2026 | FAIL | `--live-generic` conectó al named pipe, pero `ping_revit_dynamo_bridge` terminó con `revit_dispatch_timeout_before_execution` tras 90 s. La captura de Revit muestra el cuadro de cinco referencias sin resolver. La rutina no llegó a ejecutarse y el hash del RVT se mantuvo `3368FDBB…`. La automatización de escritorio no expone ventanas nativas en esta sesión. |
 | Ejecución Dynamo PythonNet3 en Revit | PENDIENTE | Requiere cargar el add-in en la sesión del RVT de prueba y pasar primero el smoke read-only. |
 | Escritura Comments + lectura posterior | PENDIENTE | Se hará en el RVT de prueba con un elemento seleccionado y aprobación explícita. |
