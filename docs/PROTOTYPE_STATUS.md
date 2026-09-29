@@ -22,6 +22,7 @@
 | Revalidación offline, 28-09-2026 | PASS | 27 pruebas unitarias, Builder MCP, Runner MCP, loop Builder → Runner con bridge falso y contrato de tres tools; confirma generación, autorización, guardado y reutilización, pero no ejecuta Revit/Dynamo. |
 | rvt-mcp read-only, 28-09-2026 | PASS | `initialize`, descubrimiento de 16 herramientas y lecturas de vista activa/selección; sin escrituras. |
 | Registro MCP de Codex CLI, 28-09-2026 | PASS | `codex mcp list` muestra los tres MCP del proyecto habilitados. El acceso desde la app Codex con el proyecto abierto sigue sin comprobar. |
+| `doctor.ps1`, 29-09-2026 | PASS + WAIT | 10 comprobaciones pasaron y no hubo fallos. Espera que se abra el RVT descartable y aparezca el pipe; el diagnóstico es de solo lectura. |
 | `python -B -m unittest discover -s tests -p 'test_*.py'` | PASS, 27 pruebas | Fakes de Revit, límites del wrapper JSON, integridad de paquetes `.py/.dyn/manifest`, hashes, timeout de cola, gate de autorización genérica y rechazo de modelos fuera de `test-models`. No ejecuta Revit. |
 | `python -B tests/run_routine_builder_mcp_smoke.py` | PASS | MCP stdio, confirmación al guardar una escritura, rutina temporal, estructura PythonNet3/Manual, hashes y limpieza. |
 | `python -B tests/run_dynamo_runner_pipe_smoke.py` | PASS | Loop Builder MCP → rutina guardada → Runner MCP → named pipe/bridge falso; deniega toda ejecución genérica sin autorización, comprueba la promoción a `validated` y que Builder la vuelva a listar. No ejecuta Revit ni Dynamo. |
