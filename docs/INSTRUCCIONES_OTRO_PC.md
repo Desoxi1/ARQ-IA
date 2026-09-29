@@ -28,6 +28,16 @@ El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desd
 4. Abre `BIM-AI-POC` como proyecto en Codex y confía esa carpeta para que Codex lea su configuración `.codex/config.toml`; reinicia Codex si ya estaba abierto. En PowerShell, desde la raíz del proyecto, ejecuta `codex mcp list` y confirma que aparezcan habilitados `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner`. La lista confirma el cableado del proyecto, no la conexión viva con Revit.
 5. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. No uses un proyecto de producción. Si no aparece el aviso, comprueba el diario de Revit y verifica que el DLL está cargado antes de ejecutar una rutina.
 
+## Diagnosticar sin modificar Revit
+
+Después de instalar y preparar el modelo, ejecuta:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1
+```
+
+El diagnóstico es de solo lectura. Comprueba las instalaciones locales de Revit/Dynamo y rvt-mcp, la configuración MCP de esta carpeta, el manifiesto/hash del bridge, el RVT descartable y la presencia del pipe. `WAIT` es normal antes de abrir el RVT de prueba; `FAIL` requiere corregir la instalación antes de ejecutar rutinas.
+
 ## Prueba 1: conexión Codex → Revit (consulta)
 
 Selecciona unos pocos elementos en Revit y pídele a Codex:

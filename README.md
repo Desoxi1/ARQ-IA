@@ -41,4 +41,6 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 
 Ejecuta `setup.ps1` para instalar/configurar rvt-mcp. Si solo hace falta actualizar la configuración local del proyecto, usa `setup.ps1 -ConfigureOnly`. `revit/bridge/install.ps1` instala el puente por usuario; si Revit sigue abierto, `-StageWhileRevitOpen` prepara los archivos para una sesión nueva. Abre esta carpeta como proyecto confiable en Codex y reinicia Codex para cargar los MCP. La primera prueba viva es solo lectura en el RVT desechable de `revit/test-models/`; confirma que `ping_revit_dynamo_bridge` responde y que la lectura de Dynamo termina antes de intentar una escritura.
 
+Para revisar la instalación sin modificarla, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1`. El diagnóstico valida Revit/Dynamo, los MCP, el add-in y sus hashes, las rutas locales y si el RVT de prueba y el pipe están disponibles. `WAIT` indica que falta abrir la sesión de prueba; `FAIL` señala una instalación o configuración que requiere corregirse.
+
 Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para replicar el POC en otro PC.
