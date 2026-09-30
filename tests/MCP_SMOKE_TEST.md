@@ -1,9 +1,10 @@
-# Registro de pruebas MCP — actualizado el 29 de septiembre de 2026
+# Registro de pruebas MCP — actualizado el 30 de septiembre de 2026
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
 | Revalidación offline, 28-09-2026 | PASS | 27 pruebas unitarias; Builder MCP; Runner MCP; loop completo contra bridge falso. Confirma integridad, autorización de escritura, ejecución simulada y reutilización; no ejecuta Revit/Dynamo. |
 | Diagnóstico local, 29-09-2026 | PASS + WAIT | `doctor.ps1`: Revit/Dynamo, Codex CLI, los tres MCP, add-ins, configuración y hash de DLL verificados. Espera que se abra el RVT descartable y esté disponible el pipe. No modifica Revit. |
+| ZIP portable, 30-09-2026 | PASS | `package.ps1` produjo 54 archivos desde `e9ebdef`; validó configuración/modelos privados, patrones de token y rutas. SHA-256 `46bbb4fe203956efe7394bad531f706f68a9fb744ab09426024a3b01ff2fc426`. |
 | rvt-mcp v0.6.2: SHA-256 oficial | PASS | ZIP coincide con el hash fijado en el instalador. |
 | rvt-mcp `initialize` + `tools/list` | PASS | 51 herramientas para los toolsets configurados; perfil Codex filtra una lista acotada y no habilita ToolBaker ni send-code. |
 | rvt-mcp vista/selección en Revit | PASS, histórico | Consultas de solo lectura respondieron en la sesión iniciada por el usuario; no se modificó el documento. El detalle del proyecto se omitió. |

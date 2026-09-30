@@ -1,6 +1,6 @@
 # Estado del prototipo
 
-**Actualizado:** 29 de septiembre de 2026
+**Actualizado:** 30 de septiembre de 2026
 **Objetivo:** Codex → MCP → rutina guardada → bridge Revit → Dynamo/PythonNet3 → verificación y reutilización.
 
 ## Estado actual
@@ -23,6 +23,7 @@
 | rvt-mcp read-only, 28-09-2026 | PASS | `initialize`, descubrimiento de 16 herramientas y lecturas de vista activa/selección; sin escrituras. |
 | Registro MCP de Codex CLI, 28-09-2026 | PASS | `codex mcp list` muestra los tres MCP del proyecto habilitados. El acceso desde la app Codex con el proyecto abierto sigue sin comprobar. |
 | `doctor.ps1`, 29-09-2026 | PASS + WAIT | 10 comprobaciones pasaron y no hubo fallos. Espera que se abra el RVT descartable y aparezca el pipe; el diagnóstico es de solo lectura. |
+| Paquete portable, 30-09-2026 | PASS | `package.ps1` empaquetó el commit `e9ebdef` en 54 archivos y excluyó RVT/RFA/RTE, `.codex/config.toml`, tokens y rutas privadas; SHA-256 `46bbb4fe203956efe7394bad531f706f68a9fb744ab09426024a3b01ff2fc426`. |
 | `python -B -m unittest discover -s tests -p 'test_*.py'` | PASS, 27 pruebas | Fakes de Revit, límites del wrapper JSON, integridad de paquetes `.py/.dyn/manifest`, hashes, timeout de cola, gate de autorización genérica y rechazo de modelos fuera de `test-models`. No ejecuta Revit. |
 | `python -B tests/run_routine_builder_mcp_smoke.py` | PASS | MCP stdio, confirmación al guardar una escritura, rutina temporal, estructura PythonNet3/Manual, hashes y limpieza. |
 | `python -B tests/run_dynamo_runner_pipe_smoke.py` | PASS | Loop Builder MCP → rutina guardada → Runner MCP → named pipe/bridge falso; deniega toda ejecución genérica sin autorización, comprueba la promoción a `validated` y que Builder la vuelva a listar. No ejecuta Revit ni Dynamo. |
