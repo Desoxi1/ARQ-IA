@@ -36,6 +36,38 @@ if (Test-Path -LiteralPath $dynamoAssembly -PathType Leaf) {
     Write-Check FAIL 'No se encontro DynamoRevitDS.dll para Revit 2027'
 }
 
+$dynamoExtensionRoot = Join-Path $revitRoot 'AddIns\DynamoForRevit'
+$extensionPackageRoot = Join-Path $projectRoot 'dynamo\extension\dist'
+$extensionPackageDll = Join-Path $extensionPackageRoot 'BimAiDynamoAssistant.dll'
+$extensionPackageHash = Join-Path $extensionPackageRoot 'BimAiDynamoAssistant.dll.sha256'
+$extensionPackageDefinition = Join-Path $extensionPackageRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$extensionInstalledDll = Join-Path $dynamoExtensionRoot 'BimAiDynamoAssistant.dll'
+$extensionInstalledDefinition = Join-Path $dynamoExtensionRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
+    (Test-Path -LiteralPath $extensionPackageHash -PathType Leaf) -and
+    (Test-Path -LiteralPath $extensionPackageDefinition -PathType Leaf)) {
+    $expectedExtensionHash = (Get-Content -LiteralPath $extensionPackageHash -Raw).Trim().ToLowerInvariant()
+    if ($expectedExtensionHash -notmatch '^[0-9a-f]{64}$' -or (Get-PathHash $extensionPackageDll) -ne $expectedExtensionHash) {
+        Write-Check FAIL 'El DLL portable de Asistente BIM no coincide con su SHA-256'
+    } elseif ((Test-Path -LiteralPath $extensionInstalledDll -PathType Leaf) -and
+        (Test-Path -LiteralPath $extensionInstalledDefinition -PathType Leaf)) {
+        $installedExtensionHash = Get-PathHash $extensionInstalledDll
+        $packageDefinitionHash = Get-PathHash $extensionPackageDefinition
+        $installedDefinitionHash = Get-PathHash $extensionInstalledDefinition
+        if ($installedExtensionHash -eq $expectedExtensionHash -and $installedDefinitionHash -eq $packageDefinitionHash) {
+            Write-Check PASS 'Asistente BIM para Dynamo instalado; DLL y manifiesto coinciden con el paquete'
+        } else {
+            Write-Check FAIL 'La extension Dynamo instalada no coincide con el paquete; revisa y actualiza con install.ps1 -Force'
+        }
+    } elseif ((Test-Path -LiteralPath $extensionInstalledDll) -or (Test-Path -LiteralPath $extensionInstalledDefinition)) {
+        Write-Check FAIL 'La extension Dynamo tiene una instalacion parcial; revisa y vuelve a ejecutar install.ps1'
+    } else {
+        Write-Check WAIT 'Paquete de Asistente BIM listo; instala con dynamo\extension\install.ps1 cuando Revit este cerrado'
+    }
+} else {
+    Write-Check FAIL 'Falta el DLL, SHA-256 o manifiesto portable de Asistente BIM para Dynamo'
+}
+
 foreach ($toolName in @('git', 'python', 'codex')) {
     if (Get-Command $toolName -ErrorAction SilentlyContinue) {
         Write-Check PASS "$toolName disponible en PATH"
