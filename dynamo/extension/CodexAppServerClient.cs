@@ -1,0 +1,407 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+
+namespace BimAiDynamoAssistant;
+
+internal sealed record AgentApprovalRequest(string Reason, string Command, string WorkingDirectory, string RequestedPermissions);
+
+internal sealed class CodexAppServerClient : IAsyncDisposable
+{
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly SemaphoreSlim _startGate = new(1, 1);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
+    private readonly CancellationTokenSource _shutdown = new();
+    private Process? _process;
+    private Task? _readerTask;
+    private TaskCompletionSource<bool>? _activeTurn;
+    private string? _activeTurnId;
+    private string? _threadId;
+    private long _nextRequestId;
+
+    public event Action<string>? TextReceived;
+    public event Action<string>? StatusChanged;
+    public event Action<string>? TurnFailed;
+    public Func<AgentApprovalRequest, Task<bool>>? ApprovalRequested { get; set; }
+
+    public async Task EnsureStartedAsync(string projectRoot, CancellationToken cancellationToken = default)
+    {
+        if (_threadId is not null) return;
+
+        await _startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_threadId is not null) return;
+            await StartProcessAsync(projectRoot, cancellationToken).ConfigureAwait(false);
+
+            await RequestAsync("initialize", new
+            {
+                clientInfo = new { name = "bim_ai_dynamo", title = "Asistente BIM para Dynamo", version = "0.1.0" },
+                capabilities = (object?)null
+            }, cancellationToken).ConfigureAwait(false);
+            await NotifyAsync("initialized", new { }, cancellationToken).ConfigureAwait(false);
+
+            var thread = await RequestAsync("thread/start", new
+            {
+                cwd = projectRoot,
+                approvalPolicy = "on-request",
+                sandbox = "read-only",
+                ephemeral = true,
+                developerInstructions = "Eres el asistente BIM local dentro de Dynamo. Sigue el AGENTS.md del proyecto. Consulta el modelo con rvt-mcp antes de asumir nombres, IDs, tipos, unidades o alcance. Explica el plan y espera una aprobación explícita del usuario antes de llamar a cualquier herramienta que pueda modificar el modelo o guardar una rutina de escritura. Ejecuta rutinas genéricas solo en el RVT descartable dentro de revit/test-models; nunca ejecutes código libre ni uses un modelo productivo. Verifica cada cambio con una lectura posterior."
+            }, cancellationToken).ConfigureAwait(false);
+
+            _threadId = thread.GetProperty("thread").GetProperty("id").GetString();
+            if (string.IsNullOrWhiteSpace(_threadId))
+                throw new InvalidOperationException("Codex did not return a thread id.");
+
+            StatusChanged?.Invoke("Codex conectado; MCP disponibles según la configuración del proyecto");
+        }
+        catch
+        {
+            await StopProcessAsync().ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            _startGate.Release();
+        }
+    }
+
+    public async Task SendMessageAsync(string message, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_threadId))
+            throw new InvalidOperationException("Codex session has not started.");
+        if (_activeTurn is not null)
+            throw new InvalidOperationException("Codex is already processing a request.");
+
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _activeTurn = completion;
+        _activeTurnId = null;
+        StatusChanged?.Invoke("Codex está preparando la respuesta…");
+        try
+        {
+            var started = await RequestAsync("turn/start", new
+            {
+                threadId = _threadId,
+                input = new[] { new { type = "text", text = message, text_elements = Array.Empty<object>() } },
+                approvalPolicy = "on-request"
+            }, cancellationToken).ConfigureAwait(false);
+
+            if (started.TryGetProperty("turn", out var turn) && turn.TryGetProperty("id", out var turnId))
+                _activeTurnId ??= turnId.GetString();
+
+            var completed = await completion.Task.WaitAsync(TimeSpan.FromMinutes(10), cancellationToken).ConfigureAwait(false);
+            if (!completed)
+                throw new InvalidOperationException("Codex turn did not complete successfully.");
+        }
+        finally
+        {
+            _activeTurn = null;
+            _activeTurnId = null;
+        }
+    }
+
+    private async Task StartProcessAsync(string projectRoot, CancellationToken cancellationToken)
+    {
+        var codexPath = FindCodexExecutable();
+        var startInfo = new ProcessStartInfo(codexPath)
+        {
+            WorkingDirectory = projectRoot,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = new UTF8Encoding(false),
+            StandardErrorEncoding = new UTF8Encoding(false)
+        };
+        startInfo.ArgumentList.Add("app-server");
+        startInfo.ArgumentList.Add("--listen");
+        startInfo.ArgumentList.Add("stdio://");
+
+        _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+        if (!_process.Start())
+            throw new InvalidOperationException("Codex app-server could not be started.");
+
+        _ = DrainStandardErrorAsync(_process.StandardError, _shutdown.Token);
+        _readerTask = Task.Run(() => ReadResponsesAsync(_process.StandardOutput, _shutdown.Token), _shutdown.Token);
+        StatusChanged?.Invoke("Iniciando Codex app-server…");
+        await Task.Yield();
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private static string FindCodexExecutable()
+    {
+        var pathValue = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var directory in pathValue.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            try
+            {
+                var candidate = Path.Combine(directory.Trim('"'), "codex.exe");
+                if (File.Exists(candidate)) return candidate;
+            }
+            catch
+            {
+                // Continue through PATH entries that are not valid filesystem paths.
+            }
+        }
+        throw new FileNotFoundException("Codex CLI (codex.exe) was not found on PATH.");
+    }
+
+    private async Task<JsonElement> RequestAsync(string method, object parameters, CancellationToken cancellationToken)
+    {
+        var id = Interlocked.Increment(ref _nextRequestId);
+        var key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var completion = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending[key] = completion;
+        var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters });
+        try
+        {
+            await WriteLineAsync(payload, cancellationToken).ConfigureAwait(false);
+            return await completion.Task.WaitAsync(TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _pending.TryRemove(key, out _);
+        }
+    }
+
+    private Task NotifyAsync(string method, object parameters, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", method, @params = parameters });
+        return WriteLineAsync(payload, cancellationToken);
+    }
+
+    private async Task WriteLineAsync(string payload, CancellationToken cancellationToken)
+    {
+        if (_process is null || _process.HasExited)
+            throw new InvalidOperationException("Codex app-server is not running.");
+
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _process.StandardInput.WriteLineAsync(payload.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await _process.StandardInput.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private async Task ReadResponsesAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                if (line is null) break;
+
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
+                if (root.TryGetProperty("method", out var methodValue))
+                {
+                    var method = methodValue.GetString() ?? string.Empty;
+                    if (root.TryGetProperty("id", out var requestId))
+                        await HandleServerRequestAsync(requestId.GetRawText(), method, root.GetProperty("params"), cancellationToken).ConfigureAwait(false);
+                    else
+                        HandleNotification(method, root.TryGetProperty("params", out var parameters) ? parameters : default);
+                    continue;
+                }
+
+                if (root.TryGetProperty("id", out var responseId))
+                {
+                    var key = responseId.GetRawText();
+                    if (_pending.TryRemove(key, out var completion))
+                    {
+                        if (root.TryGetProperty("error", out var error))
+                        {
+                            var message = error.TryGetProperty("message", out var errorMessage) ? errorMessage.GetString() : "Codex request failed.";
+                            completion.TrySetException(new InvalidOperationException(message));
+                        }
+                        else if (root.TryGetProperty("result", out var result))
+                            completion.TrySetResult(result.Clone());
+                        else
+                            completion.TrySetException(new InvalidDataException("Codex returned an invalid response."));
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            TurnFailed?.Invoke($"La conexión con Codex terminó ({ex.GetType().Name}).");
+        }
+        finally
+        {
+            foreach (var pending in _pending.Values)
+                pending.TrySetException(new EndOfStreamException("Codex app-server closed the connection."));
+            _activeTurn?.TrySetException(new EndOfStreamException("Codex app-server closed the connection."));
+        }
+    }
+
+    private void HandleNotification(string method, JsonElement parameters)
+    {
+        if (method == "turn/started" && _activeTurn is not null &&
+            parameters.TryGetProperty("turn", out var startedTurn) && startedTurn.TryGetProperty("id", out var startedId))
+            _activeTurnId ??= startedId.GetString();
+        else if (method == "item/agentMessage/delta" &&
+                 parameters.TryGetProperty("turnId", out var deltaTurnId) && deltaTurnId.GetString() == _activeTurnId &&
+                 parameters.TryGetProperty("delta", out var delta))
+            TextReceived?.Invoke(delta.GetString() ?? string.Empty);
+        else if (method == "turn/completed")
+        {
+            var status = "unknown";
+            if (parameters.TryGetProperty("turn", out var turn) && turn.TryGetProperty("id", out var completedId))
+            {
+                var currentId = completedId.GetString();
+                if (_activeTurnId is null || currentId != _activeTurnId) return;
+                if (turn.TryGetProperty("status", out var turnStatus)) status = turnStatus.GetString() ?? status;
+            }
+            else return;
+            var succeeded = status == "completed";
+            if (!succeeded) TurnFailed?.Invoke($"Codex terminó el turno con estado: {status}.");
+            _activeTurn?.TrySetResult(succeeded);
+        }
+        else if (method == "mcpServer/startupStatus/updated" && parameters.TryGetProperty("status", out var statusValue))
+            StatusChanged?.Invoke($"MCP: {statusValue.GetString() ?? "estado actualizado"}");
+    }
+
+    private async Task HandleServerRequestAsync(string rawId, string method, JsonElement parameters, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (method == "item/commandExecution/requestApproval")
+            {
+                var request = new AgentApprovalRequest(
+                    GetString(parameters, "reason"),
+                    GetString(parameters, "command"),
+                    GetString(parameters, "cwd"),
+                    string.Empty);
+                var approved = ApprovalRequested is not null && await ApprovalRequested(request).ConfigureAwait(false);
+                await RespondAsync(rawId, new { decision = approved ? "accept" : "decline" }, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (method == "item/fileChange/requestApproval")
+            {
+                await RespondAsync(rawId, new { decision = "decline" }, cancellationToken).ConfigureAwait(false);
+                StatusChanged?.Invoke("Cambio de archivos del agente rechazado; usa las herramientas MCP de rutinas");
+                return;
+            }
+
+            if (method == "item/permissions/requestApproval")
+            {
+                var requested = parameters.TryGetProperty("permissions", out var permissions) ? permissions.Clone() : default;
+                var request = new AgentApprovalRequest(
+                    GetString(parameters, "reason"),
+                    string.Empty,
+                    GetString(parameters, "cwd"),
+                    requested.ValueKind == JsonValueKind.Undefined ? "No se detallaron permisos." : requested.GetRawText());
+                var approved = ApprovalRequested is not null && await ApprovalRequested(request).ConfigureAwait(false);
+                if (approved && requested.ValueKind == JsonValueKind.Object)
+                    await RespondAsync(rawId, new { permissions = requested, scope = "turn" }, cancellationToken).ConfigureAwait(false);
+                else
+                    await RespondErrorAsync(rawId, -32001, "Additional permissions were not approved.", cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (method == "mcpServer/elicitation/request")
+            {
+                var mode = GetString(parameters, "mode");
+                var serverName = GetString(parameters, "serverName");
+                var schema = parameters.TryGetProperty("requestedSchema", out var requestedSchema) ? requestedSchema.Clone() : default;
+                var hasFormFields = schema.ValueKind == JsonValueKind.Object &&
+                    ((schema.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array && required.GetArrayLength() > 0) ||
+                     (schema.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object && properties.EnumerateObject().Any()));
+
+                if (mode == "form" && !hasFormFields)
+                {
+                    var message = GetString(parameters, "message");
+                    var request = new AgentApprovalRequest(
+                        message,
+                        $"Servidor MCP: {serverName}",
+                        string.Empty,
+                        "La solicitud no pide campos ni permisos adicionales.");
+                    var approved = ApprovalRequested is not null && await ApprovalRequested(request).ConfigureAwait(false);
+                    object? content = approved ? new { } : null;
+                    await RespondAsync(rawId, new { action = approved ? "accept" : "decline", content, _meta = (object?)null }, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                StatusChanged?.Invoke("Solicitud MCP con campos o modo no admitido; rechazada por seguridad");
+                await RespondAsync(rawId, new { action = "decline", content = (object?)null, _meta = (object?)null }, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (method == "item/tool/requestUserInput")
+            {
+                await RespondErrorAsync(rawId, -32002, "Ask the user in the assistant conversation instead.", cancellationToken).ConfigureAwait(false);
+                StatusChanged?.Invoke("El asistente necesita una aclaración; responde en el chat");
+                return;
+            }
+
+            StatusChanged?.Invoke("Solicitud de permisos adicionales rechazada por seguridad");
+            await RespondErrorAsync(rawId, -32001, "Additional permissions are not granted by the Dynamo assistant.", cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await RespondErrorAsync(rawId, -32000, $"Approval request failed: {ex.GetType().Name}.", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private Task RespondAsync(string rawId, object result, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(result);
+        return WriteLineAsync($"{{\"jsonrpc\":\"2.0\",\"id\":{rawId},\"result\":{json}}}", cancellationToken);
+    }
+
+    private Task RespondErrorAsync(string rawId, int code, string message, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(new { code, message });
+        return WriteLineAsync($"{{\"jsonrpc\":\"2.0\",\"id\":{rawId},\"error\":{json}}}", cancellationToken);
+    }
+
+    private static string GetString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
+
+    private async Task DrainStandardErrorAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is not null) { }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private async Task StopProcessAsync()
+    {
+        _shutdown.Cancel();
+        try
+        {
+            if (_process is { HasExited: false }) _process.Kill(entireProcessTree: true);
+        }
+        catch { }
+        try
+        {
+            if (_process is not null) await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+        catch { }
+        _process?.Dispose();
+        _process = null;
+        _threadId = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopProcessAsync().ConfigureAwait(false);
+        _writeGate.Dispose();
+        _startGate.Dispose();
+        _shutdown.Dispose();
+    }
+}

@@ -28,7 +28,17 @@ Para generar el ZIP desde el PC de desarrollo, guarda los cambios en un commit y
 
    Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. El DLL del POC no está firmado; al iniciar Revit, puede aparecer el aviso de complemento sin firma. Para la prueba, verifica que cargue “BIM-AI Dynamo Bridge” y elige **Load Once**. Usa **Always Load** solo si decidiste confiar permanentemente en este DLL e ID de complemento. Autodesk explica estas opciones en [Security: Unsigned File or Add-In](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm). Si Revit permanece abierto, usa `-StageWhileRevitOpen`; esa sesión no carga el add-in y será necesario iniciar una sesión nueva. Usa `-Force` solo para actualizar conscientemente una instalación previa.
 4. Abre `BIM-AI-POC` como proyecto en Codex y confía esa carpeta para que Codex lea su configuración `.codex/config.toml`; reinicia Codex si ya estaba abierto. En PowerShell, desde la raíz del proyecto, ejecuta `codex mcp list` y confirma que aparezcan habilitados `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner`. La lista confirma el cableado del proyecto, no la conexión viva con Revit.
-5. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Para el sample Snowdon predeterminado, el script también copia y verifica los cinco RVT vinculados y habilita escritura solo en la copia anfitriona. No uses un proyecto de producción. Si persiste el aviso de referencias, comprueba que Revit tiene los cinco archivos junto al host o elige «Ignorar y abrir» solo para este RVT.
+5. Instala la ventana lateral de Dynamo que conecta con Codex:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\dynamo\extension\install.ps1
+   ```
+
+   Este paso copia el DLL precompilado incluido en el paquete; el otro PC no necesita .NET SDK. Cierra todas las sesiones de Revit antes de instalar y abre PowerShell como Administrador porque Dynamo está bajo `Program Files`. El instalador verifica el SHA-256 del DLL y del manifiesto. No instala ni cambia el modelo.
+6. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Para el sample Snowdon predeterminado, el script también copia y verifica los cinco RVT vinculados y habilita escritura solo en la copia anfitriona. No uses un proyecto de producción. Si persiste el aviso de referencias, comprueba que Revit tiene los cinco archivos junto al host o elige «Ignorar y abrir» solo para este RVT.
+7. En Revit abre Dynamo y selecciona la pestaña lateral **Asistente BIM**. Escribe primero: «Consulta la vista activa y mis elementos seleccionados. No cambies el modelo». La ventana usa la sesión local de Codex CLI y los MCP del proyecto; además de Codex, ese PC debe tener `codex.exe` instalado, autenticado y disponible en `PATH`. La interfaz `app-server` de Codex está marcada experimental, así que esta integración todavía es prototipo.
+
+El asistente explica el plan y solicita aprobación por cada llamada MCP. Antes de ejecutar una rutina genérica que pueda modificar el modelo, revisa el código y confirma la operación en el diálogo. Para la primera validación, limita la prueba a leer vista/selección y comprobar que el panel recibe la respuesta; la ejecución de Dynamo dentro de Revit aún requiere pasar la prueba viva descrita abajo.
 
 ## Diagnosticar sin modificar Revit
 

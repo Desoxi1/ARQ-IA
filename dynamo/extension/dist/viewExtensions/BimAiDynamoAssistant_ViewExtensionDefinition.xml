@@ -1,0 +1,4 @@
+<ViewExtensionDefinition>
+  <AssemblyPath>..\BimAiDynamoAssistant.dll</AssemblyPath>
+  <TypeName>BimAiDynamoAssistant.BimAiDynamoViewExtension</TypeName>
+</ViewExtensionDefinition>

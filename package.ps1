@@ -35,11 +35,31 @@ try {
             'BIM-AI-POC/README.md',
             'BIM-AI-POC/setup.ps1',
             'BIM-AI-POC/doctor.ps1',
-            'BIM-AI-POC/.codex/config.toml.example'
+            'BIM-AI-POC/.codex/config.toml.example',
+            'BIM-AI-POC/dynamo/extension/README.md',
+            'BIM-AI-POC/dynamo/extension/install.ps1',
+            'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll',
+            'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256',
+            'BIM-AI-POC/dynamo/extension/dist/viewExtensions/BimAiDynamoAssistant_ViewExtensionDefinition.xml'
         )
         $entryNames = @($entries | ForEach-Object { $_.FullName })
         foreach ($requiredFile in $requiredFiles) {
             if ($requiredFile -notin $entryNames) { throw "Falta un archivo requerido: $requiredFile" }
+        }
+
+        $extensionDllEntry = $zip.GetEntry('BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll')
+        $extensionHashEntry = $zip.GetEntry('BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256')
+        $dllStream = $extensionDllEntry.Open()
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try { $packagedExtensionHash = [BitConverter]::ToString($sha256.ComputeHash($dllStream)).Replace('-', '').ToLowerInvariant() }
+        finally { $dllStream.Dispose() }
+        $sha256.Dispose()
+        $hashStream = $extensionHashEntry.Open()
+        $hashReader = New-Object System.IO.StreamReader($hashStream, [Text.Encoding]::UTF8, $true)
+        try { $declaredExtensionHash = $hashReader.ReadToEnd().Trim().ToLowerInvariant() }
+        finally { $hashReader.Dispose() }
+        if ($declaredExtensionHash -notmatch '^[0-9a-f]{64}$' -or $declaredExtensionHash -ne $packagedExtensionHash) {
+            throw 'El DLL de la extension Dynamo no coincide con su manifiesto SHA-256.'
         }
 
         $tokenPattern = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b'

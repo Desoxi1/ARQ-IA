@@ -19,6 +19,7 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 - docs/: auditoría, decisión y estado del prototipo.
 - revit/: notas del host Revit y del add-in.
 - dynamo/: plantilla PythonNet3 manual para Dynamo 4.0.2.
+- dynamo/extension/: panel lateral **Asistente BIM** integrado en Dynamo; usa Codex app-server y los MCP del proyecto.
 - routines/: destino de rutinas revisadas, versionadas y reutilizables.
 - mcp/: MCP local para crear/listar rutinas y ejecutar las guardadas desde el bridge.
 - revit/bridge/: add-in fuente, DLL precompilado para la prueba y script de instalación local.
@@ -43,6 +44,6 @@ Ejecuta `setup.ps1` para instalar/configurar rvt-mcp. Si solo hace falta actuali
 
 Para revisar la instalación sin modificarla, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1`. El diagnóstico valida Revit/Dynamo, los MCP, el add-in y sus hashes, las rutas locales y si el RVT de prueba y el pipe están disponibles. `WAIT` indica que falta abrir la sesión de prueba; `FAIL` señala una instalación o configuración que requiere corregirse.
 
-Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para replicar el POC en otro PC.
+Consulta [docs/INSTRUCCIONES_OTRO_PC.md](docs/INSTRUCCIONES_OTRO_PC.md) para instalar y probar el panel **Asistente BIM** en otro PC. El DLL precompilado evita instalar .NET SDK en el equipo arquitecto; Codex CLI y los MCP del proyecto sí deben estar configurados.
 
 Para crear un ZIP portable del commit actual, primero guarda todos los cambios en Git y ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\package.ps1`. El empaquetador excluye los modelos y la configuración local, y valida secretos/rutas antes de escribir el archivo en `artifacts/`.
