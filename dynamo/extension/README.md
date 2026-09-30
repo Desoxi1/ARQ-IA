@@ -44,4 +44,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_dynamo_extension
 python -B .\tests\run_dynamo_extension_codex_smoke.py --mcp
 ```
 
-Las dos pruebas de Codex usan `bim_ai_routines.list_saved_routines`, una lectura MCP, y esperan encontrar tres rutinas. No abren Revit ni Dynamo. La carga visual del panel y el loop Dynamo → Revit se registran aparte en `docs/PROTOTYPE_STATUS.md`.
+El smoke C# usa el cliente real de la extensión para iniciar Codex app-server, pedir la creación aprobada de una rutina de solo lectura, verificar `.py`/`.dyn`/manifiesto/hash, volver a listarla y limpiar sus archivos temporales. El smoke Python comprueba aparte `list_saved_routines` con las rutinas guardadas del proyecto. No abren Revit ni Dynamo. La carga visual del panel y el loop Dynamo → Revit se registran aparte en `docs/PROTOTYPE_STATUS.md`.
