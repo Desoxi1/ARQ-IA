@@ -9,6 +9,11 @@
     <RootNamespace>BimAiDynamoAssistant</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="DynamoCore">
       <HintPath>$(DynamoRoot)\DynamoCore.dll</HintPath>
