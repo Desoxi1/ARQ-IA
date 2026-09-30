@@ -61,11 +61,11 @@ try {
             if ($content -match $privatePathPattern) { throw "Se detecto una ruta privada local en: $name" }
         }
 
-        Move-Item -LiteralPath $tempArchive -Destination $archivePath
     } finally {
         $zip.Dispose()
     }
 
+    Move-Item -LiteralPath $tempArchive -Destination $archivePath
     $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     Write-Output 'PACKAGE=PASS'
     Write-Output ("REVISION=" + $revision)
