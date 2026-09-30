@@ -77,6 +77,7 @@ $bridgeManifest = Join-Path $revitAddinsRoot 'BimAiDynamoBridge.addin'
 $bridgeSource = Join-Path $projectRoot 'revit\bridge\dist\BimAiDynamoBridge.dll'
 $bridgeHashFile = Join-Path $projectRoot 'revit\bridge\dist\BimAiDynamoBridge.sha256'
 $bridgeSettings = Join-Path $env:APPDATA 'BIM-AI-POC\bridge.json'
+$bridgeInstallTime = $null
 if ((Test-Path -LiteralPath $bridgeManifest -PathType Leaf) -and
     (Test-Path -LiteralPath $bridgeSource -PathType Leaf) -and
     (Test-Path -LiteralPath $bridgeHashFile -PathType Leaf)) {
@@ -92,6 +93,7 @@ if ((Test-Path -LiteralPath $bridgeManifest -PathType Leaf) -and
             (Get-PathHash $installedAssembly) -ne $expectedHash) {
             throw 'El DLL instalado no coincide con el hash del paquete.'
         }
+        $bridgeInstallTime = (Get-Item -LiteralPath $bridgeManifest).LastWriteTime
         Write-Check PASS 'Add-in BIM-AI instalado y su DLL coincide con el paquete'
     } catch {
         Write-Check FAIL 'El manifiesto o el hash del add-in BIM-AI no es valido'
@@ -153,8 +155,14 @@ if ($testModel) {
 
 $revitProcesses = @(Get-Process -Name Revit -ErrorAction SilentlyContinue)
 $testProcess = @($revitProcesses | Where-Object { $_.MainWindowTitle -match 'BIM-AI-Dynamo-Test' })
+$freshRevitProcess = @()
+if ($null -ne $bridgeInstallTime -and $revitProcesses.Count -gt 0) {
+    try { $freshRevitProcess = @($revitProcesses | Where-Object { $_.StartTime -ge $bridgeInstallTime }) } catch { }
+}
 if ($testProcess.Count -gt 0) {
     Write-Check PASS 'Revit muestra abierto el modelo de prueba'
+} elseif ($revitProcesses.Count -gt 0 -and $null -ne $bridgeInstallTime -and $freshRevitProcess.Count -eq 0) {
+    Write-Check WAIT 'La sesion Revit activa precede la instalacion del bridge; guarda el trabajo cuando corresponda e inicia una sesion nueva para cargarlo'
 } elseif ($revitProcesses.Count -gt 0) {
     Write-Check WAIT 'Revit esta abierto, pero no se detecta el RVT descartable en su titulo'
 } else {
