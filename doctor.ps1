@@ -126,6 +126,27 @@ $testModels = @(
 $testModel = $testModels | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if ($testModel) {
     Write-Check PASS 'RVT descartable disponible en revit\test-models'
+    $testModelItem = Get-Item -LiteralPath $testModel
+    if ($testModelItem.IsReadOnly) {
+        Write-Check WAIT 'El RVT descartable esta en solo lectura; ejecuta prepare-test-model.ps1 para habilitar escrituras de prueba'
+    } else {
+        Write-Check PASS 'El RVT descartable permite escrituras locales'
+    }
+    if ([IO.Path]::GetFileName($testModel) -like 'BIM-AI-Dynamo-Test*.rvt') {
+        $requiredSampleLinks = @(
+            'Snowdon Towers Sample Architectural.rvt',
+            'Snowdon Towers Sample Structural.rvt',
+            'Snowdon Towers Sample Plumbing.rvt',
+            'Snowdon Towers Sample Electrical.rvt',
+            'Snowdon Towers Sample Site.rvt'
+        )
+        $missingSampleLinks = @($requiredSampleLinks | Where-Object { -not (Test-Path -LiteralPath (Join-Path $testRoot $_) -PathType Leaf) })
+        if ($missingSampleLinks.Count -eq 0) {
+            Write-Check PASS 'Los cinco RVT vinculados de Snowdon estan junto al modelo descartable'
+        } else {
+            Write-Check WAIT ("Faltan RVT vinculados de Snowdon: " + ($missingSampleLinks -join ', ') + '; prepara la muestra para copiar sus dependencias locales')
+        }
+    }
 } else {
     Write-Check WAIT 'Falta el RVT descartable; prepara una copia local con revit\test-models\prepare-test-model.ps1'
 }

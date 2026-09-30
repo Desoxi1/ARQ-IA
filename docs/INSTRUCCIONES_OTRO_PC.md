@@ -28,7 +28,7 @@ Para generar el ZIP desde el PC de desarrollo, guarda los cambios en un commit y
 
    Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. El DLL del POC no está firmado; al iniciar Revit, puede aparecer el aviso de complemento sin firma. Para la prueba, verifica que cargue “BIM-AI Dynamo Bridge” y elige **Load Once**. Usa **Always Load** solo si decidiste confiar permanentemente en este DLL e ID de complemento. Autodesk explica estas opciones en [Security: Unsigned File or Add-In](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm). Si Revit permanece abierto, usa `-StageWhileRevitOpen`; el puente se cargará solo en la próxima sesión. Usa `-Force` solo para actualizar conscientemente una instalación previa.
 4. Abre `BIM-AI-POC` como proyecto en Codex y confía esa carpeta para que Codex lea su configuración `.codex/config.toml`; reinicia Codex si ya estaba abierto. En PowerShell, desde la raíz del proyecto, ejecuta `codex mcp list` y confirma que aparezcan habilitados `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner`. La lista confirma el cableado del proyecto, no la conexión viva con Revit.
-5. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. No uses un proyecto de producción. Si no aparece el aviso, comprueba el diario de Revit y verifica que el DLL está cargado antes de ejecutar una rutina.
+5. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Para el sample Snowdon predeterminado, el script también copia y verifica los cinco RVT vinculados y habilita escritura solo en la copia anfitriona. No uses un proyecto de producción. Si persiste el aviso de referencias, comprueba que Revit tiene los cinco archivos junto al host o elige «Ignorar y abrir» solo para este RVT.
 
 ## Diagnosticar sin modificar Revit
 
@@ -56,7 +56,7 @@ El RVT descartable está excluido del ZIP/repositorio. En el PC de prueba prepar
 powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1
 ```
 
-El script copia `Samples\Snowdon Towers Sample HVAC.rvt` a `revit/test-models/BIM-AI-Dynamo-Test.rvt`, verifica SHA-256 y no sobrescribe un destino existente distinto. Si no está instalado ese sample, pasa `-SourceModelPath` con otro RVT local y desechable.
+El script copia `Samples\Snowdon Towers Sample HVAC.rvt` a `revit/test-models/BIM-AI-Dynamo-Test.rvt`, verifica SHA-256 y no sobrescribe un destino existente distinto. También copia los cinco RVT Snowdon que el HVAC referencia con rutas relativas y comprueba sus hashes; los modelos permanecen locales e ignorados por Git. Solo quita el atributo de solo lectura a la copia HVAC de prueba, no al sample instalado. Si no está instalado ese sample, pasa `-SourceModelPath` con otro RVT local y desechable; sus dependencias deben estar disponibles en sus rutas.
 
 En la carpeta del proyecto ejecuta:
 
