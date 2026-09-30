@@ -2,8 +2,9 @@
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
-| Revalidación offline, 28-09-2026 | PASS | 27 pruebas unitarias; Builder MCP; Runner MCP; loop completo contra bridge falso. Confirma integridad, autorización de escritura, ejecución simulada y reutilización; no ejecuta Revit/Dynamo. |
-| Diagnóstico local, 29-09-2026 | PASS + WAIT | `doctor.ps1`: Revit/Dynamo, Codex CLI, los tres MCP, add-ins, configuración y hash de DLL verificados. Espera que se abra el RVT descartable y esté disponible el pipe. No modifica Revit. |
+| Revalidación offline, 30-09-2026 | PASS | 27 pruebas unitarias; Builder MCP; Runner MCP; loop completo contra bridge falso. Confirma integridad, autorización de escritura, ejecución simulada y reutilización; no ejecuta Revit/Dynamo. |
+| Diagnóstico local, 30-09-2026 | PASS + WAIT | `doctor.ps1`: Revit/Dynamo, Codex CLI, los tres MCP, add-in, configuración y hash de DLL verificados. Revit no muestra el RVT descartable en el título y el pipe no está disponible. No modifica Revit. |
+| Codex CLI → Builder MCP, 30-09-2026 | PASS | Una sesión CLI efímera invocó `bim_ai_routines.list_saved_routines` y recibió tres rutinas. Se permitió solo esta consulta de lectura mediante revisión automática; no se ejecutó ninguna rutina. |
 | ZIP portable, 30-09-2026 | PASS | `package.ps1` produjo 54 archivos desde `e9ebdef`; validó configuración/modelos privados, patrones de token y rutas. SHA-256 `46bbb4fe203956efe7394bad531f706f68a9fb744ab09426024a3b01ff2fc426`. |
 | rvt-mcp v0.6.2: SHA-256 oficial | PASS | ZIP coincide con el hash fijado en el instalador. |
 | rvt-mcp `initialize` + `tools/list` | PASS | 51 herramientas para los toolsets configurados; perfil Codex filtra una lista acotada y no habilita ToolBaker ni send-code. |
@@ -17,11 +18,12 @@
 | Build y paquete del add-in | PASS | Roslyn compiló un DLL de 36.352 bytes contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10; DLL distribuido e instalado coinciden por SHA-256 `9205c035…`. |
 | Instalación del bridge | PASS, staged | Add-in y bridge.json están instalados por usuario. El diario registró el aviso `TaskDialog_Security_Unsigned_File_Loading`; después, el pipe aceptó una llamada. La sesión productiva permanece intacta. El `ExternalEvent` sigue sin verificarse. |
 | RVT de prueba | PASS | Copia local de `Snowdon Towers Sample HVAC.rvt` incluida con Revit 2027; coincide en tamaño/hash y está ignorada por Git. |
-| Estado Revit, 29-09-2026 | PENDIENTE | La sesión de prueba se cerró; solo está abierto el proyecto productivo y no existe el pipe de prueba. El SHA-256 del RVT descartable sigue igual. |
+| Estado Revit, 30-09-2026 | PENDIENTE | La captura muestra el cuadro «Referencias sin resolver» para el RVT descartable; `doctor.ps1` aún no detecta ese modelo ni el pipe. La sesión productiva no se usará. |
 | Smoke vivo bridge → Revit, 28-09-2026 | FAIL | `--live-generic` conectó al named pipe, pero `ping_revit_dynamo_bridge` terminó con `revit_dispatch_timeout_before_execution` tras 90 s. La captura de Revit muestra el cuadro de cinco referencias sin resolver. La rutina no llegó a ejecutarse y el hash del RVT se mantuvo `3368FDBB…`. La automatización de escritorio no expone ventanas nativas en esta sesión. |
 | Ejecución Dynamo PythonNet3 en Revit | PENDIENTE | Requiere cargar el add-in en la sesión del RVT de prueba y pasar primero el smoke read-only. |
 | Escritura Comments + lectura posterior | PENDIENTE | Se hará en el RVT de prueba con un elemento seleccionado y aprobación explícita. |
-| Herramientas Codex desde esta carpeta | PENDIENTE | Abrir esta carpeta como proyecto confiable y comprobar `tools/list` en la app Codex. |
+| Herramientas Codex CLI desde esta carpeta | PASS | Se invocó el tool real `list_saved_routines` y devolvió tres rutinas. |
+| Herramientas MCP en la app Codex | PENDIENTE | Falta comprobar que la app haya cargado las herramientas de este proyecto. |
 
 ## Repetir pruebas offline
 

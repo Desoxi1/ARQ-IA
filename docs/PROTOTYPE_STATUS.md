@@ -9,7 +9,7 @@
 - El proyecto Codex contiene tres MCP: rvt-mcp con una lista curada de herramientas tipadas, generador/listado de rutinas y runner Dynamo. Las llamadas tienen aprobación por herramienta.
 - El generador guarda fuente `.py`, un `.dyn` manual con un único nodo PythonNet3, wrapper de resultado JSON y un manifiesto con hashes.
 - El runner comprueba los hashes y el formato del grafo tanto en PowerShell como en el add-in. Las rutinas genéricas solo corren con un RVT local guardado y no workshared dentro de `revit/test-models/`; toda ejecución requiere `authorize_possible_model_writes=true`, aunque el manifiesto diga solo lectura, porque PythonNet3 no permite demostrar estáticamente que no habrá escrituras. Para rutinas declaradas como escritoras, el wrapper debe devolver `affected_ids` que coincidan con los elementos reportados por Revit `DocumentChanged`.
-- El add-in compila contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. Está instalado en el perfil de usuario. El DLL no está firmado. Hoy solo está abierta la sesión productiva; la instancia de prueba se cerró y el pipe del bridge no está disponible. El RVT de prueba permanece intacto.
+- El add-in compila contra RevitAPI, RevitAPIUI, DynamoRevitDS y .NET Runtime 10. Está instalado en el perfil de usuario. El DLL no está firmado. La captura del 30-09 muestra el cuadro de referencias sin resolver del RVT descartable; `doctor.ps1` no detecta ese RVT en el título y el pipe no está disponible. No se usó el modelo productivo para las pruebas del bridge.
 - El paquete `dist/` y la copia instalada por usuario coinciden en SHA-256 (`9205c035…`). La instancia previa del modelo de prueba se cerró sin guardar y el hash del RVT en disco permaneció igual.
 - Hay copias locales, ignoradas por Git, de `Snowdon Towers Sample HVAC.rvt` bajo `revit/test-models/`; ambas provienen de los Samples instalados con Revit 2027.
 - Rutinas incluidas: `read_active_view_selection` (solo lectura y hash fijado), `read_test_model_summary` (solo lectura genérica) y `set_comments_on_selection` (borrador de escritura con protección interna de ruta).
@@ -19,10 +19,10 @@
 
 | Prueba | Resultado | Alcance |
 |---|---|---|
-| Revalidación offline, 28-09-2026 | PASS | 27 pruebas unitarias, Builder MCP, Runner MCP, loop Builder → Runner con bridge falso y contrato de tres tools; confirma generación, autorización, guardado y reutilización, pero no ejecuta Revit/Dynamo. |
+| Revalidación offline, 30-09-2026 | PASS | 27 pruebas unitarias, Builder MCP, Runner MCP y loop Builder → Runner con bridge falso; confirma generación, autorización, guardado, ejecución simulada y reutilización, pero no ejecuta Revit/Dynamo. |
 | rvt-mcp read-only, 28-09-2026 | PASS | `initialize`, descubrimiento de 16 herramientas y lecturas de vista activa/selección; sin escrituras. |
-| Registro MCP de Codex CLI, 28-09-2026 | PASS | `codex mcp list` muestra los tres MCP del proyecto habilitados. El acceso desde la app Codex con el proyecto abierto sigue sin comprobar. |
-| `doctor.ps1`, 29-09-2026 | PASS + WAIT | 10 comprobaciones pasaron y no hubo fallos. Espera que se abra el RVT descartable y aparezca el pipe; el diagnóstico es de solo lectura. |
+| Codex CLI → MCP de rutinas, 30-09-2026 | PASS | Desde esta carpeta, una sesión CLI efímera llamó `bim_ai_routines.list_saved_routines` y recibió las tres rutinas. Se usó revisión automática solo para esta consulta de lectura; ninguna rutina se ejecutó. La app Codex aún debe comprobarse aparte. |
+| `doctor.ps1`, 30-09-2026 | PASS + WAIT | 10 comprobaciones pasaron y no hubo fallos. Revit está abierto, pero el título no corresponde al RVT descartable y el pipe no existe; diagnóstico de solo lectura. |
 | Paquete portable, 30-09-2026 | PASS | `package.ps1` empaquetó el commit `e9ebdef` en 54 archivos y excluyó RVT/RFA/RTE, `.codex/config.toml`, tokens y rutas privadas; SHA-256 `46bbb4fe203956efe7394bad531f706f68a9fb744ab09426024a3b01ff2fc426`. |
 | `python -B -m unittest discover -s tests -p 'test_*.py'` | PASS, 27 pruebas | Fakes de Revit, límites del wrapper JSON, integridad de paquetes `.py/.dyn/manifest`, hashes, timeout de cola, gate de autorización genérica y rechazo de modelos fuera de `test-models`. No ejecuta Revit. |
 | `python -B tests/run_routine_builder_mcp_smoke.py` | PASS | MCP stdio, confirmación al guardar una escritura, rutina temporal, estructura PythonNet3/Manual, hashes y limpieza. |
@@ -32,12 +32,12 @@
 | `revit/bridge/build.ps1 -Package` | PASS | DLL de 36.352 bytes compilado contra las APIs locales; el paquete y el archivo SHA-256 coinciden (`9205c035…`). |
 | `revit/bridge/install.ps1 -Force -StageWhileRevitOpen` | PASS, staged | El paquete endurecido se copió al perfil de usuario; el SHA-256 instalado coincide con `dist/`. |
 | Copia del RVT de muestra | PASS | Tamaño y SHA-256 de la copia coinciden con el sample Autodesk instalado; el RVT está excluido de Git. |
-| Sesión de prueba actual, 29-09-2026 | PENDIENTE | El proceso de Revit que tenía el RVT de prueba ya no está activo y no existe el named pipe. La sesión productiva sigue abierta; no se usará para esta prueba. |
+| Sesión de prueba actual, 30-09-2026 | PENDIENTE | La captura muestra el aviso de cinco referencias sin resolver al abrir el RVT descartable. El diagnóstico todavía no detecta ese RVT en el título ni el named pipe. La sesión productiva no se usará para esta prueba. |
 | Smoke vivo bridge → Revit, 28-09-2026 | FAIL | El named pipe aceptó la llamada, pero `ping_revit_dynamo_bridge` terminó con `revit_dispatch_timeout_before_execution` tras 90 s. La captura de Revit muestra un cuadro con cinco referencias sin resolver. No hubo ejecución de rutina y el SHA-256 del RVT de prueba permaneció `3368FDBB…`. |
 | Ejecución de Dynamo desde el bridge dentro de Revit | PENDIENTE | Requiere cerrar el cuadro de referencias en la sesión del RVT de prueba, repetir primero el ping/read-only y confirmar que Dynamo devuelve el resultado. No se probó sobre el proyecto productivo. |
 | Escritura PythonNet3 y lectura posterior de Comments | PENDIENTE | Requiere completar primero la prueba genérica read-only en el test RVT. |
 | Herramientas de escritura tipadas rvt-mcp desde Codex | PARCIAL | El inventario y esquemas están revisados; las operaciones no se probaron una por una. |
-| Carga de `.codex/config.toml` desde Codex | PASS, cableado CLI | `codex mcp list` muestra `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner` habilitados; falta comprobar acceso a esos tools en la app Codex con este proyecto abierto. |
+| Carga MCP desde Codex CLI | PASS, cableado y llamada de lectura | `codex mcp list` muestra `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner` habilitados. La llamada real a `list_saved_routines` respondió; el acceso desde la app Codex todavía no está verificado. |
 
 ## Qué puede hacer hoy
 
