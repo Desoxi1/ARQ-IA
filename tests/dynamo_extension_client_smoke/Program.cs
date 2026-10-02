@@ -5,6 +5,8 @@ using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 if (args.Length != 3)
 {
@@ -20,6 +22,9 @@ var routineName = "codex_probe_" + Guid.NewGuid().ToString("N")[..10];
 var routinePaths = new[] { ".py", ".dyn", ".manifest.json" }
     .Select(suffix => Path.Combine(routinesRoot, routineName + suffix))
     .ToArray();
+var attachmentProbeDirectory = Path.Combine(Path.GetTempPath(), "BIM-AI-POC-attachment-smoke-" + Guid.NewGuid().ToString("N"));
+var attachmentStoreType = (Type?)null;
+IDisposable? attachmentStore = null;
 var exitCode = 0;
 
 AssemblyLoadContext.Default.Resolving += (context, name) =>
@@ -32,8 +37,11 @@ var extensionAssembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(extensi
 var clientType = extensionAssembly.GetType("BimAiDynamoAssistant.CodexAppServerClient", throwOnError: true)!;
 var client = Activator.CreateInstance(clientType, nonPublic: true)!;
 var text = new StringBuilder();
+var statuses = new StringBuilder();
 var textReceived = clientType.GetEvent("TextReceived")!;
 textReceived.AddEventHandler(client, new Action<string>(delta => text.Append(delta)));
+var statusChanged = clientType.GetEvent("StatusChanged")!;
+statusChanged.AddEventHandler(client, new Action<string>(status => statuses.AppendLine(status)));
 
 var createApprovalCount = 0;
 var listApprovalCount = 0;
@@ -83,7 +91,12 @@ try
     if (listApprovalCount > 2)
         throw new InvalidOperationException($"Unexpected number of list calls during routine creation: {listApprovalCount}.");
     if (!routinePaths.All(File.Exists))
+    {
+        var assistantReply = text.ToString();
+        var excerpt = assistantReply.Length > 400 ? assistantReply[^400..] : assistantReply;
+        Console.WriteLine($"CODEX_APP_SERVER_CSHARP_CREATE_DIAGNOSTICS approvals=create:{createApprovalCount},list:{listApprovalCount}; statuses={statuses.ToString().Trim()}; reply={excerpt}");
         throw new FileNotFoundException("Codex completed without creating the complete routine package.");
+    }
 
     var python = File.ReadAllText(routinePaths[0]);
     if (!python.Contains("OUT = \"APP_SERVER_GENERATED_PROBE\"", StringComparison.Ordinal))
@@ -121,15 +134,63 @@ try
 
     Console.WriteLine("CODEX_APP_SERVER_CSHARP_APPROVAL=PASS create_and_list_approved=true");
     Console.WriteLine("CODEX_APP_SERVER_CSHARP_MCP_LIST=PASS saved_routine_returned=true");
+
+    Directory.CreateDirectory(attachmentProbeDirectory);
+    var probeToken = "BIM_ATTACHMENT_PROBE_" + Guid.NewGuid().ToString("N")[..12];
+    var imagePath = Path.Combine(attachmentProbeDirectory, "red-square.png");
+    var textPath = Path.Combine(attachmentProbeDirectory, "reference.txt");
+    var pixels = new byte[32 * 32 * 4];
+    for (var index = 0; index < pixels.Length; index += 4)
+    {
+        pixels[index] = 0;
+        pixels[index + 1] = 0;
+        pixels[index + 2] = 255;
+        pixels[index + 3] = 255;
+    }
+    var bitmap = BitmapSource.Create(32, 32, 96, 96, PixelFormats.Bgra32, null, pixels, 32 * 4);
+    var encoder = new PngBitmapEncoder();
+    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+    using (var imageStream = File.Create(imagePath)) encoder.Save(imageStream);
+    File.WriteAllText(textPath, $"Reference code: {probeToken}", new UTF8Encoding(false));
+
+    attachmentStoreType = extensionAssembly.GetType("BimAiDynamoAssistant.LocalAttachmentStore", throwOnError: true)!;
+    attachmentStore = (IDisposable)Activator.CreateInstance(attachmentStoreType, new object[] { projectRoot })!;
+    var addFile = attachmentStoreType.GetMethod("AddFile")!;
+    var imageAttachment = addFile.Invoke(attachmentStore, new object[] { imagePath })!;
+    var textAttachment = addFile.Invoke(attachmentStore, new object[] { textPath })!;
+    var attachmentType = extensionAssembly.GetType("BimAiDynamoAssistant.LocalAttachment", throwOnError: true)!;
+    var stagedAttachments = Array.CreateInstance(attachmentType, 2);
+    stagedAttachments.SetValue(imageAttachment, 0);
+    stagedAttachments.SetValue(textAttachment, 1);
+
+    text.Clear();
+    var sendWithAttachments = clientType.GetMethod("SendMessageWithAttachmentsAsync")!;
+    var attachmentTurn = (Task)sendWithAttachments.Invoke(client, new object[]
+    {
+        $"Inspect the attached image and text file. Reply with the square's color and the exact reference code. Do not call MCP tools or inspect other files.",
+        stagedAttachments,
+        CancellationToken.None
+    })!;
+    await attachmentTurn;
+    var attachmentReply = text.ToString();
+    if (!attachmentReply.Contains(probeToken, StringComparison.Ordinal) ||
+        !(attachmentReply.Contains("red", StringComparison.OrdinalIgnoreCase) || attachmentReply.Contains("rojo", StringComparison.OrdinalIgnoreCase)))
+    {
+        var excerpt = attachmentReply.Length > 500 ? attachmentReply[^500..] : attachmentReply;
+        throw new InvalidOperationException($"Codex did not correctly use both staged attachments: {excerpt}");
+    }
+    Console.WriteLine("CODEX_APP_SERVER_CSHARP_IMAGE_TEXT_ATTACHMENTS=PASS image_and_reference_read=true");
 }
 catch (Exception exception)
 {
     Exception failure = (exception as TargetInvocationException)?.InnerException ?? exception;
-    Console.WriteLine($"CODEX_APP_SERVER_CSHARP=FAIL error={failure.GetType().Name} detail={failure.Message[..Math.Min(220, failure.Message.Length)]}");
+    Console.WriteLine($"CODEX_APP_SERVER_CSHARP=FAIL error={failure.GetType().Name} detail={failure.Message[..Math.Min(700, failure.Message.Length)]}");
     exitCode = 1;
 }
 finally
 {
+    attachmentStore?.Dispose();
+    if (Directory.Exists(attachmentProbeDirectory)) Directory.Delete(attachmentProbeDirectory, recursive: true);
     if (client is IAsyncDisposable disposable)
         await disposable.DisposeAsync();
 

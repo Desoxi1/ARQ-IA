@@ -26,13 +26,18 @@ function New-ToolReply([object]$RequestId, [string]$Text, [bool]$IsError = $fals
 function Get-ToolDefinitions {
     return @(
         [ordered]@{
+            name = 'open_dynamo_ui'
+            description = 'Open the official Dynamo window in Revit for the active saved, idle, unmodified disposable RVT under revit/test-models. Uses Revit PostableCommand.Dynamo and does not run a graph or routine. Dynamo preview initialization can touch the active document; use only the disposable test model and close without saving if Revit marks it modified.'
+            inputSchema = [ordered]@{ type = 'object'; properties = [ordered]@{}; additionalProperties = $false }
+        },
+        [ordered]@{
             name = 'ping_revit_dynamo_bridge'
-            description = 'Check whether the per-user Dynamo bridge is running inside Revit 2027. This makes no model changes.'
+            description = 'Check whether the per-user bridge is running inside Revit 2027 and whether the Dynamo UI is open on the active document. This makes no model changes.'
             inputSchema = [ordered]@{ type = 'object'; properties = [ordered]@{}; additionalProperties = $false }
         },
         [ordered]@{
             name = 'execute_saved_readonly_routine'
-            description = 'Run only the exact hash-pinned read_active_view_selection PythonNet3 graph inside Revit 2027/Dynamo. It refuses dirty or modifiable documents, validates the .py/.dyn/manifest and verifies unchanged selection/view/document state. It cannot execute user-supplied code or write routines.'
+            description = 'Run only the exact hash-pinned read_active_view_selection PythonNet3 graph inside Revit 2027/Dynamo. Dynamo UI must already be open and bound to the active document; the bridge will not initialize Dynamo silently. It refuses dirty or modifiable documents, validates the .py/.dyn/manifest and verifies unchanged selection/view/document state. It cannot execute user-supplied code or write routines.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -44,7 +49,7 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'execute_saved_routine'
-            description = 'Execute one hash-validated, saved PythonNet3 Manual graph through Revit/Dynamo. Generic routines run only in a saved, idle, non-workshared RVT under revit/test-models. Every generic execution requires authorize_possible_model_writes=true because any PythonNet3 source may write the model regardless of its manifest. Review the source; PythonNet3 has Revit process user permissions and the model path gate is not an operating-system sandbox. If status is revit_execution_timeout_unknown, query the model before retrying. Tool approval is required.'
+            description = 'Execute one hash-validated, saved PythonNet3 Manual graph through Revit/Dynamo. Dynamo UI must already be open and bound to the active document; the bridge will not initialize Dynamo silently. Generic routines run only in a saved, idle, non-workshared RVT under revit/test-models. Every generic execution requires authorize_possible_model_writes=true because any PythonNet3 source may write the model regardless of its manifest. Review the source; PythonNet3 has Revit process user permissions and the model path gate is not an operating-system sandbox. If status is revit_execution_timeout_unknown, query the model before retrying. Tool approval is required.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -150,6 +155,9 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                 $toolName = [string]$request.params.name
                 try {
                     switch ($toolName) {
+                        'open_dynamo_ui' {
+                            $bridge = Invoke-RevitBridge -Operation 'open_dynamo_ui' -RoutineId $null
+                        }
                         'ping_revit_dynamo_bridge' {
                             $bridge = Invoke-RevitBridge -Operation 'ping' -RoutineId $null
                         }
@@ -188,7 +196,25 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                 } catch {
                     $status = 'bridge_unavailable_or_rejected'
                     if ($_.Exception.Message -match '^[a-z0-9_]{1,80}$') { $status = $_.Exception.Message }
-                    New-ToolReply -RequestId $requestId -Text (@{ ok = $false; status = $status } | ConvertTo-Json -Compress) -IsError $true
+                    $reply = [ordered]@{ ok = $false; status = $status }
+                    $allowedVerificationFailures = @(
+                        'routine_status_not_ok', 'document_modified_state_changed', 'document_modified',
+                        'document_modifiable', 'active_document_changed', 'active_view_changed',
+                        'selection_changed', 'routine_view_type_mismatch', 'routine_selection_count_mismatch',
+                        'document_elements_changed', 'document_modified_without_element_changes'
+                    )
+                    if ($null -ne $bridge -and $bridge.verificationFailures) {
+                        $safeFailures = @($bridge.verificationFailures | Where-Object { [string]$_ -in $allowedVerificationFailures })
+                        if ($safeFailures.Count -gt 0) { $reply.verificationFailures = $safeFailures }
+                    }
+                    if ($null -ne $bridge -and $null -ne $bridge.changedElementCount) {
+                        $reply.changedElementCount = [int]$bridge.changedElementCount
+                    }
+                    if ($null -ne $bridge -and $bridge.changedElementTypes) {
+                        $safeElementTypes = @($bridge.changedElementTypes | Where-Object { [string]$_ -match '^[A-Za-z][A-Za-z0-9_]{0,63}$' } | Select-Object -First 8)
+                        if ($safeElementTypes.Count -gt 0) { $reply.changedElementTypes = $safeElementTypes }
+                    }
+                    New-ToolReply -RequestId $requestId -Text ($reply | ConvertTo-Json -Compress) -IsError $true
                 }
             }
             default {

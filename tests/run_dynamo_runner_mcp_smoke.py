@@ -26,7 +26,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 105
-EXPECTED_TOOLS = {"ping_revit_dynamo_bridge", "execute_saved_readonly_routine", "execute_saved_routine"}
+EXPECTED_TOOLS = {"open_dynamo_ui", "ping_revit_dynamo_bridge", "execute_saved_readonly_routine", "execute_saved_routine"}
 
 
 def parse_tool_payload(response: dict[str, Any]) -> dict[str, Any]:
@@ -120,6 +120,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Run the hash-pinned read-only graph in Revit.")
     parser.add_argument("--live-generic", action="store_true", help="Run the saved generic read-only routine on the disposable test RVT.")
+    parser.add_argument("--open-dynamo-ui", action="store_true", help="Open Dynamo through the Revit API on the active disposable test RVT and verify readiness.")
     args = parser.parse_args()
 
     powershell = shutil.which("powershell.exe")
@@ -164,7 +165,45 @@ def main() -> int:
             print("DYNAMO_RUNNER_AUTHORIZATION_SCHEMA=FAIL")
             return 1
         print("DYNAMO_RUNNER_AUTHORIZATION_SCHEMA=PASS")
-        print("DYNAMO_RUNNER_MCP_CONTRACT=PASS tools=3")
+        open_tool = next(
+            (tool for tool in tools if isinstance(tool, dict) and tool.get("name") == "open_dynamo_ui"),
+            {},
+        )
+        open_schema = open_tool.get("inputSchema", {})
+        if open_schema.get("additionalProperties") is not False or open_schema.get("properties") != {}:
+            print("DYNAMO_OPEN_UI_SCHEMA=FAIL")
+            return 1
+        print("DYNAMO_OPEN_UI_SCHEMA=PASS")
+        print("DYNAMO_RUNNER_MCP_CONTRACT=PASS tools=4")
+
+        if args.open_dynamo_ui:
+            opened = client.request(
+                "tools/call", {"name": "open_dynamo_ui", "arguments": {}}
+            )
+            if opened.get("result", {}).get("isError"):
+                status = parse_tool_payload(opened).get("status", "unknown")
+                print(f"DYNAMO_OPEN_UI=FAIL status={status}")
+                return 1
+            open_payload = parse_tool_payload(opened)
+            status = open_payload.get("status", "unknown")
+            print(f"DYNAMO_OPEN_UI_REQUEST=PASS status={status}")
+            deadline = time.monotonic() + 75
+            while time.monotonic() < deadline:
+                ping = client.request(
+                    "tools/call", {"name": "ping_revit_dynamo_bridge", "arguments": {}}
+                )
+                payload = parse_tool_payload(ping)
+                if payload.get("ok") is True and payload.get("dynamoReadyForActiveDocument") is True:
+                    print("DYNAMO_UI_READY=PASS")
+                    return 0
+                if ping.get("result", {}).get("isError") and payload.get("status") not in {
+                    "dynamo_command_unavailable",
+                    "revit_dispatch_timeout_before_execution",
+                }:
+                    print(f"DYNAMO_UI_READY=WAIT status={payload.get('status', 'unknown')}")
+                time.sleep(2)
+            print("DYNAMO_UI_READY=FAIL timeout")
+            return 1
 
         if not args.live and not args.live_generic:
             print("DYNAMO_RUNNER_LIVE=NOT_REQUESTED")
@@ -189,8 +228,20 @@ def main() -> int:
             )
             result = run.get("result", {})
             if result.get("isError"):
-                status = parse_tool_payload(run).get("status", "unknown")
-                print(f"DYNAMO_READONLY_RUN=FAIL status={status}")
+                payload = parse_tool_payload(run)
+                status = payload.get("status", "unknown")
+                failures = payload.get("verificationFailures", [])
+                diagnostic = ",".join(value for value in failures if isinstance(value, str)) if isinstance(failures, list) else ""
+                suffix = f" checks={diagnostic}" if diagnostic else ""
+                changed_count = payload.get("changedElementCount")
+                if isinstance(changed_count, int):
+                    suffix += f" changed_elements={changed_count}"
+                changed_types = payload.get("changedElementTypes", [])
+                if isinstance(changed_types, list):
+                    safe_types = [value for value in changed_types if isinstance(value, str) and value.isascii() and value.replace("_", "").isalnum()]
+                    if safe_types:
+                        suffix += f" element_types={','.join(safe_types)}"
+                print(f"DYNAMO_READONLY_RUN=FAIL status={status}{suffix}")
                 return 1
             payload = parse_tool_payload(run)
             ok = (

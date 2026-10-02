@@ -15,6 +15,7 @@
 logs/*.log
 logs/*.jsonl
 logs/runner-results/
+logs/attachments/**
 *.log
 *.tmp
 *.temp
@@ -27,6 +28,7 @@ bin/
 obj/
 publish/
 artifacts/
+docs/assets/asistente-bim-preview.png
 
 # Large third-party installer is fetched from its pinned official release.
 vendor/*.zip

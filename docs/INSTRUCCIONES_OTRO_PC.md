@@ -6,39 +6,19 @@ Para generar el ZIP desde el PC de desarrollo, guarda los cambios en un commit y
 
 ## Instalación
 
-1. Cierra Revit.
-2. Abre PowerShell en la carpeta `BIM-AI-POC` y ejecuta:
+Clona la carpeta, abre PowerShell en su raíz y ejecuta este único comando:
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
-   ```
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
 
-   El script verifica SHA-256 antes de instalar. Instala rvt-mcp solo para Revit 2027 y el usuario actual; no registra un MCP global. Crea `.codex/config.toml` para este proyecto con una lista acotada de consultas y operaciones tipadas, generador/listado de rutinas y runner. Cada herramienta pide aprobación en Codex.
+El instalador comprueba Revit 2027, Dynamo y `codex.exe`, instala/configura rvt-mcp y los MCP de esta copia, enlaza `routines/` con el bridge y registra los dos accesos: panel acoplable **BIM-AI** en Revit y chat lateral **Asistente BIM** en Dynamo. Verifica hashes de los ensamblados distribuidos y escribe la configuración en rutas relativas al clon, salvo el puente local del perfil de usuario.
 
-   Si rvt-mcp ya está instalado, puedes actualizar solo el cableado del proyecto sin reinstalar add-ins:
+Windows pedirá elevar permisos una vez para colocar la extensión junto a Dynamo. Si Revit está abierto con rvt-mcp ya instalado, el comando prepara los complementos para el siguiente reinicio. Para instalar rvt-mcp por primera vez, guarda y cierra Revit antes de ejecutar el comando. `-CheckOnly` valida prerequisitos sin escribir archivos.
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -ConfigureOnly
-   ```
-3. Instala el add-in puente local:
+Después de instalar, abre esta carpeta como proyecto en Codex y confirma que confías en ella para habilitar sus MCP locales. Codex debe estar iniciado con tu cuenta; la integración no guarda claves de API. Reinicia Revit y abre Dynamo. Si Revit muestra el aviso de add-in sin firma, revisa que el nombre sea **BIM-AI**/**BIM-AI Dynamo Bridge** y el fabricante **Branko Plaza** antes de elegir **Load Once**.
 
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\bridge\install.ps1
-   ```
-
-   Esta versión incluye un DLL precompilado para Revit/Dynamo 2027. El instalador vuelve a compilar desde fuente solo si falta ese archivo. El DLL del POC no está firmado; al iniciar Revit, puede aparecer el aviso de complemento sin firma. Para la prueba, verifica que cargue “BIM-AI Dynamo Bridge” y elige **Load Once**. Usa **Always Load** solo si decidiste confiar permanentemente en este DLL e ID de complemento. Autodesk explica estas opciones en [Security: Unsigned File or Add-In](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm). Si Revit permanece abierto, usa `-StageWhileRevitOpen`; esa sesión no carga el add-in y será necesario iniciar una sesión nueva. Usa `-Force` solo para actualizar conscientemente una instalación previa.
-4. Abre `BIM-AI-POC` como proyecto en Codex y confía esa carpeta para que Codex lea su configuración `.codex/config.toml`; reinicia Codex si ya estaba abierto. En PowerShell, desde la raíz del proyecto, ejecuta `codex mcp list` y confirma que aparezcan habilitados `rvt_mcp`, `bim_ai_routines` y `bim_ai_dynamo_runner`. La lista confirma el cableado del proyecto, no la conexión viva con Revit.
-5. Instala la ventana lateral de Dynamo que conecta con Codex:
-
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\dynamo\extension\install.ps1
-   ```
-
-   Este paso copia el DLL precompilado incluido en el paquete; el otro PC no necesita .NET SDK. Cierra todas las sesiones de Revit antes de instalar y abre PowerShell como Administrador porque Dynamo está bajo `Program Files`. El instalador verifica el SHA-256 del DLL y del manifiesto. No instala ni cambia el modelo.
-6. Prepara primero el RVT desechable con `powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-test-model.ps1`; luego inicia Revit 2027 con `revit/test-models/BIM-AI-Dynamo-Test.rvt`. Para el sample Snowdon predeterminado, el script también copia y verifica los cinco RVT vinculados y habilita escritura solo en la copia anfitriona. No uses un proyecto de producción. Si persiste el aviso de referencias, comprueba que Revit tiene los cinco archivos junto al host o elige «Ignorar y abrir» solo para este RVT.
-7. En Revit abre Dynamo y selecciona la pestaña lateral **Asistente BIM**. Escribe primero: «Consulta la vista activa y mis elementos seleccionados. No cambies el modelo». La ventana usa la sesión local de Codex CLI y los MCP del proyecto; además de Codex, ese PC debe tener `codex.exe` instalado, autenticado y disponible en `PATH`. La interfaz `app-server` de Codex está marcada experimental, así que esta integración todavía es prototipo.
-
-El asistente explica el plan y solicita aprobación por cada llamada MCP. Antes de ejecutar una rutina genérica que pueda modificar el modelo, revisa el código y confirma la operación en el diálogo. Para la primera validación, limita la prueba a leer vista/selección y comprobar que el panel recibe la respuesta; la ejecución de Dynamo dentro de Revit aún requiere pasar la prueba viva descrita abajo.
+En Dynamo, envía primero una consulta de solo lectura: **“Consulta la vista activa y la selección de Revit; devuelve vista, IDs y categorías. No cambies el modelo.”** El panel muestra **Gestor: Branko Plaza**, acepta archivos e imágenes y conecta Codex al enviar. Para cambios, revisa cada propuesta y aprobación; no uses un modelo productivo en esta primera prueba.
 
 ## Diagnosticar sin modificar Revit
 
@@ -48,7 +28,7 @@ Después de instalar y preparar el modelo, ejecuta:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1
 ```
 
-El diagnóstico es de solo lectura. Comprueba las instalaciones locales de Revit/Dynamo y rvt-mcp, la configuración MCP de esta carpeta, el manifiesto/hash del bridge, el RVT descartable y la presencia del pipe. `WAIT` es normal antes de abrir el RVT de prueba; `FAIL` requiere corregir la instalación antes de ejecutar rutinas.
+El diagnóstico es de solo lectura. Comprueba las instalaciones locales de Revit/Dynamo y rvt-mcp, la configuración MCP de esta carpeta, el manifiesto/hash del bridge, el RVT descartable, el pipe y si Dynamo UI está enlazado al documento activo. `WAIT` puede indicar que falta reiniciar Revit tras instalar el bridge o abrir el modelo/Dynamo UI; `FAIL` requiere corregir la instalación antes de ejecutar rutinas.
 
 ## Prueba 1: conexión Codex → Revit (consulta)
 
@@ -68,13 +48,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\test-models\prepare-
 
 El script copia `Samples\Snowdon Towers Sample HVAC.rvt` a `revit/test-models/BIM-AI-Dynamo-Test.rvt`, verifica SHA-256 y no sobrescribe un destino existente distinto. También copia los cinco RVT Snowdon que el HVAC referencia con rutas relativas y comprueba sus hashes; los modelos permanecen locales e ignorados por Git. Solo quita el atributo de solo lectura a la copia HVAC de prueba, no al sample instalado. Si no está instalado ese sample, pasa `-SourceModelPath` con otro RVT local y desechable; sus dependencias deben estar disponibles en sus rutas.
 
-En la carpeta del proyecto ejecuta:
+Abre primero `revit/test-models/BIM-AI-Dynamo-Test.rvt`, o una copia descartable local, en Revit 2027. Si Revit muestra referencias ausentes, puedes elegir **Ignorar y abrir** solo para este RVT de prueba. Abre Dynamo UI en el mismo documento y espera a que no haya operaciones ni diálogos pendientes. Si la primera activación de Dynamo marca cambios por la inicialización de materiales de vista previa, guarda solo esta copia descartable para dejarla limpia. Ejecuta `doctor.ps1`; debe confirmar `Dynamo UI está abierto y ligado al modelo Revit activo`.
+
+Con Revit y Dynamo todavía abiertos, ejecuta desde la carpeta del proyecto:
 
 ```powershell
-python tests/run_dynamo_runner_mcp_smoke.py --live-generic
+python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
 ```
 
-Abre primero `revit/test-models/BIM-AI-Dynamo-Test.rvt`, o una copia descartable local, en Revit 2027; guárdala y espera a que no haya operaciones pendientes. El resultado esperado incluye `REVIT_BRIDGE_PING=PASS` y `DYNAMO_GENERIC_READONLY_RUN=PASS`. La rutina consulta título, vista, selección y cantidad de elementos; verifica que el documento no cambió y elimina el resultado temporal. Si falla, revisa que el add-in cargó en esa sesión y que `bridge.json` apunta a esta carpeta.
+El resultado esperado incluye `REVIT_BRIDGE_PING=PASS` y `DYNAMO_GENERIC_READONLY_RUN=PASS`. La rutina consulta título, vista, selección y cantidad de elementos; verifica que el documento no cambió y elimina el resultado temporal. Si falla, revisa que el add-in actualizado cargó en esa sesión, que Dynamo siga enlazado al documento y que `bridge.json` apunte a esta carpeta.
 
 ## Prueba 3: Codex prepara una rutina Dynamo
 

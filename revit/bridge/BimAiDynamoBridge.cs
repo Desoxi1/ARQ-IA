@@ -170,7 +170,7 @@ namespace BimAiDynamoBridge
                             (confirmation.ValueKind != JsonValueKind.True && confirmation.ValueKind != JsonValueKind.False)) return null;
                         confirmModelWrite = confirmation.GetBoolean();
                     }
-                    if (op != "ping" && op != "run_saved_readonly_routine" && op != "run_saved_routine") return null;
+                    if (op != "ping" && op != "open_dynamo_ui" && op != "run_saved_readonly_routine" && op != "run_saved_routine") return null;
                     return new BridgeRequest(op, routineId, confirmModelWrite);
                 }
             }
@@ -224,8 +224,12 @@ namespace BimAiDynamoBridge
         public string ModelChangeCheck { get; set; }
         public string RevitMajor { get; set; }
         public string DynamoAssemblyVersion { get; set; }
+        public bool? DynamoReadyForActiveDocument { get; set; }
         public long[] ChangedElementIds { get; set; }
         public object RoutineResult { get; set; }
+        public string[] VerificationFailures { get; set; }
+        public int? ChangedElementCount { get; set; }
+        public string[] ChangedElementTypes { get; set; }
 
         internal static BridgeResponse Fail(string status) => new BridgeResponse { Ok = false, Status = status };
     }
@@ -282,9 +286,13 @@ namespace BimAiDynamoBridge
                     Status = "ready",
                     RevitMajor = application.Application.VersionNumber,
                     DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString(),
+                    DynamoReadyForActiveDocument = application.ActiveUIDocument?.Document != null &&
+                        IsDynamoReadyForDocument(application, application.ActiveUIDocument.Document),
                     RoutineId = BridgeApplication.RoutineId
                 };
             }
+
+            if (request.Operation == "open_dynamo_ui") return OpenDynamoUi(application);
 
             if (request.Operation == "run_saved_routine") return HandleSavedRoutine(application, request);
 
@@ -294,7 +302,12 @@ namespace BimAiDynamoBridge
             var uiDocument = application.ActiveUIDocument;
             if (uiDocument == null || uiDocument.Document == null) return BridgeResponse.Fail("no_active_document");
             var document = uiDocument.Document;
-            if (document.IsModified || document.IsModifiable) return BridgeResponse.Fail("document_must_be_saved_and_idle");
+            // Opening Dynamo can dirty a disposable test document (for example while
+            // initializing preview resources). The allowlisted graph remains safe to
+            // run against that baseline if Revit is idle; verify no further changes.
+            if (document.IsModifiable) return BridgeResponse.Fail("document_must_be_idle");
+            if (!IsTestModel(document, _testModelsRoot)) return BridgeResponse.Fail("test_model_required");
+            if (!IsDynamoReadyForDocument(application, document)) return BridgeResponse.Fail("dynamo_ui_required_for_active_document");
 
             string pythonPath;
             string graphPath;
@@ -315,6 +328,24 @@ namespace BimAiDynamoBridge
             var beforeViewType = uiDocument.ActiveView.ViewType.ToString();
             var beforeSelectionCount = uiDocument.Selection.GetElementIds().Count;
             var beforeModified = document.IsModified;
+            var beforeDocumentPath = Path.GetFullPath(document.PathName);
+            var changedIds = new HashSet<long>();
+            var changedElementTypes = new SortedSet<string>(StringComparer.Ordinal);
+            EventHandler<DocumentChangedEventArgs> changedHandler = (sender, args) =>
+            {
+                var eventIds = args.GetAddedElementIds()
+                    .Concat(args.GetModifiedElementIds())
+                    .Concat(args.GetDeletedElementIds())
+                    .Distinct()
+                    .ToArray();
+                AddChangedIds(changedIds, eventIds);
+                foreach (var elementId in eventIds)
+                {
+                    var elementType = document.GetElement(elementId)?.GetType().Name ?? "DeletedElement";
+                    if (Regex.IsMatch(elementType, "^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.CultureInvariant))
+                        changedElementTypes.Add(elementType);
+                }
+            };
             var runId = Guid.NewGuid().ToString("N");
             var projectRoot = Directory.GetParent(_routinesRoot).FullName;
             var resultRoot = Path.GetFullPath(Path.Combine(projectRoot, "logs", "runner-results"));
@@ -325,6 +356,7 @@ namespace BimAiDynamoBridge
             if (!IsWithin(resultRoot, resultPath)) return BridgeResponse.Fail("invalid_result_path");
 
             string runtimeGraphPath = null;
+            application.Application.DocumentChanged += changedHandler;
             try
             {
                 runtimeGraphPath = CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath);
@@ -347,14 +379,35 @@ namespace BimAiDynamoBridge
                     var status = result.GetProperty("status").GetString();
                     var viewType = result.GetProperty("view_type").GetString();
                     var selectionCount = result.GetProperty("selection_count").GetInt32();
-                    var unchanged = !document.IsModified && !document.IsModifiable &&
-                        ReferenceEquals(application.ActiveUIDocument?.Document, document) &&
-                        uiDocument.ActiveView.Id.Value == beforeViewId &&
-                        uiDocument.Selection.GetElementIds().Count == beforeSelectionCount &&
-                        beforeModified == document.IsModified &&
-                        String.Equals(beforeViewType, viewType, StringComparison.Ordinal) &&
-                        beforeSelectionCount == selectionCount;
-                    if (status != "ok" || !unchanged) return BridgeResponse.Fail("post_run_verification_failed");
+                    var verificationFailures = new List<string>();
+                    var activeUIDocument = application.ActiveUIDocument;
+                    var afterDocumentPath = activeUIDocument?.Document?.PathName;
+                    var sameActiveDocument = !String.IsNullOrWhiteSpace(afterDocumentPath) &&
+                        String.Equals(Path.GetFullPath(afterDocumentPath), beforeDocumentPath, StringComparison.OrdinalIgnoreCase);
+                    if (status != "ok") verificationFailures.Add("routine_status_not_ok");
+                    if (beforeModified != document.IsModified) verificationFailures.Add("document_modified_state_changed");
+                    if (document.IsModifiable) verificationFailures.Add("document_modifiable");
+                    if (!sameActiveDocument) verificationFailures.Add("active_document_changed");
+                    if (activeUIDocument == null || activeUIDocument.ActiveView.Id.Value != beforeViewId)
+                        verificationFailures.Add("active_view_changed");
+                    if (activeUIDocument == null || activeUIDocument.Selection.GetElementIds().Count != beforeSelectionCount)
+                        verificationFailures.Add("selection_changed");
+                    if (!String.Equals(beforeViewType, viewType, StringComparison.Ordinal))
+                        verificationFailures.Add("routine_view_type_mismatch");
+                    if (beforeSelectionCount != selectionCount)
+                        verificationFailures.Add("routine_selection_count_mismatch");
+                    if (changedIds.Count != 0) verificationFailures.Add("document_elements_changed");
+                    if (verificationFailures.Count != 0)
+                    {
+                        return new BridgeResponse
+                        {
+                            Ok = false,
+                            Status = "post_run_verification_failed",
+                            VerificationFailures = verificationFailures.ToArray(),
+                            ChangedElementCount = changedIds.Count,
+                            ChangedElementTypes = changedElementTypes.Take(8).ToArray()
+                        };
+                    }
                     return new BridgeResponse
                     {
                         Ok = true,
@@ -370,10 +423,45 @@ namespace BimAiDynamoBridge
             }
             finally
             {
+                application.Application.DocumentChanged -= changedHandler;
                 try { if (runtimeGraphPath != null && File.Exists(runtimeGraphPath)) File.Delete(runtimeGraphPath); } catch { }
                 try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
                 try { if (File.Exists(resultPath + ".started")) File.Delete(resultPath + ".started"); } catch { }
             }
+        }
+
+        private BridgeResponse OpenDynamoUi(UIApplication application)
+        {
+            var uiDocument = application.ActiveUIDocument;
+            if (uiDocument?.Document == null) return BridgeResponse.Fail("no_active_document");
+            var document = uiDocument.Document;
+            if (!IsTestModel(document, _testModelsRoot)) return BridgeResponse.Fail("test_model_required");
+            if (IsDynamoReadyForDocument(application, document))
+            {
+                return new BridgeResponse
+                {
+                    Ok = true,
+                    Status = "dynamo_ui_already_open",
+                    RevitMajor = application.Application.VersionNumber,
+                    DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString(),
+                    DynamoReadyForActiveDocument = true
+                };
+            }
+            if (document.IsModified || document.IsModifiable) return BridgeResponse.Fail("document_must_be_saved_and_idle");
+
+            var commandId = RevitCommandId.LookupPostableCommandId(PostableCommand.Dynamo);
+            if (commandId == null || !application.CanPostCommand(commandId))
+                return BridgeResponse.Fail("dynamo_command_unavailable");
+
+            application.PostCommand(commandId);
+            return new BridgeResponse
+            {
+                Ok = true,
+                Status = "dynamo_ui_open_requested",
+                RevitMajor = application.Application.VersionNumber,
+                DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString(),
+                DynamoReadyForActiveDocument = false
+            };
         }
 
         private string InRoutinesRoot(string fileName)
@@ -391,8 +479,12 @@ namespace BimAiDynamoBridge
             var uiDocument = application.ActiveUIDocument;
             if (uiDocument == null || uiDocument.Document == null) return BridgeResponse.Fail("no_active_document");
             var document = uiDocument.Document;
-            if (document.IsModified || document.IsModifiable) return BridgeResponse.Fail("document_must_be_saved_and_idle");
+            // The saved path identifies the disposable RVT on disk. Dynamo may have
+            // already marked that in-memory copy modified during UI startup; routines
+            // still require an idle document and verify their own DocumentChanged delta.
+            if (document.IsModifiable) return BridgeResponse.Fail("document_must_be_idle");
             if (!IsTestModel(document, _testModelsRoot)) return BridgeResponse.Fail("test_model_required");
+            if (!IsDynamoReadyForDocument(application, document)) return BridgeResponse.Fail("dynamo_ui_required_for_active_document");
 
             string pythonPath;
             string graphPath;
@@ -414,6 +506,7 @@ namespace BimAiDynamoBridge
             if (!request.ConfirmModelWrite) return BridgeResponse.Fail("generic_execution_confirmation_required");
             if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");
 
+            var beforeModified = document.IsModified;
             var beforeViewId = uiDocument.ActiveView.Id.Value;
             var beforeSelection = uiDocument.Selection.GetElementIds().Select(id => id.Value).OrderBy(id => id).ToArray();
             var projectRoot = Directory.GetParent(_routinesRoot).FullName;
@@ -478,7 +571,7 @@ namespace BimAiDynamoBridge
                     }
 
                     if (changedIds.Count != 0) return BridgeResponse.Fail("post_run_document_changed_" + changedIds.Count);
-                    if (document.IsModified) return BridgeResponse.Fail("post_run_document_modified_without_element_changes");
+                    if (beforeModified != document.IsModified) return BridgeResponse.Fail("post_run_document_modified_state_changed");
                     return new BridgeResponse
                     {
                         Ok = true,
@@ -547,8 +640,8 @@ namespace BimAiDynamoBridge
 
         private static Result ExecuteDynamoWorkspace(UIApplication application, Dictionary<string, string> graphJournal, string expectedGraphPath, string resultPath, bool disableTransactions)
         {
-            var initializationResult = EnsureDynamoInitialized(application);
-            if (initializationResult != Result.Succeeded) return initializationResult;
+            var activeDocument = application.ActiveUIDocument?.Document;
+            if (activeDocument == null || !IsDynamoReadyForDocument(application, activeDocument)) return Result.Failed;
 
             object transactionManager = null;
             PropertyInfo disableTransactionsProperty = null;
@@ -609,25 +702,29 @@ namespace BimAiDynamoBridge
             }
         }
 
-        private static Result EnsureDynamoInitialized(UIApplication application)
+        private static bool IsDynamoReadyForDocument(UIApplication application, Document document)
         {
-            var modelState = GetDynamoModelState(GetDynamoModel());
-            if (modelState == "StartedUIless" || modelState == "StartedUI") return Result.Succeeded;
+            try
+            {
+                if (application?.ActiveUIDocument?.Document == null || document == null) return false;
+                if (GetDynamoModelState(GetDynamoModel()) != "StartedUI") return false;
 
-            var initializationJournal = new Dictionary<string, string>
+                var managerType = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(assembly => assembly.GetType("RevitServices.Persistence.DocumentManager", false))
+                    .FirstOrDefault(type => type != null);
+                var instanceProperty = managerType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                var manager = instanceProperty?.GetValue(null);
+                var currentDocumentProperty = managerType?.GetProperty("CurrentUIDocument", BindingFlags.Public | BindingFlags.Instance);
+                var dynamoUiDocument = currentDocumentProperty?.GetValue(manager) as UIDocument;
+                var targetPath = application.ActiveUIDocument.Document.PathName;
+                var dynamoPath = dynamoUiDocument?.Document?.PathName;
+                return !String.IsNullOrWhiteSpace(targetPath) && !String.IsNullOrWhiteSpace(dynamoPath) &&
+                    String.Equals(Path.GetFullPath(targetPath), Path.GetFullPath(dynamoPath), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
             {
-                [JournalKeys.AutomationModeKey] = "true",
-                [JournalKeys.ShowUiKey] = "false"
-            };
-            var initializationData = new DynamoRevitCommandData
-            {
-                Application = application,
-                JournalData = initializationJournal
-            };
-            var initializationResult = new DynamoRevit().ExecuteCommand(initializationData);
-            if (initializationResult != Result.Succeeded) return initializationResult;
-            modelState = GetDynamoModelState(GetDynamoModel());
-            return modelState == "StartedUIless" || modelState == "StartedUI" ? Result.Succeeded : Result.Failed;
+                return false;
+            }
         }
 
         private static bool TrySetDynamoTransactionsDisabled(bool disabled, out object transactionManager, out PropertyInfo disableTransactionsProperty, out object previousValue)

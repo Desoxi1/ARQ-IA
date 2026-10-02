@@ -37,6 +37,8 @@ $viewExtensionsDirectory = Join-Path $OutputDirectory 'viewExtensions'
 $null = New-Item -ItemType Directory -Force -Path $viewExtensionsDirectory
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'BimAiDynamoAssistant_ViewExtensionDefinition.xml') `
     -Destination $viewExtensionsDirectory -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'pkg.json') `
+    -Destination (Join-Path $OutputDirectory 'pkg.json') -Force
 
 $distributionViewExtensions = Join-Path $distributionDirectory 'viewExtensions'
 $null = New-Item -ItemType Directory -Force -Path $distributionViewExtensions
@@ -44,6 +46,8 @@ Copy-Item -LiteralPath (Join-Path $OutputDirectory 'BimAiDynamoAssistant.dll') `
     -Destination (Join-Path $distributionDirectory 'BimAiDynamoAssistant.dll') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'BimAiDynamoAssistant_ViewExtensionDefinition.xml') `
     -Destination $distributionViewExtensions -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'pkg.json') `
+    -Destination (Join-Path $distributionDirectory 'pkg.json') -Force
 $dllHash = (Get-FileHash -LiteralPath (Join-Path $distributionDirectory 'BimAiDynamoAssistant.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText(
     (Join-Path $distributionDirectory 'BimAiDynamoAssistant.dll.sha256'),

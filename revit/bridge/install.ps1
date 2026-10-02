@@ -71,7 +71,7 @@ $manifest = @"
     <AddInId>85279988-3BB1-4200-8DA5-E2FD521EA7A8</AddInId>
     <FullClassName>BimAiDynamoBridge.BridgeApplication</FullClassName>
     <VendorId>BMAI</VendorId>
-    <VendorDescription>BIM-AI-POC local test-model Dynamo runner</VendorDescription>
+    <VendorDescription>Branko Plaza</VendorDescription>
   </AddIn>
 </RevitAddIns>
 "@

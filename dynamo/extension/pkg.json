@@ -1,0 +1,18 @@
+{
+  "name": "BIM-AI-POC",
+  "version": "0.2.0",
+  "description": "Panel lateral local de Codex y MCP para Dynamo/Revit 2027.",
+  "group": "Asistente BIM",
+  "keywords": ["BIM", "Revit", "Dynamo", "Codex", "MCP"],
+  "dependencies": [],
+  "contents": "Dynamo View Extension para ejecutar el asistente local desde Dynamo.",
+  "engine_version": "4.0.2.3852",
+  "engine": "dynamo",
+  "engine_metadata": "",
+  "site_url": "",
+  "repository_url": "",
+  "copyright_holder": "Branko Plaza",
+  "copyright_year": "2026",
+  "contains_binaries": true,
+  "node_libraries": []
+}

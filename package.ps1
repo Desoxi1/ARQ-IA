@@ -33,14 +33,23 @@ try {
         $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
         $requiredFiles = @(
             'BIM-AI-POC/README.md',
+            'BIM-AI-POC/install.ps1',
             'BIM-AI-POC/setup.ps1',
             'BIM-AI-POC/doctor.ps1',
             'BIM-AI-POC/.codex/config.toml.example',
             'BIM-AI-POC/dynamo/extension/README.md',
             'BIM-AI-POC/dynamo/extension/install.ps1',
+            'BIM-AI-POC/dynamo/extension/uninstall_legacy_programfiles.ps1',
             'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll',
             'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256',
-            'BIM-AI-POC/dynamo/extension/dist/viewExtensions/BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+            'BIM-AI-POC/dynamo/extension/dist/pkg.json',
+            'BIM-AI-POC/dynamo/extension/dist/viewExtensions/BimAiDynamoAssistant_ViewExtensionDefinition.xml',
+            'BIM-AI-POC/revit/assistant/BimAiRevitAssistant.csproj',
+            'BIM-AI-POC/revit/assistant/README.md',
+            'BIM-AI-POC/revit/assistant/build.ps1',
+            'BIM-AI-POC/revit/assistant/install.ps1',
+            'BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.dll',
+            'BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.sha256'
         )
         $entryNames = @($entries | ForEach-Object { $_.FullName })
         foreach ($requiredFile in $requiredFiles) {
@@ -62,6 +71,21 @@ try {
             throw 'El DLL de la extension Dynamo no coincide con su manifiesto SHA-256.'
         }
 
+        $revitAssemblyEntry = $zip.GetEntry('BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.dll')
+        $revitHashEntry = $zip.GetEntry('BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.sha256')
+        $revitDllStream = $revitAssemblyEntry.Open()
+        $revitSha256 = [Security.Cryptography.SHA256]::Create()
+        try { $packagedRevitHash = [BitConverter]::ToString($revitSha256.ComputeHash($revitDllStream)).Replace('-', '').ToLowerInvariant() }
+        finally { $revitDllStream.Dispose() }
+        $revitSha256.Dispose()
+        $revitHashStream = $revitHashEntry.Open()
+        $revitHashReader = New-Object System.IO.StreamReader($revitHashStream, [Text.Encoding]::UTF8, $true)
+        try { $declaredRevitHash = $revitHashReader.ReadToEnd().Trim().ToLowerInvariant() }
+        finally { $revitHashReader.Dispose() }
+        if ($declaredRevitHash -notmatch '^[0-9a-f]{64}$' -or $declaredRevitHash -ne $packagedRevitHash) {
+            throw 'El DLL del add-in Revit no coincide con su manifiesto SHA-256.'
+        }
+
         $tokenPattern = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b'
         $privatePathPattern = '(?i)[A-Z]:[\\/]+Users[\\/]+Branko(?:[\\/]|$)'
         foreach ($entry in $entries) {
@@ -70,7 +94,7 @@ try {
             if ($extension -in @('.rvt', '.rfa', '.rte') -or
                 $name -eq 'BIM-AI-POC/.codex/config.toml' -or
                 $name -match '(?i)(^|/)\.env(\.(?!example$)[^/]+)?$' -or
-                $name -match '(?i)(^|/)logs/runner-results/') {
+                $name -match '(?i)(^|/)logs/(runner-results|attachments)/') {
                 throw "El paquete incluye un artefacto local no permitido: $name"
             }
 

@@ -36,36 +36,114 @@ if (Test-Path -LiteralPath $dynamoAssembly -PathType Leaf) {
     Write-Check FAIL 'No se encontro DynamoRevitDS.dll para Revit 2027'
 }
 
-$dynamoExtensionRoot = Join-Path $revitRoot 'AddIns\DynamoForRevit'
+$assistantAddinPackage = Join-Path $projectRoot 'revit\assistant\dist\BimAiRevitAssistant.dll'
+$assistantAddinHashFile = Join-Path $projectRoot 'revit\assistant\dist\BimAiRevitAssistant.sha256'
+$assistantAddinsRoot = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
+$assistantAddinManifest = Join-Path $assistantAddinsRoot 'BimAiRevitAssistant.addin'
+$assistantInstallTime = $null
+if ((Test-Path -LiteralPath $assistantAddinPackage -PathType Leaf) -and
+    (Test-Path -LiteralPath $assistantAddinHashFile -PathType Leaf)) {
+    $expectedAssistantHash = (Get-Content -LiteralPath $assistantAddinHashFile -Raw).Trim().ToLowerInvariant()
+    if ($expectedAssistantHash -notmatch '^[0-9a-f]{64}$' -or (Get-PathHash $assistantAddinPackage) -ne $expectedAssistantHash) {
+        Write-Check FAIL 'El add-in portable de Revit no coincide con su SHA-256'
+    } elseif (Test-Path -LiteralPath $assistantAddinManifest -PathType Leaf) {
+        try {
+            [xml]$assistantManifestXml = Get-Content -LiteralPath $assistantAddinManifest -Raw
+            $assistantEntry = $assistantManifestXml.RevitAddIns.AddIn
+            $installedAssistantAssembly = [IO.Path]::GetFullPath([string]$assistantEntry.Assembly)
+            if ($assistantEntry.FullClassName -ne 'BimAiRevitAssistant.RevitAssistantApplication' -or
+                $assistantEntry.VendorDescription -ne 'Branko Plaza' -or
+                -not (Test-Path -LiteralPath $installedAssistantAssembly -PathType Leaf) -or
+                (Get-PathHash $installedAssistantAssembly) -ne $expectedAssistantHash) {
+                throw 'El registro, fabricante o ensamblado no coincide con el paquete.'
+            }
+            $assistantInstallTime = (Get-Item -LiteralPath $assistantAddinManifest).LastWriteTime
+            Write-Check PASS 'Add-in nativo de Revit instalado; Branko Plaza y SHA-256 verificados'
+        } catch {
+            Write-Check FAIL 'El manifiesto o el ensamblado de Asistente BIM para Revit no es valido'
+        }
+    } else {
+        Write-Check WAIT 'Add-in nativo listo; instala con revit\assistant\install.ps1'
+    }
+} else {
+    Write-Check FAIL 'Falta el add-in portable de Revit o su manifiesto SHA-256; compila con revit\assistant\build.ps1'
+}
+
+if ($assistantInstallTime -and (Test-Path -LiteralPath $assistantAddinManifest -PathType Leaf)) {
+    $runningAssistantSession = @(Get-Process -Name Revit -ErrorAction SilentlyContinue)
+    $olderAssistantSessions = @()
+    foreach ($process in $runningAssistantSession) {
+        try { if ($process.StartTime -lt $assistantInstallTime) { $olderAssistantSessions += $process } } catch { }
+    }
+    if ($olderAssistantSessions.Count -gt 0) {
+        Write-Check WAIT 'Guarda el trabajo y reinicia Revit cuando corresponda para cargar el panel BIM-AI en la cinta'
+    }
+}
+
 $extensionPackageRoot = Join-Path $projectRoot 'dynamo\extension\dist'
 $extensionPackageDll = Join-Path $extensionPackageRoot 'BimAiDynamoAssistant.dll'
 $extensionPackageHash = Join-Path $extensionPackageRoot 'BimAiDynamoAssistant.dll.sha256'
 $extensionPackageDefinition = Join-Path $extensionPackageRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
-$extensionInstalledDll = Join-Path $dynamoExtensionRoot 'BimAiDynamoAssistant.dll'
-$extensionInstalledDefinition = Join-Path $dynamoExtensionRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$extensionPackageManifest = Join-Path $extensionPackageRoot 'pkg.json'
+$dynamoRoot = Join-Path $revitRoot 'AddIns\DynamoForRevit'
+$extensionInstalledManifest = Join-Path $dynamoRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$extensionRegistrationReady = $false
 if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
     (Test-Path -LiteralPath $extensionPackageHash -PathType Leaf) -and
-    (Test-Path -LiteralPath $extensionPackageDefinition -PathType Leaf)) {
+    (Test-Path -LiteralPath $extensionPackageDefinition -PathType Leaf) -and
+    (Test-Path -LiteralPath $extensionPackageManifest -PathType Leaf)) {
     $expectedExtensionHash = (Get-Content -LiteralPath $extensionPackageHash -Raw).Trim().ToLowerInvariant()
     if ($expectedExtensionHash -notmatch '^[0-9a-f]{64}$' -or (Get-PathHash $extensionPackageDll) -ne $expectedExtensionHash) {
         Write-Check FAIL 'El DLL portable de Asistente BIM no coincide con su SHA-256'
-    } elseif ((Test-Path -LiteralPath $extensionInstalledDll -PathType Leaf) -and
-        (Test-Path -LiteralPath $extensionInstalledDefinition -PathType Leaf)) {
-        $installedExtensionHash = Get-PathHash $extensionInstalledDll
-        $packageDefinitionHash = Get-PathHash $extensionPackageDefinition
-        $installedDefinitionHash = Get-PathHash $extensionInstalledDefinition
-        if ($installedExtensionHash -eq $expectedExtensionHash -and $installedDefinitionHash -eq $packageDefinitionHash) {
-            Write-Check PASS 'Asistente BIM para Dynamo instalado; DLL y manifiesto coinciden con el paquete'
-        } else {
-            Write-Check FAIL 'La extension Dynamo instalada no coincide con el paquete; revisa y actualiza con install.ps1 -Force'
+    } elseif (Test-Path -LiteralPath $extensionInstalledManifest -PathType Leaf) {
+        try {
+            [xml]$registeredExtension = Get-Content -LiteralPath $extensionInstalledManifest -Raw
+            $registeredAssemblyText = [string]$registeredExtension.ViewExtensionDefinition.AssemblyPath
+            if ([IO.Path]::IsPathRooted($registeredAssemblyText)) {
+                $registeredAssembly = [IO.Path]::GetFullPath($registeredAssemblyText)
+            } else {
+                $registeredAssembly = [IO.Path]::GetFullPath([IO.Path]::Combine((Split-Path -Parent $extensionInstalledManifest), $registeredAssemblyText))
+            }
+            $registeredAssemblyRoot = [IO.Path]::GetFullPath((Split-Path -Parent $registeredAssembly))
+            $expectedAssemblyRoot = [IO.Path]::GetFullPath($dynamoRoot)
+            $manifestTypeMatches = $registeredExtension.ViewExtensionDefinition.TypeName -eq 'BimAiDynamoAssistant.BimAiDynamoViewExtension'
+            $registrationMatches = [String]::Equals($registeredAssemblyRoot, $expectedAssemblyRoot, [StringComparison]::OrdinalIgnoreCase) -and
+                [IO.Path]::GetFileName($registeredAssembly) -match '^BimAiDynamoAssistant(?:\.[0-9a-f]{16})?\.dll$' -and
+                (Test-Path -LiteralPath $registeredAssembly -PathType Leaf)
+        } catch {
+            $manifestTypeMatches = $false
+            $registrationMatches = $false
         }
-    } elseif ((Test-Path -LiteralPath $extensionInstalledDll) -or (Test-Path -LiteralPath $extensionInstalledDefinition)) {
-        Write-Check FAIL 'La extension Dynamo tiene una instalacion parcial; revisa y vuelve a ejecutar install.ps1'
+        $installedExtensionHash = if ($registrationMatches) { Get-PathHash $registeredAssembly } else { '' }
+        if (-not $manifestTypeMatches) {
+            Write-Check FAIL 'El manifiesto de Dynamo es inválido o pertenece a otra extensión'
+        } elseif (-not $registrationMatches) {
+            Write-Check WAIT 'Asistente BIM aún apunta a una ruta antigua; migra el manifiesto con install.ps1 -Force y completa la elevación de Windows'
+        } elseif ($installedExtensionHash -eq $expectedExtensionHash) {
+            $extensionRegistrationReady = $true
+            Write-Check PASS 'Asistente BIM instalado junto a Dynamo 4.0.2; DLL versionada, manifiesto relativo y SHA-256 coinciden'
+        } else {
+            Write-Check WAIT 'La extensión Dynamo instalada tiene una versión anterior; actualiza con install.ps1 -Force y completa la elevación de Windows'
+        }
     } else {
-        Write-Check WAIT 'Paquete de Asistente BIM listo; instala con dynamo\extension\install.ps1 cuando Revit este cerrado'
+        Write-Check WAIT 'Paquete de Asistente BIM listo; instala con dynamo\extension\install.ps1'
     }
 } else {
-    Write-Check FAIL 'Falta el DLL, SHA-256 o manifiesto portable de Asistente BIM para Dynamo'
+    Write-Check FAIL 'Falta el DLL, SHA-256, pkg.json o manifiesto portable de Asistente BIM para Dynamo'
+}
+
+if ($extensionRegistrationReady) {
+    $dynamoLogRoot = Join-Path $env:APPDATA 'Dynamo\Dynamo Revit\27.0\Logs'
+    $latestDynamoLog = Get-ChildItem -LiteralPath $dynamoLogRoot -Filter 'dynamoLog_*.txt' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $manifestWriteTime = (Get-Item -LiteralPath $extensionInstalledManifest).LastWriteTime
+    if (-not $latestDynamoLog -or $latestDynamoLog.LastWriteTime -lt $manifestWriteTime) {
+        Write-Check WAIT 'Instalación lista; reinicia Revit/Dynamo para comprobar que cargue el panel'
+    } elseif (Select-String -LiteralPath $latestDynamoLog.FullName -Pattern 'Asistente BIM \(id: a6b0d0a4-0d48-4d74-9a8f-9e0e3f3d1a27\) view extension is added' -Quiet) {
+        Write-Check PASS 'El journal más reciente de Dynamo confirma que cargó Asistente BIM'
+    } else {
+        Write-Check WARN 'El journal más reciente de Dynamo no registra Asistente BIM; revisa la ruta del manifiesto y los errores de carga'
+    }
 }
 
 foreach ($toolName in @('git', 'python', 'codex')) {
@@ -84,7 +162,11 @@ if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
         $configText -notmatch ('(?m)^\[mcp_servers\.' + [regex]::Escape($_) + '\]$')
     })
     if ($missingServers.Count -eq 0) {
-        Write-Check PASS 'Configuracion MCP local contiene los tres servidores del proyecto'
+        if ($configText -match '"open_dynamo_ui"') {
+            Write-Check PASS 'Configuracion MCP local contiene los tres servidores y la herramienta de apertura de Dynamo'
+        } else {
+            Write-Check WAIT 'La configuración MCP no expone open_dynamo_ui; ejecuta setup.ps1 -ConfigureOnly y reinicia el panel de Codex'
+        }
     } else {
         Write-Check FAIL ('Faltan servidores MCP en la configuracion local: ' + ($missingServers -join ', '))
     }
@@ -205,6 +287,37 @@ $bridgePipe = Get-ChildItem -LiteralPath '\\.\pipe\' -ErrorAction SilentlyContin
     Where-Object { $_.Name -eq 'BIM-AI-POC-Revit-27' } | Select-Object -First 1
 if ($bridgePipe) {
     Write-Check PASS 'Named pipe del bridge disponible'
+    $pingClient = $null
+    $pingReader = $null
+    $pingWriter = $null
+    try {
+        $pipeName = 'BIM-AI-POC-Revit-27'
+        $pipeEncoding = New-Object System.Text.UTF8Encoding($false)
+        $pingClient = New-Object System.IO.Pipes.NamedPipeClientStream('.', $pipeName, [System.IO.Pipes.PipeDirection]::InOut, [System.IO.Pipes.PipeOptions]::None)
+        $pingClient.Connect(2500)
+        $pingReader = New-Object System.IO.StreamReader($pingClient, $pipeEncoding, $false, 1024, $true)
+        $pingWriter = New-Object System.IO.StreamWriter($pingClient, $pipeEncoding, 1024, $true)
+        $pingWriter.AutoFlush = $true
+        $pingWriter.WriteLine('{"operation":"ping"}')
+        $pingTask = $pingReader.ReadLineAsync()
+        if (-not $pingTask.Wait(10000)) { throw 'bridge_ping_timeout' }
+        $ping = $pingTask.Result | ConvertFrom-Json
+        if ($ping.ok -ne $true -or [string]$ping.revitMajor -ne '2027') {
+            Write-Check WARN 'El bridge respondió con un estado inesperado o una versión distinta de Revit'
+        } elseif (-not $ping.PSObject.Properties['dynamoReadyForActiveDocument']) {
+            Write-Check WAIT 'El bridge cargado es anterior al gate de Dynamo UI; reinicia Revit para cargar la versión preparada'
+        } elseif ([bool]$ping.dynamoReadyForActiveDocument) {
+            Write-Check PASS 'Dynamo UI está abierto y ligado al modelo Revit activo'
+        } else {
+            Write-Check WAIT 'El bridge actualizado responde; abre Dynamo UI con el RVT descartable activo'
+        }
+    } catch {
+        Write-Check WAIT 'El pipe existe, pero el ping de estado no respondió dentro del límite'
+    } finally {
+        if ($pingWriter) { $pingWriter.Dispose() }
+        if ($pingReader) { $pingReader.Dispose() }
+        if ($pingClient) { $pingClient.Dispose() }
+    }
 } else {
     Write-Check WAIT 'Pipe del bridge no disponible; inicia una sesion de prueba Revit 2027 y acepta la carga del add-in'
 }

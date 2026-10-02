@@ -2,7 +2,9 @@
 
 By default this sends a short, tool-free response request through the signed-in
 Codex CLI. With --mcp it approves only the read-only list_saved_routines request.
-Neither mode calls Revit or Dynamo.
+With --revit-readonly it approves only active-view and selection queries in Revit.
+With --eval-ambiguity it checks that an ambiguous BIM request receives a
+clarification before tools or changes. No mode executes Dynamo or changes Revit.
 """
 
 from __future__ import annotations
@@ -22,6 +24,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 90
 EXPECTED_REPLY = "BIM_AI_EXTENSION_CONNECTED"
+READONLY_REVIT_TOOLS = {
+    "revit_get_current_view_info",
+    "revit_get_selected_elements",
+}
 
 
 class AppServer:
@@ -118,6 +124,21 @@ class AppServer:
                 "result": {"action": "accept", "content": {}, "_meta": None},
             })
             return
+        serialized_params = json.dumps(params, ensure_ascii=False).casefold()
+        matched_read_tools = [name for name in READONLY_REVIT_TOOLS if name in serialized_params]
+        if (
+            method == "mcpServer/elicitation/request"
+            and isinstance(params, dict)
+            and params.get("serverName") == "rvt_mcp"
+            and params.get("mode") == "form"
+            and len(matched_read_tools) == 1
+        ):
+            self._send({
+                "jsonrpc": "2.0",
+                "id": message["id"],
+                "result": {"action": "accept", "content": {}, "_meta": None},
+            })
+            return
         self._send({
             "jsonrpc": "2.0",
             "id": message["id"],
@@ -160,7 +181,10 @@ class AppServer:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mcp", action="store_true", help="Also call the read-only routine listing MCP tool.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--mcp", action="store_true", help="Also call the read-only routine listing MCP tool.")
+    mode.add_argument("--revit-readonly", action="store_true", help="Call only the active-view and selection read tools in Revit.")
+    mode.add_argument("--eval-ambiguity", action="store_true", help="Check that an ambiguous BIM request receives a clarification before tools or changes.")
     args = parser.parse_args()
     executable = shutil.which("codex.exe") or shutil.which("codex")
     if not executable:
@@ -182,10 +206,19 @@ def main() -> int:
             return 1
         client.notify("initialized", {})
 
-        developer_instructions = (
-            "Only call bim_ai_routines.list_saved_routines, a read-only tool. Do not call any Revit or write tool."
-            if args.mcp else "Do not call tools or access Revit. Reply exactly BIM_AI_EXTENSION_CONNECTED."
-        )
+        if args.mcp:
+            developer_instructions = "Only call bim_ai_routines.list_saved_routines, a read-only tool. Do not call any Revit or write tool."
+        elif args.revit_readonly:
+            developer_instructions = (
+                "Only call rvt_mcp.revit_get_current_view_info and "
+                "rvt_mcp.revit_get_selected_elements, exactly once each and in that order. "
+                "Wait for the first tool result before calling the second; never call them in parallel. "
+                "Do not call any other tool, do not modify the model, and report the active view and selection count."
+            )
+        elif args.eval_ambiguity:
+            developer_instructions = "Follow the project's AGENTS.md and language evaluation cases. For this evaluation, do not call tools or access Revit. If the request has materially different BIM/Revit interpretations, ask one concise clarification in Spanish before planning any change."
+        else:
+            developer_instructions = "Do not call tools or access Revit. Reply exactly BIM_AI_EXTENSION_CONNECTED."
         thread = client.request(
             "thread/start",
             {
@@ -205,6 +238,15 @@ def main() -> int:
 
         if args.mcp:
             smoke_prompt = "Llama a bim_ai_routines.list_saved_routines. Responde únicamente con RUTINAS=<cantidad>. No uses herramientas que escriban ni accedas a Revit."
+        elif args.revit_readonly:
+            smoke_prompt = (
+                "Primero consulta una vez la vista activa de Revit y espera el resultado. "
+                "Después consulta una vez la selección actual y espera el resultado. "
+                "Dime el nombre de la vista activa y cuántos elementos hay seleccionados. "
+                "Haz las llamadas una por una, nunca en paralelo. Solo lectura; no cambies nada."
+            )
+        elif args.eval_ambiguity:
+            smoke_prompt = "Haz una planta para el segundo piso."
         else:
             smoke_prompt = "Responde exactamente BIM_AI_EXTENSION_CONNECTED. No uses herramientas."
 
@@ -224,6 +266,34 @@ def main() -> int:
             print("CODEX_APP_SERVER_TURN_START=FAIL missing_turn_id")
             return 1
         reply, status, tool_calls = client.wait_for_turn(turn_id)
+        if args.eval_ambiguity:
+            normalized_reply = " ".join(reply.casefold().split())
+            asks_clarification = any(marker in normalized_reply for marker in ("¿", "necesito saber", "aclarar", "prefieres", "prefiere"))
+            identifies_distinct_bim_intents = (
+                "vista" in normalized_reply
+                and any(term in normalized_reply for term in ("nivel", "losa", "recinto", "distribuci", "diseñar", "disenar"))
+            )
+            if status != "completed" or not asks_clarification or not identifies_distinct_bim_intents or tool_calls or client.server_requests:
+                print(f"CODEX_APP_SERVER_AMBIGUITY=FAIL status={status} reply={reply[:300]!r} calls={tool_calls} requests={client.server_requests}")
+                return 1
+            print("CODEX_APP_SERVER_AMBIGUITY=PASS asks_clarification=true tools=0")
+            return 0
+        if args.revit_readonly:
+            completed_tools = [
+                entry.split(":", 1)[0].split(".", 1)[-1]
+                for entry in tool_calls
+                if entry.casefold().endswith(":completed")
+            ]
+            if (
+                status != "completed"
+                or sorted(completed_tools) != sorted(READONLY_REVIT_TOOLS)
+                or not reply.strip()
+                or any("failed" in entry.casefold() for entry in tool_calls)
+            ):
+                print(f"CODEX_APP_SERVER_REVIT_READONLY=FAIL status={status} reply={reply[:300]!r} calls={tool_calls} requests={client.server_requests}")
+                return 1
+            print(f"CODEX_APP_SERVER_REVIT_READONLY=PASS tools={','.join(sorted(READONLY_REVIT_TOOLS))}")
+            return 0
         expected = "RUTINAS=3" if args.mcp else EXPECTED_REPLY
         if status != "completed" or expected not in reply.replace(" ", ""):
             print(f"CODEX_APP_SERVER_{'MCP' if args.mcp else 'TURN'}=FAIL status={status} reply={reply[:300]!r} calls={tool_calls} requests={client.server_requests}")

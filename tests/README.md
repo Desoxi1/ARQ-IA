@@ -19,7 +19,7 @@ python -B tests/run_revit_mcp_readonly_smoke.py
 
 Consulta solo vista y selección y no imprime datos del modelo. Si agota el timeout, no repite escrituras: es un smoke solo de lectura.
 
-La primera integración viva después de cargar el add-in debe usar el RVT desechable dentro de `revit/test-models/`:
+La integración viva usa el RVT desechable dentro de `revit/test-models/`. Abre primero el documento y la interfaz Dynamo en Revit; el bridge no inicializa Dynamo en modo invisible sobre el modelo. `ping_revit_dynamo_bridge` informa si Dynamo está abierto y enlazado al documento activo:
 
 ```powershell
 python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
@@ -30,3 +30,5 @@ python -B tests/run_dynamo_runner_mcp_smoke.py --live-generic
 Después de aprobar el smoke read-only, selecciona un elemento de prueba y ejecuta `set_comments_on_selection` con aprobación MCP. Relee Comments con rvt-mcp y confirma que `affected_ids` coincide con los IDs reportados por Revit. No uses el bridge genérico sobre un proyecto productivo.
 
 El smoke MCP del runner sin flags valida solo el contrato. `run_dynamo_runner_pipe_smoke.py` recorre Builder MCP → rutina generada/guardada → Runner MCP → pipe aleatorio → fake bridge → manifiesto `validated` y listado de rutina reutilizable. No es evidencia de ejecución Revit/Dynamo.
+
+Para comprobar Codex app-server desde esta carpeta, ejecuta `python -B tests/run_dynamo_extension_codex_smoke.py`; añade `--mcp` para permitir únicamente el listado de rutinas de solo lectura. `--revit-readonly` consulta secuencialmente la vista activa y la selección por `rvt-mcp`; necesita Revit abierto con el RVT de prueba y no modifica el modelo. La opción `--eval-ambiguity` prueba que «Haz una planta para el segundo piso» genera una pregunta que distingue una vista de planta de otras intenciones de modelado, como distribuir recintos o crear una losa. El arnés deniega cualquier llamada de herramienta en esa evaluación; no abre Dynamo ni modifica Revit.

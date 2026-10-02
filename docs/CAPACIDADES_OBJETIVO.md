@@ -1,6 +1,6 @@
 # Capacidad objetivo del asistente BIM
 
-**Actualizado:** 29 de septiembre de 2026
+**Actualizado:** 1 de octubre de 2026
 **Estado:** arquitectura y ruta de desarrollo; todavía no es la capacidad instalada completa.
 
 ## Objetivo
@@ -31,7 +31,7 @@ Volver a consultar el modelo y comparar con el plan
 Informar resultados y guardar el procedimiento reutilizable
 ```
 
-Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario, pero la sesión de prueba está cerrada y la rutina aún no llegó a Dynamo/PythonNet3. En el intento vivo anterior, Revit no despachó el `ExternalEvent`.
+Para tareas habituales se prefieren herramientas Revit tipadas: crear niveles, ejes, muros, pisos, recintos, instancias de familias; editar parámetros/tipos; documentar vistas, cotas y etiquetas. Para un caso que no tenga una herramienta tipada, Codex puede guardar una rutina PythonNet3/Dynamo y solicitar su ejecución. El runner genérico está compilado e instalado por usuario. En la última comprobación (1-10-2026), Revit estaba en Inicio sin modelo y respondía por el bridge anterior; el nuevo bridge, staged después del inicio de esa sesión, exige Dynamo UI abierta y ligada al RVT activo. Aún falta ejecutar la rutina en vivo con esa condición.
 
 ## Conocimiento técnico reutilizable
 
@@ -48,10 +48,10 @@ Una rutina entra a la biblioteca común después de revisión y prueba en un mod
 ## Capacidad disponible hoy
 
 - La consulta directa Revit 2027 ↔ rvt-mcp pasó en solo lectura: se obtuvo la vista activa y la selección de un muro. Los IDs y nombres del modelo se omitieron de la versión pública.
-- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. `codex mcp list` muestra habilitados los tres MCP del proyecto; falta comprobarlos en la app Codex con esta carpeta abierta.
+- La instalación v0.6.2 expone un inventario local de **51 herramientas** al seleccionar los grupos `query,create,modify,view,annotation`. El perfil de proyecto prepara una lista curada de consultas, creación de objetos arquitectónicos y edición de parámetros/tipos; Codex solicita aprobación por llamada. No se habilitan borrado ni ejecución de código arbitrario. `codex mcp list` muestra habilitados los tres MCP del proyecto y una prueba app-server llamó al MCP de rutinas; la consulta desde el panel hacia Revit todavía no está validada.
 - El MCP de rutinas genera el fuente `.py`, un `.dyn` de un nodo PythonNet3 Manual con wrapper de resultado y un manifiesto con hashes. El runner genérico vuelve a validar ambos y se limita a RVT de `revit/test-models/`.
 - El borrador `set_comments_on_selection` escribe `PRUEBA_IA` en Comments de los elementos seleccionados. El propio script también comprueba que el documento sea un RVT local guardado bajo el directorio desechable. Aún no se ha ejecutado en Revit.
-- La consulta real de rvt-mcp a Revit pasó por separado desde la CLI. La app Codex todavía debe abrir esta carpeta como proyecto confiable y confirmar que cargó los MCP desde la interfaz.
+- La consulta real de rvt-mcp a Revit pasó por separado desde la CLI. Codex app-server desde esta carpeta listó rutinas mediante el MCP; aún falta probar desde la ventana Asistente BIM una consulta al modelo Revit y la rutina PythonNet3.
 
 El inventario local es una lectura del esquema de herramientas, no una prueba de cada comando. Antes de aprobar una escritura, Codex debe explicar el objetivo y consultar los datos relevantes del proyecto. Cada herramienta aprobada puede aplicar el cambio inmediatamente; el MCP no proporciona una vista previa o rollback general. Las tareas compuestas se ejecutan en pasos pequeños sobre un modelo descartable y se verifican con consultas posteriores. Borrado, guardado, exportación y ejecución libre requieren controles separados.
 
@@ -88,9 +88,9 @@ No se instalarán varias implementaciones de puente Revit simultáneamente hasta
 
 ## Interfaz recomendada
 
-Para esta prueba, el arquitecto conversa con Codex en una ventana separada y el agente opera Revit mediante los MCP del proyecto. La única ejecución presentada por el runner es de solo lectura y todavía no ha pasado la prueba viva. Las rutinas nuevas se guardan para revisión y ejecución manual. Esta ruta permite medir los pedidos frecuentes antes de financiar y desplegar otra interfaz.
+El prototipo ya incluye el panel **Asistente BIM** dentro de Dynamo 4.0.2. El panel conversa con Codex app-server local y sus MCP del proyecto; no es una página web de ChatGPT incrustada ni usa una API key. Codex recibe las reglas del `AGENTS.md`, consulta este glosario y las capacidades instaladas, elige entre herramientas Revit tipadas y rutinas Dynamo/PythonNet3, y muestra el progreso en el panel. Las ejecuciones que puedan modificar el modelo siguen sujetas a aprobación explícita.
 
-Si la adopción justifica un panel dentro del flujo de trabajo, la opción a evaluar primero es un panel acoplable en Revit. El panel puede enviar solicitudes al mismo agente/orquestador y conservar un solo puente autorizado para operar el modelo. Un paquete de extensión de Dynamo queda como opción para controles propios del editor de grafos. La interfaz no reemplaza el runner, el despacho de Revit, las aprobaciones ni la verificación posterior.
+El smoke app-server → MCP y la generación de rutinas ya pasaron. Falta validar el panel en la instalación actualizada y cerrar el ciclo con Dynamo UI abierto sobre un RVT descartable: petición en el chat, consulta o cambio, lectura posterior y rutina reutilizable. Un panel nativo de Revit puede evaluarse después como una segunda superficie; no reemplaza el panel Dynamo que forma parte del objetivo actual.
 
 ## Fuentes consultadas
 

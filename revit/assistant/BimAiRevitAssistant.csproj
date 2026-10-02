@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>BimAiRevitAssistant</AssemblyName>
+    <RootNamespace>BimAiRevitAssistant</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Company>Branko Plaza</Company>
+    <Product>Asistente BIM para Revit y Dynamo</Product>
+    <Copyright>Copyright © Branko Plaza 2026</Copyright>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI">
+      <HintPath>$(RevitRoot)\RevitAPI.dll</HintPath>
+      <Private>false</Private>
+      <ExternallyResolved>true</ExternallyResolved>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(RevitRoot)\RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+      <ExternallyResolved>true</ExternallyResolved>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\dynamo\extension\AssistantPane.cs" Link="Shared\AssistantPane.cs" />
+    <Compile Include="..\..\dynamo\extension\CodexAppServerClient.cs" Link="Shared\CodexAppServerClient.cs" />
+    <Compile Include="..\..\dynamo\extension\LocalAttachmentStore.cs" Link="Shared\LocalAttachmentStore.cs" />
+    <Compile Include="..\..\dynamo\extension\ProjectSettings.cs" Link="Shared\ProjectSettings.cs" />
+  </ItemGroup>
+</Project>

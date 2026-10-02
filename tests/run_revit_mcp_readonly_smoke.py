@@ -105,6 +105,39 @@ def require_ok(response: dict[str, Any] | None) -> bool:
     return isinstance(result, dict) and not result.get("isError")
 
 
+def read_tool_status(response: dict[str, Any] | None) -> str:
+    if not require_ok(response):
+        return "tool_error"
+    result = response.get("result", {}) if isinstance(response, dict) else {}
+    content = result.get("content", []) if isinstance(result, dict) else []
+    if not isinstance(content, list) or not content:
+        return "empty_response"
+    saw_payload = False
+    for item in content:
+        if not isinstance(item, dict) or not isinstance(item.get("text"), str):
+            continue
+        text = item["text"].strip()
+        if not text:
+            continue
+        saw_payload = True
+        normalized = text.casefold()
+        if normalized.startswith(("error", "failed", "exception")):
+            if "document" in normalized and "open" in normalized:
+                return "no_active_document"
+            return "tool_error"
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            if payload.get("error"):
+                return "tool_error"
+            status = str(payload.get("status", "")).casefold()
+            if status in {"error", "failed", "failure", "no_active_document", "no_document_open"}:
+                return "no_active_document" if "document" in status else "tool_error"
+    return "ok" if saw_payload else "empty_response"
+
+
 def main() -> int:
     try:
         executable = find_server()
@@ -147,10 +180,10 @@ def main() -> int:
                 response = client.request(
                     "tools/call", {"name": name, "arguments": {}}
                 )
-                ok = require_ok(response) and isinstance(
-                    response.get("result", {}).get("content"), list
-                )
-                print(f"{name.upper()}={'PASS' if ok else 'FAIL'}")
+                status = read_tool_status(response)
+                ok = status == "ok"
+                suffix = "" if ok else f" status={status}"
+                print(f"{name.upper()}={'PASS' if ok else 'FAIL'}{suffix}")
                 passed &= ok
             return 0 if passed else 1
         finally:
