@@ -1,4 +1,4 @@
-# Instalar y probar en el otro PC
+# Instalar ARQ-IA en otro PC
 
 El otro PC indicado tiene Revit 2027 y Codex. Copia la carpeta del proyecto desde un release del repositorio o transfiérela como ZIP. Si el instalador no está en `vendor/`, `setup.ps1` lo descarga desde el release oficial v0.6.2 y verifica el SHA-256 antes de ejecutarlo.
 
@@ -6,17 +6,19 @@ Para generar el ZIP desde el PC de desarrollo, guarda los cambios en un commit y
 
 ## Instalación
 
-Clona la carpeta, abre PowerShell en su raíz y ejecuta este único comando:
+Clona la carpeta como **ARQ-IA**, cierra Revit y haz doble clic en **Instalar-ARQ-IA.cmd**. También puedes ejecutar el instalador desde PowerShell:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-El instalador comprueba Revit 2027, Dynamo y `codex.exe`, instala/configura rvt-mcp y los MCP de esta copia, enlaza `routines/` con el bridge y registra los dos accesos: panel acoplable **BIM-AI** en Revit y chat lateral **Asistente BIM** en Dynamo. Verifica hashes de los ensamblados distribuidos y escribe la configuración en rutas relativas al clon, salvo el puente local del perfil de usuario.
+El instalador comprueba Revit 2027, Dynamo y Codex CLI, instala/configura rvt-mcp y los MCP de esta copia, enlaza `routines/` con el bridge y registra los dos accesos **ARQ-IA**: panel acoplable en Revit y chat lateral en Dynamo. Verifica hashes de los ensamblados distribuidos y genera las rutas locales para este clon.
 
-Windows pedirá elevar permisos una vez para colocar la extensión junto a Dynamo. Si Revit está abierto con rvt-mcp ya instalado, el comando prepara los complementos para el siguiente reinicio. Para instalar rvt-mcp por primera vez, guarda y cierra Revit antes de ejecutar el comando. `-CheckOnly` valida prerequisitos sin escribir archivos.
+El panel Dynamo se instala en el perfil del usuario y no requiere administrador en un equipo nuevo. Si este equipo ya tenía una versión antigua en `Program Files`, ejecuta **Migrar-ARQ-IA-Anterior.cmd** una sola vez con Revit cerrado y acepta el aviso de Windows. El diagnóstico avisa si hace falta.
 
-Después de instalar, abre esta carpeta como proyecto en Codex y confirma que confías en ella para habilitar sus MCP locales. Codex debe estar iniciado con tu cuenta; la integración no guarda claves de API. Reinicia Revit y abre Dynamo. Si Revit muestra el aviso de add-in sin firma, revisa que el nombre sea **BIM-AI**/**BIM-AI Dynamo Bridge** y el fabricante **Branko Plaza** antes de elegir **Load Once**.
+La instalación nueva de ARQ-IA usa el perfil del usuario y no necesita elevar permisos. Si Revit está abierto con rvt-mcp ya instalado, el comando prepara los complementos para el siguiente reinicio. Para instalar rvt-mcp por primera vez, guarda y cierra Revit antes de ejecutar el comando. `-CheckOnly` valida prerequisitos sin escribir archivos.
+
+Después de instalar, abre esta carpeta como proyecto en Codex y confirma que confías en ella para habilitar sus MCP locales si aparece el aviso. Codex debe estar iniciado con tu cuenta; la integración no guarda claves de API. Abre Revit y Dynamo en una sesión nueva. Si Revit muestra el aviso de add-in sin firma, revisa que el nombre sea **ARQ-IA**/**ARQ-IA Dynamo Bridge** y el fabricante **Branko Plaza** antes de elegir **Load Once**.
 
 En Dynamo, envía primero una consulta de solo lectura: **“Consulta la vista activa y la selección de Revit; devuelve vista, IDs y categorías. No cambies el modelo.”** El panel muestra **Gestor: Branko Plaza**, acepta archivos e imágenes y conecta Codex al enviar. Para cambios, revisa cada propuesta y aprobación; no uses un modelo productivo en esta primera prueba.
 

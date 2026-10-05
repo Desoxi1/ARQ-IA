@@ -87,7 +87,11 @@ try
     await create;
 
     if (createApprovalCount != 1)
+    {
+        var reply = text.ToString();
+        Console.WriteLine($"CODEX_APP_SERVER_CSHARP_CREATE_DIAGNOSTICS statuses={statuses.ToString().Trim()}; reply={(reply.Length > 800 ? reply[^800..] : reply)}");
         throw new InvalidOperationException($"Expected one approved routine creation call; got {createApprovalCount}.");
+    }
     if (listApprovalCount > 2)
         throw new InvalidOperationException($"Unexpected number of list calls during routine creation: {listApprovalCount}.");
     if (!routinePaths.All(File.Exists))

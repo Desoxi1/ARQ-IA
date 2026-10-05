@@ -92,6 +92,8 @@ class BridgePackageIntegrityTests(unittest.TestCase):
 
     def test_bridge_requires_open_dynamo_bound_to_active_document_without_silent_initialization(self):
         source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        self.assertEqual(source.count('[JournalKeys.AutomationModeKey] = "false"'), 2)
+        self.assertNotIn("Thread.Sleep(50)", source)
         self.assertIn("ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: true)", source)
         self.assertIn("disableTransactions: !writesModel", source)
         self.assertGreaterEqual(source.count('BridgeResponse.Fail("dynamo_ui_required_for_active_document")'), 2)
@@ -102,7 +104,8 @@ class BridgePackageIntegrityTests(unittest.TestCase):
         self.assertIn('GetProperty("RevitDynamoModel", BindingFlags.Public | BindingFlags.Static)', source)
         self.assertIn('GetProperty("State", BindingFlags.Public | BindingFlags.Instance)', source)
         self.assertIn('GetProperty("CurrentWorkspace", BindingFlags.Public | BindingFlags.Instance)', source)
-        self.assertIn('GetMethod("Run", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null)', source)
+        self.assertIn('[JournalKeys.DynPathExecuteKey] = "true"', source)
+        self.assertNotIn('runMethod.Invoke(workspace, null)', source)
         self.assertIn('GetType("RevitServices.Transactions.TransactionManager", false)', source)
         self.assertIn('GetProperty("DisableTransactions", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)', source)
         self.assertIn('post_run_document_changed_" + changedIds.Count', source)

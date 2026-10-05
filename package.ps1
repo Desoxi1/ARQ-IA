@@ -5,7 +5,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
-$prefix = 'BIM-AI-POC/'
+$prefix = 'ARQ-IA/'
 
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.git') -PathType Container)) {
     throw 'Ejecuta este empaquetador desde un checkout Git del proyecto.'
@@ -17,8 +17,8 @@ if ($status.Count -gt 0) { throw 'Guarda los cambios en un commit antes de empaq
 $revision = (& git -C $projectRoot rev-parse --short HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[0-9a-f]{7,40}$') { throw 'No se pudo resolver el commit actual.' }
 New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
-$archivePath = Join-Path $artifactsRoot ('BIM-AI-POC-' + $revision + '.zip')
-$tempArchive = Join-Path $artifactsRoot ('.BIM-AI-POC-' + [Guid]::NewGuid().ToString('N') + '.tmp.zip')
+$archivePath = Join-Path $artifactsRoot ('ARQ-IA-' + $revision + '.zip')
+$tempArchive = Join-Path $artifactsRoot ('.ARQ-IA-' + [Guid]::NewGuid().ToString('N') + '.tmp.zip')
 if (Test-Path -LiteralPath $archivePath) { throw 'Ya existe un paquete para este commit; no se sobrescribio.' }
 
 try {
@@ -32,32 +32,33 @@ try {
     try {
         $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
         $requiredFiles = @(
-            'BIM-AI-POC/README.md',
-            'BIM-AI-POC/install.ps1',
-            'BIM-AI-POC/setup.ps1',
-            'BIM-AI-POC/doctor.ps1',
-            'BIM-AI-POC/.codex/config.toml.example',
-            'BIM-AI-POC/dynamo/extension/README.md',
-            'BIM-AI-POC/dynamo/extension/install.ps1',
-            'BIM-AI-POC/dynamo/extension/uninstall_legacy_programfiles.ps1',
-            'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll',
-            'BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256',
-            'BIM-AI-POC/dynamo/extension/dist/pkg.json',
-            'BIM-AI-POC/dynamo/extension/dist/viewExtensions/BimAiDynamoAssistant_ViewExtensionDefinition.xml',
-            'BIM-AI-POC/revit/assistant/BimAiRevitAssistant.csproj',
-            'BIM-AI-POC/revit/assistant/README.md',
-            'BIM-AI-POC/revit/assistant/build.ps1',
-            'BIM-AI-POC/revit/assistant/install.ps1',
-            'BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.dll',
-            'BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.sha256'
+            'ARQ-IA/README.md',
+            'ARQ-IA/Instalar-ARQ-IA.cmd',
+            'ARQ-IA/install.ps1',
+            'ARQ-IA/setup.ps1',
+            'ARQ-IA/doctor.ps1',
+            'ARQ-IA/.codex/config.toml.example',
+            'ARQ-IA/dynamo/extension/README.md',
+            'ARQ-IA/dynamo/extension/install.ps1',
+            'ARQ-IA/dynamo/extension/uninstall_legacy_programfiles.ps1',
+            'ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll',
+            'ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256',
+            'ARQ-IA/dynamo/extension/dist/pkg.json',
+            'ARQ-IA/dynamo/extension/dist/viewExtensions/BimAiDynamoAssistant_ViewExtensionDefinition.xml',
+            'ARQ-IA/revit/assistant/BimAiRevitAssistant.csproj',
+            'ARQ-IA/revit/assistant/README.md',
+            'ARQ-IA/revit/assistant/build.ps1',
+            'ARQ-IA/revit/assistant/install.ps1',
+            'ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.dll',
+            'ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.sha256'
         )
         $entryNames = @($entries | ForEach-Object { $_.FullName })
         foreach ($requiredFile in $requiredFiles) {
             if ($requiredFile -notin $entryNames) { throw "Falta un archivo requerido: $requiredFile" }
         }
 
-        $extensionDllEntry = $zip.GetEntry('BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll')
-        $extensionHashEntry = $zip.GetEntry('BIM-AI-POC/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256')
+        $extensionDllEntry = $zip.GetEntry('ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll')
+        $extensionHashEntry = $zip.GetEntry('ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256')
         $dllStream = $extensionDllEntry.Open()
         $sha256 = [Security.Cryptography.SHA256]::Create()
         try { $packagedExtensionHash = [BitConverter]::ToString($sha256.ComputeHash($dllStream)).Replace('-', '').ToLowerInvariant() }
@@ -71,8 +72,8 @@ try {
             throw 'El DLL de la extension Dynamo no coincide con su manifiesto SHA-256.'
         }
 
-        $revitAssemblyEntry = $zip.GetEntry('BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.dll')
-        $revitHashEntry = $zip.GetEntry('BIM-AI-POC/revit/assistant/dist/BimAiRevitAssistant.sha256')
+        $revitAssemblyEntry = $zip.GetEntry('ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.dll')
+        $revitHashEntry = $zip.GetEntry('ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.sha256')
         $revitDllStream = $revitAssemblyEntry.Open()
         $revitSha256 = [Security.Cryptography.SHA256]::Create()
         try { $packagedRevitHash = [BitConverter]::ToString($revitSha256.ComputeHash($revitDllStream)).Replace('-', '').ToLowerInvariant() }
@@ -92,7 +93,7 @@ try {
             $name = $entry.FullName
             $extension = [IO.Path]::GetExtension($name).ToLowerInvariant()
             if ($extension -in @('.rvt', '.rfa', '.rte') -or
-                $name -eq 'BIM-AI-POC/.codex/config.toml' -or
+                $name -eq 'ARQ-IA/.codex/config.toml' -or
                 $name -match '(?i)(^|/)\.env(\.(?!example$)[^/]+)?$' -or
                 $name -match '(?i)(^|/)logs/(runner-results|attachments)/') {
                 throw "El paquete incluye un artefacto local no permitido: $name"

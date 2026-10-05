@@ -57,7 +57,7 @@ internal sealed class LocalAttachmentStore : IDisposable
         _sessionDirectory = Path.Combine(_attachmentsRoot, Guid.NewGuid().ToString("N"));
 
         if (!Directory.Exists(_projectRoot))
-            throw new DirectoryNotFoundException("No se encontró la carpeta del proyecto BIM-AI.");
+            throw new DirectoryNotFoundException("No se encontró la carpeta del proyecto ARQ-IA.");
         EnsureWithin(_projectRoot, _attachmentsRoot);
         EnsureWithin(_attachmentsRoot, _sessionDirectory);
         EnsureNoReparsePoint(_projectRoot);

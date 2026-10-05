@@ -1,8 +1,8 @@
 {
-  "name": "BIM-AI-POC",
-  "version": "0.2.0",
+  "name": "ARQ-IA",
+  "version": "0.3.0",
   "description": "Panel lateral local de Codex y MCP para Dynamo/Revit 2027.",
-  "group": "Asistente BIM",
+  "group": "ARQ-IA",
   "keywords": ["BIM", "Revit", "Dynamo", "Codex", "MCP"],
   "dependencies": [],
   "contents": "Dynamo View Extension para ejecutar el asistente local desde Dynamo.",

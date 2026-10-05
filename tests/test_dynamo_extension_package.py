@@ -15,8 +15,8 @@ EXTENSION = ROOT / "dynamo" / "extension"
 class DynamoExtensionPackageTests(unittest.TestCase):
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
-        self.assertEqual(package["name"], "BIM-AI-POC")
-        self.assertEqual(package["version"], "0.2.0")
+        self.assertEqual(package["name"], "ARQ-IA")
+        self.assertEqual(package["version"], "0.3.0")
         self.assertEqual(package["engine"], "dynamo")
         self.assertTrue(package["engine_version"].startswith("4.0."))
         self.assertTrue(package["contains_binaries"])
@@ -30,15 +30,13 @@ class DynamoExtensionPackageTests(unittest.TestCase):
             "BimAiDynamoAssistant.BimAiDynamoViewExtension",
         )
 
-    def test_installer_uses_the_verified_revit_2027_dynamo_location(self):
+    def test_installer_uses_the_current_user_dynamo_package_location(self):
         installer = (EXTENSION / "install.ps1").read_text(encoding="utf-8")
         self.assertIn("Autodesk\\Revit 2027\\AddIns\\DynamoForRevit", installer)
-        self.assertIn("$targetDllName = 'BimAiDynamoAssistant.' + $expectedHash.Substring(0, 16) + '.dll'", installer)
-        self.assertIn("$manifestAssemblyPath = '..\\' + $targetDllName", installer)
-        self.assertIn("register_view_extension.ps1", installer)
-        self.assertIn("WindowsBuiltInRole]::Administrator", installer)
+        self.assertIn("Dynamo\\Dynamo Revit\\27.0\\packages", installer)
+        self.assertIn("$manifest.ViewExtensionDefinition.AssemblyPath = '..\\bin\\' + $targetDllName", installer)
         self.assertIn("StageWhileRevitOpen", installer)
-        self.assertIn("DLL_SCOPE=Revit2027Shared", installer)
+        self.assertIn("DLL_SCOPE=CurrentUserPackage", installer)
 
     def test_elevated_registration_targets_only_official_revit_2027_view_extensions_folder(self):
         registration = (EXTENSION / "register_view_extension.ps1").read_text(encoding="utf-8")
@@ -56,11 +54,11 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn("Dynamo Revit\\27.0\\Logs", doctor)
         self.assertIn("view extension is added", doctor)
         self.assertIn("journal más reciente de Dynamo", doctor)
-        self.assertIn("migra el manifiesto con install.ps1 -Force", doctor)
+        self.assertIn("actualiza con install.ps1 -Force", doctor)
 
     def test_legacy_remover_is_limited_to_verified_extension_paths(self):
         remover = (EXTENSION / "uninstall_legacy_programfiles.ps1").read_text(encoding="utf-8")
-        self.assertIn("BimAiDynamoAssistant.dll", remover)
+        self.assertIn("BimAiDynamoAssistant(?:\\.[0-9a-f]{16})?\\.dll", remover)
         self.assertIn("BimAiDynamoAssistant_ViewExtensionDefinition.xml", remover)
         self.assertIn("BimAiDynamoAssistant.BimAiDynamoViewExtension", remover)
         self.assertIn("BimAiDynamoAssistant", remover)
@@ -82,6 +80,23 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn("RequestContextAsync", pane)
         self.assertIn('type = "localImage"', client)
         self.assertIn("INICIO DE CONTENIDO ADJUNTO NO CONFIABLE", client)
+
+    def test_assistant_is_available_from_dynamo_extensions_menu_and_sidebar(self):
+        extension = (EXTENSION / "BimAiDynamoViewExtension.cs").read_text(encoding="utf-8")
+        self.assertIn('Header = "Abrir ARQ-IA"', extension)
+        self.assertIn("p.AddExtensionMenuItem(openAssistant)", extension)
+        self.assertIn("p.AddToExtensionsSideBar(this", extension)
+        self.assertIn("p.OpenViewExtension(Name)", extension)
+
+    def test_assistant_buttons_define_readable_disabled_colors(self):
+        pane = (EXTENSION / "AssistantPane.cs").read_text(encoding="utf-8")
+        self.assertIn("CreateButtonTemplate()", pane)
+        self.assertIn("ButtonAccent = BrushFromRgb(89, 200, 230)", pane)
+        self.assertIn('CreateButton("＋ Adjuntar", ButtonAccent, ButtonAccentText', pane)
+        self.assertIn('CreateButton("Enviar  ↑", ButtonAccent, ButtonAccentText', pane)
+        self.assertIn("ButtonDisabledSurface", pane)
+        self.assertIn("ButtonDisabledBorder", pane)
+        self.assertIn("ButtonDisabledText", pane)
 
 
 if __name__ == "__main__":

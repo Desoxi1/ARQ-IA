@@ -9,7 +9,7 @@
     <RootNamespace>BimAiRevitAssistant</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Company>Branko Plaza</Company>
-    <Product>Asistente BIM para Revit y Dynamo</Product>
+    <Product>ARQ-IA para Revit y Dynamo</Product>
     <Copyright>Copyright © Branko Plaza 2026</Copyright>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

@@ -66,7 +66,7 @@ $manifest = @"
 <?xml version="1.0" encoding="utf-8"?>
 <RevitAddIns>
   <AddIn Type="Application">
-    <Name>BIM-AI Dynamo Bridge</Name>
+    <Name>ARQ-IA Dynamo Bridge</Name>
     <Assembly>$escapedAssembly</Assembly>
     <AddInId>85279988-3BB1-4200-8DA5-E2FD521EA7A8</AddInId>
     <FullClassName>BimAiDynamoBridge.BridgeApplication</FullClassName>

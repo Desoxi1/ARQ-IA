@@ -1,4 +1,4 @@
-# Asistente BIM para Dynamo
+# ARQ-IA para Dynamo
 
 Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar con Codex desde Dynamo y usa los MCP configurados en la carpeta del proyecto.
 
@@ -6,7 +6,7 @@ Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar 
 
 ## Cómo funciona
 
-1. Dynamo agrega la pestaña lateral **Asistente BIM**.
+1. Dynamo agrega el comando **Extensiones → Abrir ARQ-IA** y la pestaña lateral **ARQ-IA**. El comando vuelve a abrir el panel si cierras la pestaña.
 2. El panel inicia `codex app-server` desde la carpeta del POC y mantiene la conversación mientras Dynamo permanece abierto.
 3. Codex consulta el modelo mediante los MCP disponibles y sigue el flujo definido en `AGENTS.md`.
 4. Las solicitudes MCP de herramientas piden aprobación individual en una ventana de confirmación. Los permisos de archivos/red se limitan al turno y requieren aprobación; solicitudes de archivos del agente y formularios MCP con campos se rechazan.
@@ -14,7 +14,7 @@ Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar 
 
 ## Chat, contexto y adjuntos
 
-La interfaz usa la paleta oscura de Dynamo, azul para las acciones y una jerarquía compacta para dejar el foco en la conversación. El encabezado conserva al gestor **Branko Plaza**. Cuando falta la instalación inicial, la tarjeta muestra el comando único `.\install.ps1` y desactiva el compositor; cuando está listo, resume Codex local, MCP Revit y rutinas Dynamo. El pie aclara que Codex inicia al enviar el primer mensaje.
+La interfaz usa la paleta oscura de Dynamo y botones celestes. El encabezado conserva al gestor **Branko Plaza**. Cuando falta la instalación inicial, la tarjeta indica **Instalar-ARQ-IA.cmd** y el panel comprueba periódicamente cuándo termina la configuración para activar el chat. El pie aclara que Codex inicia al enviar el primer mensaje.
 
 - El chat muestra el estado de Codex y del contexto Revit/MCP. Al enviar una solicitud de Revit, Codex consulta la vista activa y la selección mediante los MCP configurados; el panel no lee ni cambia el modelo por sí mismo.
 - El botón **Ver** consulta ahora la vista activa y los elementos seleccionados sin enviar el borrador ni los adjuntos que estén esperando en el compositor. El resultado aparece como respuesta dentro del chat.
@@ -24,7 +24,7 @@ La interfaz usa la paleta oscura de Dynamo, azul para las acciones y una jerarqu
 - La carpeta `logs/attachments/` está ignorada por Git y excluida del ZIP portable. Al cerrar correctamente el panel, se elimina su carpeta de sesión; un cierre abrupto puede dejar archivos que deben borrarse manualmente.
 - Codex trabaja con la sesión local autenticada y los MCP configurados. No se requiere una clave API aparte. El panel pide aprobación para las herramientas que la solicitan.
 
-El panel no contiene una credencial de API. Usa la sesión local de Codex CLI, que debe estar instalada, autenticada y disponible en `PATH`. El protocolo local [`app-server`](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server) está marcado como experimental por Codex. La extensión sigue siendo un prototipo hasta pasar pruebas visuales y de Revit en una sesión limpia. Dynamo la carga con su API oficial de [View Extensions](https://github.com/DynamoDS/Dynamo/wiki/Dynamo-View-Extensions).
+El panel no contiene una credencial de API. Usa la sesión local autenticada de Codex CLI; busca el ejecutable en `PATH` y en la instalación de Codex Desktop. El protocolo local [`app-server`](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server) está marcado como experimental por Codex. La extensión sigue siendo un prototipo hasta pasar pruebas visuales y de Revit en una sesión limpia. Dynamo la carga con su API oficial de [View Extensions](https://github.com/DynamoDS/Dynamo/wiki/Dynamo-View-Extensions).
 
 ## Compilar
 
@@ -44,9 +44,9 @@ Desde la raíz clonada, ejecuta el instalador completo una vez; deja preparados 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-Windows solicita elevación para instalar el DLL y registrar el manifiesto dentro de Dynamo for Revit. Con Revit abierto, los archivos quedan staged para el próximo reinicio; en una primera instalación de rvt-mcp, guarda/cierra Revit antes. Para reparar solo esta extensión, se conserva el instalador específico de abajo.
+El instalador coloca un paquete de Dynamo en el perfil del usuario. Con Revit abierto, los archivos quedan preparados para el próximo reinicio; en una primera instalación de rvt-mcp, guarda/cierra Revit antes. Para reparar solo esta extensión, se conserva el instalador específico de abajo.
 
-El instalador Dynamo específico valida SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. La DLL queda junto a los assemblies de Dynamo for Revit 2027 y el XML usa una ruta relativa. No modifica modelos RVT. Para reparar manualmente, ejecuta `dynamo/extension/install.ps1` desde la raíz; el instalador completo es el recomendado.
+El instalador Dynamo específico valida SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. La DLL queda en `bin/` y el XML de la extensión en `extra/`, según el [formato de paquetes con extensiones de Dynamo](https://developer.dynamobim.org/05-Package-Deployment/deploying-extensions-on-the-package-manager.html). No modifica modelos RVT. Para reparar manualmente, ejecuta `dynamo/extension/install.ps1` desde la raíz; el instalador completo es el recomendado.
 
 El instalador individual valida el SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. Para reemplazar una versión distinta, usa `dynamo/extension/install.ps1 -Force` desde la raíz y revisa el destino. No modifica modelos RVT.
 

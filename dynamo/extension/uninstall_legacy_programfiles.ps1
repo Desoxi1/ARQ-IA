@@ -13,9 +13,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 $legacyRoot = Join-Path $env:ProgramFiles 'Autodesk\Revit 2027\AddIns\DynamoForRevit'
-$legacyDll = Join-Path $legacyRoot 'BimAiDynamoAssistant.dll'
 $legacyDefinition = Join-Path $legacyRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
-if (-not (Test-Path -LiteralPath $legacyDll) -and -not (Test-Path -LiteralPath $legacyDefinition)) {
+if (-not (Test-Path -LiteralPath $legacyDefinition)) {
     Write-Output 'LEGACY_EXTENSION=NOT_INSTALLED'
     exit 0
 }
@@ -25,8 +24,12 @@ if (-not (Test-Path -LiteralPath $legacyDefinition -PathType Leaf)) {
 }
 [xml]$definition = Get-Content -LiteralPath $legacyDefinition -Raw
 if ($definition.ViewExtensionDefinition.TypeName -ne 'BimAiDynamoAssistant.BimAiDynamoViewExtension' -or
-    $definition.ViewExtensionDefinition.AssemblyPath -ne '..\BimAiDynamoAssistant.dll') {
+    [string]$definition.ViewExtensionDefinition.AssemblyPath -notmatch '^\.\.\\BimAiDynamoAssistant(?:\.[0-9a-f]{16})?\.dll$') {
     throw 'El manifiesto de Program Files no coincide con el add-in antiguo esperado; no se eliminó nada.'
+}
+$legacyDll = [IO.Path]::GetFullPath([IO.Path]::Combine((Split-Path -Parent $legacyDefinition), [string]$definition.ViewExtensionDefinition.AssemblyPath))
+if ([IO.Path]::GetFullPath((Split-Path -Parent $legacyDll)) -ne [IO.Path]::GetFullPath($legacyRoot)) {
+    throw 'La DLL referida por el manifiesto no está dentro de Dynamo for Revit; se conserva.'
 }
 if (Test-Path -LiteralPath $legacyDll -PathType Leaf) {
     $assemblyName = [Reflection.AssemblyName]::GetAssemblyName($legacyDll)
@@ -35,7 +38,7 @@ if (Test-Path -LiteralPath $legacyDll -PathType Leaf) {
     }
 }
 
-foreach ($path in @($legacyDll, $legacyDefinition)) {
+foreach ($path in @($legacyDefinition, $legacyDll)) {
     if (Test-Path -LiteralPath $path -PathType Leaf) {
         Remove-Item -LiteralPath $path -Force
     }

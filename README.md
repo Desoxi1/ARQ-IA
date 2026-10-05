@@ -1,14 +1,14 @@
-# Rvit-mcp-dynamo
+# ARQ-IA
 
-PoC local para evaluar ChatGPT/GPT → MCP/bridge → Dynamo + PythonNet3 → Revit 2027.
+Asistente local para Revit 2027 y Dynamo 4.0.2: chat con Codex, contexto Revit por MCP y rutinas Dynamo/PythonNet3 guardadas.
 
 ## Estado
 
-El paquete incluye un chat para Revit y una extensión lateral para Dynamo, conectados a Codex local mediante MCP. El asistente acepta texto, imágenes y documentos; puede consultar vista/selección, preparar scripts PythonNet3 y grafos `.dyn`, guardar rutinas reutilizables y solicitar aprobación antes de cada operación sensible.
+ARQ-IA aparece como panel en Revit y como extensión en **Dynamo → Extensiones → Abrir ARQ-IA**. El chat acepta texto, imágenes y archivos. Codex usa los MCP configurados para consultar el modelo, preparar grafos `.dyn` y scripts PythonNet3, y guardar rutinas reutilizables. Las operaciones que puedan modificar el modelo piden aprobación.
 
-La configuración para otro PC ahora tiene una sola entrada: `install.ps1`. En este PC se ejecutó correctamente y dejó bridge, chat de Revit y panel Dynamo instalados para la próxima sesión. Ambos assemblies compilaron en Release con 0 advertencias y 0 errores. La suite offline pasa 54 pruebas; `doctor.ps1` informa 14 PASS, 4 WAIT y 0 FAIL. Los WAIT son esperables antes de reiniciar Revit y Dynamo: el proceso actual conserva los assemblies anteriores, por eso la UI nueva todavía no está validada en pantalla.
+En un PC nuevo con Revit 2027 y Codex Desktop iniciado, clona o descarga esta carpeta como **ARQ-IA**, cierra Revit y haz doble clic en **Instalar-ARQ-IA.cmd**. El instalador coloca los paneles y el bridge, configura los tres MCP locales para la ruta del clon y ejecuta el diagnóstico. El panel de Dynamo se instala en el perfil del usuario, sin permiso de administrador. Al abrir el proyecto en Codex, confirma la confianza para cargar sus MCP locales si aparece el aviso.
 
-La compilación Dynamo actual es SHA-256 `874713ea360d5f4acd0ef30dfec9725f98407269a07483726adf4866df89e0ab`. La compilación del panel nativo de Revit es `60178b1eae3ef918c88632dc189232e7c4ade76b256f48a86478cc0ccbfe3897`; el bridge conserva `adf38e853f958fe37d866b8b5c21da2c071f4afabf0f71e503a52ead903f053c`. La respuesta desde la UI nueva y la ejecución viva de rutinas siguen pendientes. El instalador no abrió ni editó modelos.
+La interfaz usa botones celestes y activa el chat automáticamente cuando detecta la instalación. El código compila contra las API locales de Revit y Dynamo. La rutina fija de solo lectura ya pasó en un RVT descartable mediante MCP → bridge → Dynamo/PythonNet3 → Revit, con verificación de modelo sin cambios. La ejecución genérica y las escrituras complejas siguen en validación; consulta el [estado actual](docs/PROTOTYPE_STATUS.md) antes de usarlas.
 
 La preparación del entorno está documentada en [docs/ENV_AUDIT.md](docs/ENV_AUDIT.md), la decisión de arquitectura en [docs/ARCHITECTURE_DECISION.md](docs/ARCHITECTURE_DECISION.md) y la ruta de prueba en [docs/PROTOTYPE_STATUS.md](docs/PROTOTYPE_STATUS.md).
 
@@ -19,8 +19,8 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 - docs/: auditoría, decisión y estado del prototipo.
 - revit/: notas del host Revit y del add-in.
 - dynamo/: plantilla PythonNet3 manual para Dynamo 4.0.2.
-- dynamo/extension/: panel lateral **Asistente BIM** integrado en Dynamo; usa Codex app-server y los MCP del proyecto.
-- revit/assistant/: add-in nativo de Revit 2027 con pestaña BIM-AI y panel acoplable; comparte el chat y adjuntos con Dynamo.
+- dynamo/extension/: extensión **ARQ-IA** integrada en Dynamo, accesible desde **Extensiones** y la barra lateral; usa Codex app-server y los MCP del proyecto.
+- revit/assistant/: add-in nativo de Revit 2027 con pestaña ARQ-IA y panel acoplable; comparte el chat y adjuntos con Dynamo.
 - routines/: destino de rutinas revisadas, versionadas y reutilizables.
 - mcp/: MCP local para crear/listar rutinas y ejecutar las guardadas desde el bridge.
 - revit/bridge/: add-in fuente, DLL precompilado para la prueba y script de instalación local.
@@ -43,15 +43,17 @@ La capacidad objetivo para interpretar lenguaje natural/técnico, planificar cam
 
 ### Instalación rápida en un PC nuevo
 
-Clona esta carpeta y, desde PowerShell en su raíz, ejecuta una sola vez:
+Clona esta carpeta como **ARQ-IA** y haz doble clic en **Instalar-ARQ-IA.cmd** con Revit cerrado. El archivo llama al instalador completo y muestra el diagnóstico al terminar. También puedes ejecutarlo desde PowerShell:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-El instalador detecta Revit/Dynamo 2027 y Codex CLI, descarga rvt-mcp si hace falta, configura los MCP para esta copia del repositorio, enlaza sus rutinas locales e instala el bridge y los paneles **BIM-AI** de Revit y **Asistente BIM** de Dynamo. Windows solicita elevación para escribir la extensión en la carpeta de Dynamo. Si Revit ya está abierto y rvt-mcp está instalado, prepara las nuevas versiones para el próximo reinicio; para una primera instalación con Revit abierto, guarda y cierra antes de ejecutar el comando.
+El instalador detecta Revit/Dynamo 2027 y Codex CLI, descarga rvt-mcp si hace falta, configura los MCP para esta copia del repositorio, enlaza sus rutinas locales e instala el bridge y los paneles **ARQ-IA**. El panel de Dynamo usa un paquete en `%APPDATA%\Dynamo\Dynamo Revit\27.0\packages\ARQ-IA`. Si Revit ya está abierto y rvt-mcp está instalado, prepara las nuevas versiones para el próximo reinicio. Para instalar rvt-mcp por primera vez, cierra Revit antes de hacer doble clic.
 
 Después, abre esta carpeta en Codex y confirma que confías en el proyecto para cargar sus MCP locales. Inicia sesión en Codex si aún no lo has hecho y reinicia Revit; abre Dynamo para ver el panel. No se requiere una API key ni el SDK de .NET en el PC arquitecto. `install.ps1 -CheckOnly` solo revisa prerequisitos y no instala archivos.
+
+Si este PC tuvo una versión anterior instalada dentro de `Program Files`, el diagnóstico indicará un manifiesto antiguo. Con Revit cerrado, haz doble clic en **Migrar-ARQ-IA-Anterior.cmd** y acepta el permiso de administrador una sola vez. El migrador comprueba que el manifiesto y la DLL pertenezcan a esta extensión antes de retirarlos. Un PC nuevo no necesita este paso.
 
 Los instaladores individuales siguen disponibles para reparación: `setup.ps1`, `revit/bridge/install.ps1`, `revit/assistant/install.ps1` y `dynamo/extension/install.ps1`. Para la prueba viva, usa un RVT descartable, abre Dynamo y confirma `dynamoReadyForActiveDocument=true` antes de ejecutar la rutina fija de solo lectura.
 

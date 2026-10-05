@@ -41,7 +41,7 @@ namespace BimAiDynamoBridge
                 var settings = ReadBridgeSettings();
                 _routinesRoot = settings.RoutinesRoot;
                 _testModelsRoot = settings.TestModelsRoot;
-                var handler = new BridgeEventHandler(Requests, _routinesRoot, _testModelsRoot);
+                var handler = new BridgeEventHandler(Requests, _routinesRoot, _testModelsRoot, () => _externalEvent?.Raise());
                 _externalEvent = ExternalEvent.Create(handler);
                 _shutdown = new CancellationTokenSource();
                 Task.Run(() => ListenAsync(_shutdown.Token));
@@ -191,6 +191,7 @@ namespace BimAiDynamoBridge
         internal string RoutineId { get; }
         internal bool ConfirmModelWrite { get; }
         internal TaskCompletionSource<BridgeResponse> Completion { get; }
+        internal DeferredRun Deferred { get; set; }
         private int _state;
 
         internal PendingRequest(string operation, string routineId, bool confirmModelWrite)
@@ -204,6 +205,20 @@ namespace BimAiDynamoBridge
         internal bool TryStart() => Interlocked.CompareExchange(ref _state, 1, 0) == 0;
         internal bool TryCancelBeforeStart() => Interlocked.CompareExchange(ref _state, 2, 0) == 0;
         internal void MarkComplete() => Interlocked.CompareExchange(ref _state, 3, 1);
+    }
+
+    internal sealed class DeferredRun
+    {
+        internal string ResultPath { get; }
+        internal Func<UIApplication, BridgeResponse> Verify { get; }
+        internal Action Cleanup { get; }
+
+        internal DeferredRun(string resultPath, Func<UIApplication, BridgeResponse> verify, Action cleanup)
+        {
+            ResultPath = resultPath;
+            Verify = verify;
+            Cleanup = cleanup;
+        }
     }
 
     internal sealed class BridgeRequest
@@ -239,18 +254,33 @@ namespace BimAiDynamoBridge
         private readonly ConcurrentQueue<PendingRequest> _requests;
         private readonly string _routinesRoot;
         private readonly string _testModelsRoot;
+        private readonly Action _raise;
 
-        internal BridgeEventHandler(ConcurrentQueue<PendingRequest> requests, string routinesRoot, string testModelsRoot)
+        internal BridgeEventHandler(ConcurrentQueue<PendingRequest> requests, string routinesRoot, string testModelsRoot, Action raise)
         {
             _requests = requests;
             _routinesRoot = routinesRoot;
             _testModelsRoot = testModelsRoot;
+            _raise = raise;
         }
 
         public void Execute(UIApplication application)
         {
             while (_requests.TryDequeue(out var request))
             {
+                if (request.Deferred != null)
+                {
+                    BridgeResponse response;
+                    try { response = request.Deferred.Verify(application); }
+                    catch { response = BridgeResponse.Fail("routine_result_invalid"); }
+                    finally
+                    {
+                        try { request.Deferred.Cleanup(); } catch { }
+                        request.MarkComplete();
+                    }
+                    request.Completion.TrySetResult(response);
+                    continue;
+                }
                 if (!request.TryStart())
                 {
                     request.Completion.TrySetResult(BridgeResponse.Fail("revit_dispatch_timeout_before_execution"));
@@ -258,7 +288,9 @@ namespace BimAiDynamoBridge
                 }
                 try
                 {
-                    request.Completion.TrySetResult(Handle(application, request));
+                    var response = Handle(application, request);
+                    if (request.Deferred != null) ScheduleDeferredCompletion(request);
+                    else request.Completion.TrySetResult(response);
                 }
                 catch
                 {
@@ -266,12 +298,25 @@ namespace BimAiDynamoBridge
                 }
                 finally
                 {
-                    request.MarkComplete();
+                    if (request.Deferred == null) request.MarkComplete();
                 }
             }
         }
 
-        public string GetName() => "BIM-AI Dynamo read-only routine bridge";
+        private void ScheduleDeferredCompletion(PendingRequest request)
+        {
+            var resultPath = request.Deferred.ResultPath;
+            Task.Run(async () =>
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(30);
+                while (!File.Exists(resultPath) && DateTime.UtcNow < deadline)
+                    await Task.Delay(100).ConfigureAwait(false);
+                _requests.Enqueue(request);
+                _raise();
+            });
+        }
+
+        public string GetName() => "ARQ-IA Dynamo routine bridge";
 
         private BridgeResponse Handle(UIApplication application, PendingRequest request)
         {
@@ -356,20 +401,16 @@ namespace BimAiDynamoBridge
             if (!IsWithin(resultRoot, resultPath)) return BridgeResponse.Fail("invalid_result_path");
 
             string runtimeGraphPath = null;
-            application.Application.DocumentChanged += changedHandler;
-            try
+            void Cleanup()
             {
-                runtimeGraphPath = CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath);
+                application.Application.DocumentChanged -= changedHandler;
+                try { if (runtimeGraphPath != null && File.Exists(runtimeGraphPath) && !IsCurrentDynamoWorkspace(runtimeGraphPath)) File.Delete(runtimeGraphPath); } catch { }
+                try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
+                try { if (File.Exists(resultPath + ".started")) File.Delete(resultPath + ".started"); } catch { }
+            }
 
-                var journal = new Dictionary<string, string>
-                {
-                    [JournalKeys.AutomationModeKey] = "true",
-                    [JournalKeys.ShowUiKey] = "false",
-                    [JournalKeys.DynPathKey] = runtimeGraphPath,
-                    [JournalKeys.DynPathExecuteKey] = "true"
-                };
-                var dynamoResult = ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: true);
-                if (dynamoResult != Result.Succeeded) return BridgeResponse.Fail("dynamo_command_failed");
+            BridgeResponse Verify()
+            {
                 if (!File.Exists(resultPath)) return BridgeResponse.Fail(File.Exists(resultPath + ".started") ? "dynamo_python_node_started_without_result" : "dynamo_python_node_not_started");
 
                 if (new FileInfo(resultPath).Length > 65536) return BridgeResponse.Fail("routine_result_invalid");
@@ -421,14 +462,32 @@ namespace BimAiDynamoBridge
                     };
                 }
             }
+
+            var cleanupNow = true;
+            application.Application.DocumentChanged += changedHandler;
+            try
+            {
+                runtimeGraphPath = CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath);
+                var journal = new Dictionary<string, string>
+                {
+                    [JournalKeys.AutomationModeKey] = "false",
+                    [JournalKeys.ShowUiKey] = "false",
+                    [JournalKeys.DynPathKey] = runtimeGraphPath,
+                    [JournalKeys.DynPathExecuteKey] = "true"
+                };
+                var dynamoResult = ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: true);
+                if (dynamoResult != Result.Succeeded) return BridgeResponse.Fail("dynamo_command_failed");
+                if (File.Exists(resultPath)) return Verify();
+                request.Deferred = new DeferredRun(resultPath, _ => Verify(), Cleanup);
+                cleanupNow = false;
+                return null;
+            }
             finally
             {
-                application.Application.DocumentChanged -= changedHandler;
-                try { if (runtimeGraphPath != null && File.Exists(runtimeGraphPath)) File.Delete(runtimeGraphPath); } catch { }
-                try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
-                try { if (File.Exists(resultPath + ".started")) File.Delete(resultPath + ".started"); } catch { }
+                if (cleanupNow) Cleanup();
             }
         }
+
 
         private BridgeResponse OpenDynamoUi(UIApplication application)
         {
@@ -526,19 +585,17 @@ namespace BimAiDynamoBridge
                 AddChangedIds(changedIds, args.GetDeletedElementIds());
             };
             string runtimeGraphPath = null;
-            application.Application.DocumentChanged += changedHandler;
-            try
+            void Cleanup()
             {
-                runtimeGraphPath = CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath);
-                var journal = new Dictionary<string, string>
-                {
-                    [JournalKeys.AutomationModeKey] = "true",
-                    [JournalKeys.ShowUiKey] = "false",
-                    [JournalKeys.DynPathKey] = runtimeGraphPath,
-                    [JournalKeys.DynPathExecuteKey] = "true"
-                };
-                var dynamoResult = ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: !writesModel);
-                if (dynamoResult != Result.Succeeded) return BridgeResponse.Fail("dynamo_command_failed");
+                application.Application.DocumentChanged -= changedHandler;
+                try { if (runtimeGraphPath != null && File.Exists(runtimeGraphPath) && !IsCurrentDynamoWorkspace(runtimeGraphPath)) File.Delete(runtimeGraphPath); } catch { }
+                try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
+                try { if (File.Exists(resultPath + ".tmp")) File.Delete(resultPath + ".tmp"); } catch { }
+                try { if (File.Exists(resultPath + ".started")) File.Delete(resultPath + ".started"); } catch { }
+            }
+
+            BridgeResponse Verify()
+            {
                 if (!File.Exists(resultPath)) return BridgeResponse.Fail(File.Exists(resultPath + ".started") ? "dynamo_python_node_started_without_result" : "dynamo_python_node_not_started");
                 if (new FileInfo(resultPath).Length > 65536) return BridgeResponse.Fail("routine_result_invalid");
 
@@ -585,19 +642,36 @@ namespace BimAiDynamoBridge
                     };
                 }
             }
+
+            var cleanupNow = true;
+            application.Application.DocumentChanged += changedHandler;
+            try
+            {
+                runtimeGraphPath = CreateRuntimeGraphCopy(validatedGraphBytes, runId, resultPath);
+                var journal = new Dictionary<string, string>
+                {
+                    [JournalKeys.AutomationModeKey] = "false",
+                    [JournalKeys.ShowUiKey] = "false",
+                    [JournalKeys.DynPathKey] = runtimeGraphPath,
+                    [JournalKeys.DynPathExecuteKey] = "true"
+                };
+                var dynamoResult = ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: !writesModel);
+                if (dynamoResult != Result.Succeeded) return BridgeResponse.Fail("dynamo_command_failed");
+                if (File.Exists(resultPath)) return Verify();
+                request.Deferred = new DeferredRun(resultPath, _ => Verify(), Cleanup);
+                cleanupNow = false;
+                return null;
+            }
             catch
             {
                 return BridgeResponse.Fail("routine_result_invalid");
             }
             finally
             {
-                application.Application.DocumentChanged -= changedHandler;
-                try { if (runtimeGraphPath != null && File.Exists(runtimeGraphPath)) File.Delete(runtimeGraphPath); } catch { }
-                try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
-                try { if (File.Exists(resultPath + ".tmp")) File.Delete(resultPath + ".tmp"); } catch { }
-                try { if (File.Exists(resultPath + ".started")) File.Delete(resultPath + ".started"); } catch { }
+                if (cleanupNow) Cleanup();
             }
         }
+
 
         private string CreateRuntimeGraphCopy(byte[] validatedGraphBytes, string runId, string resultPath)
         {
@@ -675,7 +749,7 @@ namespace BimAiDynamoBridge
                 JournalData = graphJournal
             };
             var graphResult = new DynamoRevit().ExecuteCommand(graphData);
-            if (graphResult != Result.Succeeded || File.Exists(resultPath) || File.Exists(resultPath + ".started"))
+            if (graphResult != Result.Succeeded)
                 return graphResult;
 
             var model = GetDynamoModel();
@@ -689,17 +763,9 @@ namespace BimAiDynamoBridge
                 !String.Equals(Path.GetFullPath(openedPath), Path.GetFullPath(expectedGraphPath), StringComparison.OrdinalIgnoreCase))
                 return Result.Failed;
 
-            var runMethod = workspace.GetType().GetMethod("Run", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-            if (runMethod == null) return Result.Failed;
-            try
-            {
-                runMethod.Invoke(workspace, null);
-                return Result.Succeeded;
-            }
-            catch
-            {
-                return Result.Failed;
-            }
+            // DynPathExecuteKey already calls HomeWorkspaceModel.Run() in DynamoRevit.
+            // A second Run() here could execute an approved write twice.
+            return Result.Succeeded;
         }
 
         private static bool IsDynamoReadyForDocument(UIApplication application, Document document)
@@ -750,6 +816,19 @@ namespace BimAiDynamoBridge
         {
             var modelProperty = typeof(DynamoRevit).GetProperty("RevitDynamoModel", BindingFlags.Public | BindingFlags.Static);
             return modelProperty?.GetValue(null);
+        }
+
+        private static bool IsCurrentDynamoWorkspace(string path)
+        {
+            try
+            {
+                var model = GetDynamoModel();
+                var workspace = model?.GetType().GetProperty("CurrentWorkspace", BindingFlags.Public | BindingFlags.Instance)?.GetValue(model);
+                var fileName = workspace?.GetType().GetProperty("FileName", BindingFlags.Public | BindingFlags.Instance)?.GetValue(workspace) as string;
+                return !String.IsNullOrWhiteSpace(fileName) &&
+                    String.Equals(Path.GetFullPath(fileName), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         private static string GetDynamoModelState(object model)

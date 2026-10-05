@@ -27,7 +27,7 @@ function Invoke-ProjectStep([string]$Name, [string]$ScriptPath, [string[]]$Argum
     if ($LASTEXITCODE -ne 0) { throw "$Name terminó con código $LASTEXITCODE." }
 }
 
-Write-Output 'BIM-AI-POC · instalador automático para Revit 2027 y Dynamo'
+Write-Output 'ARQ-IA · instalación automática para Revit 2027 y Dynamo'
 Assert-RequiredFile $revitExe 'Revit 2027'
 Assert-RequiredFile (Join-Path $dynamoRoot 'DynamoCore.dll') 'Dynamo for Revit 2027'
 Assert-RequiredFile (Join-Path $dynamoRoot 'DynamoCoreWpf.dll') 'Dynamo for Revit 2027'
@@ -38,11 +38,28 @@ foreach ($path in @(
     (Join-Path $projectRoot 'dynamo\extension\install.ps1')
 )) { Assert-RequiredFile $path 'un instalador del paquete' }
 
-$codex = Get-Command 'codex.exe' -CommandType Application -ErrorAction SilentlyContinue
-if (-not $codex) {
-    throw 'Falta Codex CLI (codex.exe) en PATH. Instálalo e inicia sesión con tu cuenta; luego vuelve a ejecutar .\install.ps1. No se necesita una API key.'
+function Resolve-CodexExecutable {
+    $onPath = Get-Command 'codex.exe' -CommandType Application -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+    $desktopBin = Join-Path $env:LOCALAPPDATA 'OpenAI\Codex\bin'
+    if (Test-Path -LiteralPath $desktopBin -PathType Container) {
+        foreach ($directory in @(Get-ChildItem -LiteralPath $desktopBin -Directory | Sort-Object LastWriteTime -Descending)) {
+            $candidate = Join-Path $directory.FullName 'codex.exe'
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+        }
+    }
+    return $null
 }
-Write-Output ("CODEX_CLI=" + $codex.Source)
+
+$codexExecutable = Resolve-CodexExecutable
+if (-not $codexExecutable) {
+    throw 'No se encontró Codex CLI. Instala Codex Desktop en este PC e inicia sesión antes de ejecutar Instalar-ARQ-IA.cmd.'
+}
+& $codexExecutable login status *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw 'Codex está instalado, pero falta iniciar sesión. Abre Codex Desktop e inicia sesión antes de instalar ARQ-IA.'
+}
+Write-Output ("CODEX_CLI=" + $codexExecutable)
 
 if ($CheckOnly) {
     Write-Output 'PREFLIGHT=PASS'
@@ -74,11 +91,11 @@ $sharedArgs = @('-Force')
 if ($stageWhileRevitOpen) { $sharedArgs += '-StageWhileRevitOpen' }
 Invoke-ProjectStep 'bridge Revit-Dynamo' (Join-Path $projectRoot 'revit\bridge\install.ps1') $sharedArgs
 Invoke-ProjectStep 'chat BIM dentro de Revit' (Join-Path $projectRoot 'revit\assistant\install.ps1') $sharedArgs
-Invoke-ProjectStep 'panel Asistente BIM dentro de Dynamo' (Join-Path $projectRoot 'dynamo\extension\install.ps1') $sharedArgs
+Invoke-ProjectStep 'panel ARQ-IA dentro de Dynamo' (Join-Path $projectRoot 'dynamo\extension\install.ps1') $sharedArgs
 
 $bridgeSettings = Join-Path $env:APPDATA 'BIM-AI-POC\bridge.json'
 $codexConfig = Join-Path $projectRoot '.codex\config.toml'
-$dynamoManifest = Join-Path $dynamoRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$dynamoManifest = Join-Path $env:APPDATA 'Dynamo\Dynamo Revit\27.0\packages\ARQ-IA\extra\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
 $revitAssistantManifest = Join-Path $revitAddins 'BimAiRevitAssistant.addin'
 foreach ($path in @($bridgeSettings, $codexConfig, $dynamoManifest, $revitAssistantManifest)) {
     Assert-RequiredFile $path 'un archivo de instalación verificado'
@@ -89,6 +106,6 @@ if ([IO.Path]::GetFullPath([string]$settings.routinesRoot) -ne [IO.Path]::GetFul
 }
 
 Write-Output 'INSTALL=PASS'
-Write-Output 'CODEX_PROJECT=Abre esta carpeta en Codex y confirma Confiar para cargar los MCP locales.'
-Write-Output 'REVIT_DYNAMO=Reinicia Revit y abre Dynamo para cargar los paneles instalados.'
+Write-Output 'CODEX_PROJECT=Abre esta carpeta en Codex y confirma Confiar si aparece el aviso para cargar los MCP locales.'
+Write-Output 'REVIT_DYNAMO=Abre Revit y Dynamo en una sesión nueva para cargar ARQ-IA.'
 Write-Output 'NEXT_TEST=En Dynamo, consulta la vista activa y la selección; no modifica el modelo.'

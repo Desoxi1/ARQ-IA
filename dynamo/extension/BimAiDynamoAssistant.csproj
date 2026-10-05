@@ -8,6 +8,9 @@
     <AssemblyName>BimAiDynamoAssistant</AssemblyName>
     <RootNamespace>BimAiDynamoAssistant</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Company>Branko Plaza</Company>
+    <Product>ARQ-IA para Dynamo</Product>
+    <Copyright>Copyright © Branko Plaza 2026</Copyright>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>none</DebugType>

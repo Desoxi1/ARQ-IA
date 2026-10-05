@@ -31,7 +31,7 @@ function Get-ToolDefinitions {
     return @(
         [ordered]@{
             name = 'list_saved_routines'
-            description = 'List Dynamo PythonNet3 routines saved in this BIM-AI-POC folder. This does not connect to or change Revit.'
+            description = 'List Dynamo PythonNet3 routines saved in this ARQ-IA folder. This does not connect to or change Revit.'
             inputSchema = [ordered]@{ type = 'object'; properties = $emptyProperties; additionalProperties = $false }
         },
         [ordered]@{

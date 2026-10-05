@@ -27,7 +27,7 @@ if ($expectedHash -notmatch '^[0-9a-f]{64}$' -or $actualHash -ne $expectedHash) 
 
 $settingsPath = Join-Path $env:APPDATA 'BIM-AI-POC\bridge.json'
 if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
-    throw 'Falta bridge.json. Ejecuta setup.ps1 y configura primero los MCP del proyecto BIM-AI-POC.'
+    throw 'Falta bridge.json. Ejecuta Instalar-ARQ-IA.cmd desde la carpeta clonada.'
 }
 try {
     $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
@@ -38,10 +38,10 @@ try {
         -not (Test-Path -LiteralPath (Join-Path $projectRoot '.codex\config.toml.example') -PathType Leaf) -or
         -not (Test-Path -LiteralPath (Join-Path $projectRoot 'dynamo\extension\README.md') -PathType Leaf) -or
         -not (Test-Path -LiteralPath (Join-Path $projectRoot 'mcp') -PathType Container)) {
-        throw 'No se encontró el proyecto BIM-AI-POC configurado en bridge.json.'
+        throw 'No se encontró el proyecto ARQ-IA configurado en bridge.json.'
     }
 } catch {
-    throw 'bridge.json no tiene una ruta válida al proyecto BIM-AI-POC.'
+    throw 'bridge.json no tiene una ruta válida al proyecto ARQ-IA.'
 }
 
 $addinsRoot = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
@@ -89,7 +89,7 @@ $manifest = @"
 <?xml version="1.0" encoding="utf-8"?>
 <RevitAddIns>
   <AddIn Type="Application">
-    <Name>Asistente BIM para Revit</Name>
+    <Name>ARQ-IA para Revit</Name>
     <Assembly>$escapedAssembly</Assembly>
     <AddInId>4CA1683B-89AB-4F68-9D29-1D2D506C0F51</AddInId>
     <FullClassName>BimAiRevitAssistant.RevitAssistantApplication</FullClassName>

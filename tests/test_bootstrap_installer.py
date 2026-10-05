@@ -43,7 +43,7 @@ class BootstrapInstallerTests(unittest.TestCase):
 
     def test_panel_replaces_ambiguous_setup_text_with_one_exact_command(self):
         pane = (ROOT / "dynamo" / "extension" / "AssistantPane.cs").read_text(encoding="utf-8")
-        self.assertIn("En PowerShell, desde la carpeta clonada, ejecuta: .\\\\install.ps1", pane)
+        self.assertIn("Instalar-ARQ-IA.cmd", pane)
         self.assertIn("Primera instalación pendiente", pane)
         self.assertNotIn("Proyecto sin configurar", pane)
         self.assertNotIn("Configura BIM-AI-POC", pane)
@@ -57,7 +57,8 @@ class BootstrapInstallerTests(unittest.TestCase):
         packager = (ROOT / "package.ps1").read_text(encoding="utf-8")
         self.assertIn(".\\install.ps1", readme)
         self.assertIn(".\\install.ps1", other_pc)
-        self.assertIn("BIM-AI-POC/install.ps1", packager)
+        self.assertIn("ARQ-IA/install.ps1", packager)
+        self.assertIn("ARQ-IA/Instalar-ARQ-IA.cmd", packager)
 
 
 if __name__ == "__main__":

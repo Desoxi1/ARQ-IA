@@ -20,7 +20,7 @@ function Get-PathHash([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-Write-Output 'Diagnostico BIM-AI-POC (solo lectura; no modifica Revit ni instala archivos)'
+Write-Output 'Diagnostico ARQ-IA (solo lectura; no modifica Revit ni instala archivos)'
 
 $revitRoot = Join-Path $env:ProgramFiles 'Autodesk\Revit 2027'
 $revitExe = Join-Path $revitRoot 'Revit.exe'
@@ -60,7 +60,7 @@ if ((Test-Path -LiteralPath $assistantAddinPackage -PathType Leaf) -and
             $assistantInstallTime = (Get-Item -LiteralPath $assistantAddinManifest).LastWriteTime
             Write-Check PASS 'Add-in nativo de Revit instalado; Branko Plaza y SHA-256 verificados'
         } catch {
-            Write-Check FAIL 'El manifiesto o el ensamblado de Asistente BIM para Revit no es valido'
+            Write-Check FAIL 'El manifiesto o el ensamblado de ARQ-IA para Revit no es valido'
         }
     } else {
         Write-Check WAIT 'Add-in nativo listo; instala con revit\assistant\install.ps1'
@@ -76,7 +76,7 @@ if ($assistantInstallTime -and (Test-Path -LiteralPath $assistantAddinManifest -
         try { if ($process.StartTime -lt $assistantInstallTime) { $olderAssistantSessions += $process } } catch { }
     }
     if ($olderAssistantSessions.Count -gt 0) {
-        Write-Check WAIT 'Guarda el trabajo y reinicia Revit cuando corresponda para cargar el panel BIM-AI en la cinta'
+        Write-Check WAIT 'Guarda el trabajo y reinicia Revit cuando corresponda para cargar el panel ARQ-IA en la cinta'
     }
 }
 
@@ -86,7 +86,10 @@ $extensionPackageHash = Join-Path $extensionPackageRoot 'BimAiDynamoAssistant.dl
 $extensionPackageDefinition = Join-Path $extensionPackageRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
 $extensionPackageManifest = Join-Path $extensionPackageRoot 'pkg.json'
 $dynamoRoot = Join-Path $revitRoot 'AddIns\DynamoForRevit'
-$extensionInstalledManifest = Join-Path $dynamoRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$userPackageRoot = Join-Path $env:APPDATA 'Dynamo\Dynamo Revit\27.0\packages\ARQ-IA'
+$extensionInstalledManifest = Join-Path $userPackageRoot 'extra\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
+$extensionInstalledPackage = Join-Path $userPackageRoot 'pkg.json'
+$legacySystemManifest = Join-Path $dynamoRoot 'viewExtensions\BimAiDynamoAssistant_ViewExtensionDefinition.xml'
 $extensionRegistrationReady = $false
 if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
     (Test-Path -LiteralPath $extensionPackageHash -PathType Leaf) -and
@@ -94,9 +97,11 @@ if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
     (Test-Path -LiteralPath $extensionPackageManifest -PathType Leaf)) {
     $expectedExtensionHash = (Get-Content -LiteralPath $extensionPackageHash -Raw).Trim().ToLowerInvariant()
     if ($expectedExtensionHash -notmatch '^[0-9a-f]{64}$' -or (Get-PathHash $extensionPackageDll) -ne $expectedExtensionHash) {
-        Write-Check FAIL 'El DLL portable de Asistente BIM no coincide con su SHA-256'
-    } elseif (Test-Path -LiteralPath $extensionInstalledManifest -PathType Leaf) {
+        Write-Check FAIL 'El DLL portable de ARQ-IA no coincide con su SHA-256'
+    } elseif ((Test-Path -LiteralPath $extensionInstalledManifest -PathType Leaf) -and
+        (Test-Path -LiteralPath $extensionInstalledPackage -PathType Leaf)) {
         try {
+            $installedPackageInfo = Get-Content -LiteralPath $extensionInstalledPackage -Raw | ConvertFrom-Json
             [xml]$registeredExtension = Get-Content -LiteralPath $extensionInstalledManifest -Raw
             $registeredAssemblyText = [string]$registeredExtension.ViewExtensionDefinition.AssemblyPath
             if ([IO.Path]::IsPathRooted($registeredAssemblyText)) {
@@ -105,10 +110,11 @@ if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
                 $registeredAssembly = [IO.Path]::GetFullPath([IO.Path]::Combine((Split-Path -Parent $extensionInstalledManifest), $registeredAssemblyText))
             }
             $registeredAssemblyRoot = [IO.Path]::GetFullPath((Split-Path -Parent $registeredAssembly))
-            $expectedAssemblyRoot = [IO.Path]::GetFullPath($dynamoRoot)
+            $expectedAssemblyRoot = [IO.Path]::GetFullPath((Join-Path $userPackageRoot 'bin'))
             $manifestTypeMatches = $registeredExtension.ViewExtensionDefinition.TypeName -eq 'BimAiDynamoAssistant.BimAiDynamoViewExtension'
-            $registrationMatches = [String]::Equals($registeredAssemblyRoot, $expectedAssemblyRoot, [StringComparison]::OrdinalIgnoreCase) -and
-                [IO.Path]::GetFileName($registeredAssembly) -match '^BimAiDynamoAssistant(?:\.[0-9a-f]{16})?\.dll$' -and
+            $registrationMatches = $installedPackageInfo.name -eq 'ARQ-IA' -and
+                [String]::Equals($registeredAssemblyRoot, $expectedAssemblyRoot, [StringComparison]::OrdinalIgnoreCase) -and
+                [IO.Path]::GetFileName($registeredAssembly) -match '^BimAiDynamoAssistant\.[0-9a-f]{16}\.dll$' -and
                 (Test-Path -LiteralPath $registeredAssembly -PathType Leaf)
         } catch {
             $manifestTypeMatches = $false
@@ -118,18 +124,22 @@ if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
         if (-not $manifestTypeMatches) {
             Write-Check FAIL 'El manifiesto de Dynamo es inválido o pertenece a otra extensión'
         } elseif (-not $registrationMatches) {
-            Write-Check WAIT 'Asistente BIM aún apunta a una ruta antigua; migra el manifiesto con install.ps1 -Force y completa la elevación de Windows'
+            Write-Check WAIT 'ARQ-IA aún apunta a una ruta antigua; actualiza con install.ps1 -Force'
         } elseif ($installedExtensionHash -eq $expectedExtensionHash) {
             $extensionRegistrationReady = $true
-            Write-Check PASS 'Asistente BIM instalado junto a Dynamo 4.0.2; DLL versionada, manifiesto relativo y SHA-256 coinciden'
+            Write-Check PASS 'ARQ-IA instalado como paquete Dynamo 4.0.2 del usuario; manifiesto y SHA-256 coinciden'
         } else {
-            Write-Check WAIT 'La extensión Dynamo instalada tiene una versión anterior; actualiza con install.ps1 -Force y completa la elevación de Windows'
+            Write-Check WAIT 'La extensión Dynamo instalada tiene una versión anterior; actualiza con install.ps1 -Force'
         }
     } else {
-        Write-Check WAIT 'Paquete de Asistente BIM listo; instala con dynamo\extension\install.ps1'
+        Write-Check WAIT 'Paquete de ARQ-IA listo; instala con dynamo\extension\install.ps1'
     }
 } else {
-    Write-Check FAIL 'Falta el DLL, SHA-256, pkg.json o manifiesto portable de Asistente BIM para Dynamo'
+    Write-Check FAIL 'Falta el DLL, SHA-256, pkg.json o manifiesto portable de ARQ-IA para Dynamo'
+}
+
+if (Test-Path -LiteralPath $legacySystemManifest -PathType Leaf) {
+    Write-Check WARN 'Queda un manifiesto antiguo de ARQ-IA en Program Files; retíralo con el desinstalador de migración para evitar duplicados'
 }
 
 if ($extensionRegistrationReady) {
@@ -139,10 +149,10 @@ if ($extensionRegistrationReady) {
     $manifestWriteTime = (Get-Item -LiteralPath $extensionInstalledManifest).LastWriteTime
     if (-not $latestDynamoLog -or $latestDynamoLog.LastWriteTime -lt $manifestWriteTime) {
         Write-Check WAIT 'Instalación lista; reinicia Revit/Dynamo para comprobar que cargue el panel'
-    } elseif (Select-String -LiteralPath $latestDynamoLog.FullName -Pattern 'Asistente BIM \(id: a6b0d0a4-0d48-4d74-9a8f-9e0e3f3d1a27\) view extension is added' -Quiet) {
-        Write-Check PASS 'El journal más reciente de Dynamo confirma que cargó Asistente BIM'
+    } elseif (Select-String -LiteralPath $latestDynamoLog.FullName -Pattern 'ARQ-IA \(id: a6b0d0a4-0d48-4d74-9a8f-9e0e3f3d1a27\) view extension is added' -Quiet) {
+        Write-Check PASS 'El journal más reciente de Dynamo confirma que cargó ARQ-IA'
     } else {
-        Write-Check WARN 'El journal más reciente de Dynamo no registra Asistente BIM; revisa la ruta del manifiesto y los errores de carga'
+        Write-Check WARN 'El journal más reciente de Dynamo no registra ARQ-IA; revisa la ruta del manifiesto y los errores de carga'
     }
 }
 
@@ -208,12 +218,12 @@ if ((Test-Path -LiteralPath $bridgeManifest -PathType Leaf) -and
             throw 'El DLL instalado no coincide con el hash del paquete.'
         }
         $bridgeInstallTime = (Get-Item -LiteralPath $bridgeManifest).LastWriteTime
-        Write-Check PASS 'Add-in BIM-AI instalado y su DLL coincide con el paquete'
+        Write-Check PASS 'Add-in ARQ-IA instalado y su DLL coincide con el paquete'
     } catch {
         Write-Check FAIL 'El manifiesto o el hash del add-in BIM-AI no es valido'
     }
 } else {
-    Write-Check WAIT 'Add-in BIM-AI aun no esta instalado; ejecuta revit\bridge\install.ps1'
+    Write-Check WAIT 'Add-in ARQ-IA aun no esta instalado; ejecuta revit\bridge\install.ps1'
 }
 
 if (Test-Path -LiteralPath $bridgeSettings -PathType Leaf) {

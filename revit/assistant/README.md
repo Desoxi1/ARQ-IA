@@ -1,6 +1,6 @@
-# Asistente BIM para Revit
+# ARQ-IA para Revit
 
-Add-in de Revit 2027 que abre un chat acoplable en la pestaña **BIM-AI**. Comparte el mismo panel WPF, cliente local de Codex, almacenamiento de adjuntos y configuración MCP que la extensión de Dynamo.
+Add-in de Revit 2027 que abre un chat acoplable en la pestaña **ARQ-IA**. Comparte el mismo panel WPF, cliente local de Codex, almacenamiento de adjuntos y configuración MCP que la extensión de Dynamo.
 
 El encabezado identifica a **Branko Plaza** como gestor. La integración usa la sesión local autenticada de Codex CLI y los MCP de la carpeta del proyecto; no contiene una API key. Ejecuta `install.ps1` desde la raíz del clon para configurar MCP, bridge, panel Revit y panel Dynamo en un solo paso.
 
@@ -28,7 +28,7 @@ Para reparar solo el panel Revit, ejecuta el instalador específico:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\revit\assistant\install.ps1
 ```
 
-Si Revit está abierto, guarda el modelo cuando corresponda y usa `-StageWhileRevitOpen`. El manifiesto se prepara para la próxima sesión; no altera la sesión actual. Tras iniciar Revit, abre **BIM-AI → Abrir chat**. El panel aparece acoplado a la derecha y puede moverse o cerrarse desde la interfaz de Revit.
+Si Revit está abierto, guarda el modelo cuando corresponda y usa `-StageWhileRevitOpen`. El manifiesto se prepara para la próxima sesión; no altera la sesión actual. Tras iniciar Revit, abre **ARQ-IA → Abrir chat**. El panel aparece acoplado a la derecha y puede moverse o cerrarse desde la interfaz de Revit.
 
 Si Windows no inicia la elevación automática, abre PowerShell como administrador y ejecuta el mismo comando desde la raíz del proyecto.
 
