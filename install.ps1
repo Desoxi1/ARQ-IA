@@ -55,8 +55,14 @@ $codexExecutable = Resolve-CodexExecutable
 if (-not $codexExecutable) {
     throw 'No se encontró Codex CLI. Instala Codex Desktop en este PC e inicia sesión antes de ejecutar Instalar-ARQ-IA.cmd.'
 }
-& $codexExecutable login status *> $null
-if ($LASTEXITCODE -ne 0) {
+# codex.exe informa el estado por stderr incluso cuando el login es válido.
+# Con $ErrorActionPreference='Stop' eso abortaría el instalador, así que se
+# aísla la comprobación y solo manda el código de salida.
+$codexLoginExit = 1
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try { & $codexExecutable login status *> $null; $codexLoginExit = $LASTEXITCODE } catch { $codexLoginExit = 1 } finally { $ErrorActionPreference = $prevErrorAction }
+if ($codexLoginExit -ne 0) {
     throw 'Codex está instalado, pero falta iniciar sesión. Abre Codex Desktop e inicia sesión antes de instalar ARQ-IA.'
 }
 Write-Output ("CODEX_CLI=" + $codexExecutable)
