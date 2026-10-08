@@ -16,7 +16,7 @@ class DynamoExtensionPackageTests(unittest.TestCase):
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")
-        self.assertEqual(package["version"], "0.3.0")
+        self.assertEqual(package["version"], "0.4.0")
         self.assertEqual(package["engine"], "dynamo")
         self.assertTrue(package["engine_version"].startswith("4.0."))
         self.assertTrue(package["contains_binaries"])

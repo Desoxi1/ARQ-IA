@@ -48,6 +48,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private readonly Button _sendButton;
     private readonly TextBlock _status;
     private Button? _contextButton;
+    private ComboBox? _modelBox;
+    private TextBlock? _modelHint;
+    private string? _activeModelKey;
     private readonly List<LocalAttachment> _pendingAttachments = new();
     private LocalAttachmentStore? _attachmentStore;
     private CodexAppServerClient? _client;
@@ -352,8 +355,58 @@ internal sealed class AssistantPane : UserControl, IDisposable
             Margin = new Thickness(0, 3, 0, 0),
             TextWrapping = TextWrapping.Wrap
         });
+        if (projectReady) stack.Children.Add(BuildModelRow());
         card.Child = stack;
         return card;
+    }
+
+    private FrameworkElement BuildModelRow()
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 6, 0, 0), LastChildFill = true };
+        var label = new TextBlock
+        {
+            Text = "Modelo:",
+            Foreground = Muted,
+            FontSize = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        DockPanel.SetDock(label, Dock.Left);
+        row.Children.Add(label);
+
+        _modelBox = new ComboBox
+        {
+            FontSize = 10,
+            MinWidth = 150,
+            ToolTip = "Nivel de costo de Codex. Económico gasta menos cuota; Potente solo si Estándar no resolvió."
+        };
+        _modelBox.Items.Add(new ComboBoxItem { Content = "Económico", Tag = ModelTier.Economico });
+        _modelBox.Items.Add(new ComboBoxItem { Content = "Estándar", Tag = ModelTier.Estandar });
+        _modelBox.Items.Add(new ComboBoxItem { Content = "Potente", Tag = ModelTier.Potente });
+        var saved = CodexModelSelection.Load(_projectRoot);
+        _modelBox.SelectedIndex = saved switch { ModelTier.Economico => 0, ModelTier.Potente => 2, _ => 1 };
+        _modelBox.SelectionChanged += (_, _) =>
+        {
+            if (_modelBox?.SelectedItem is not ComboBoxItem selected || selected.Tag is not ModelTier tier) return;
+            CodexModelSelection.Save(_projectRoot, tier);
+            if (_modelHint is not null) _modelHint.Text = CodexModelSelection.HintFor(tier);
+            SetStatus($"Modelo {selected.Content} · rige desde el próximo envío.");
+        };
+        DockPanel.SetDock(_modelBox, Dock.Right);
+        row.Children.Add(_modelBox);
+
+        _modelHint = new TextBlock
+        {
+            Text = CodexModelSelection.HintFor(saved),
+            Foreground = BrushFromRgb(125, 143, 164),
+            FontSize = 9,
+            Margin = new Thickness(0, 4, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var container = new StackPanel();
+        container.Children.Add(row);
+        container.Children.Add(_modelHint);
+        return container;
     }
 
     private void TryActivateProject()
@@ -540,7 +593,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         }
     }
 
-    private async Task SendPromptAsync(string? promptOverride = null, bool includeAttachments = true, bool clearComposer = true)
+    private async Task SendPromptAsync(string? promptOverride = null, bool includeAttachments = true, bool clearComposer = true, ModelTier? forceTier = null)
     {
         if (_disposed || _projectRoot is null || _turnInProgress || !_sendButton.IsEnabled) return;
         var prompt = promptOverride ?? _prompt.Text.Trim();
@@ -548,7 +601,30 @@ internal sealed class AssistantPane : UserControl, IDisposable
             prompt = "Analiza los adjuntos y relaciónalos con el contexto actual de Revit.";
         if (prompt.Length == 0) return;
 
+        // Escritura ambigua (p.ej. "píntame el piso 1 de rojo"): se aclara en local
+        // sin gastar un turno de Codex, como exige AGENTS.md.
+        if (forceTier is null && TaskRouter.NeedsClarification(prompt))
+        {
+            AddMessage("Tú", prompt, isUser: true);
+            AddMessage("ARQ-IA", TaskRouter.ClarifyingMessage(prompt), isUser: false);
+            SetStatus("Aclaración pedida en local · sin gasto de cuota.");
+            return;
+        }
+
+        var tier = forceTier ?? SelectedTier();
+        var effort = CodexModelSelection.EffortFor(tier);
+        var pinnedModel = CodexModelSelection.PinnedModel(_projectRoot);
+        var modelKey = tier + "|" + effort + "|" + (pinnedModel ?? "-");
+        if (_client is not null && _activeModelKey != modelKey)
+        {
+            var previous = _client;
+            _client = null;
+            _activeModelKey = null;
+            await previous.DisposeAsync();
+        }
+
         var attachments = includeAttachments ? _pendingAttachments.ToArray() : Array.Empty<LocalAttachment>();
+        var estimateTokens = (prompt.Length + attachments.Where(a => a.TextContent is not null).Sum(a => a.TextContent!.Length)) / 4;
         AddMessage("Tú", prompt, isUser: true, attachments);
         _streamingText = null;
         _turnInProgress = true;
@@ -565,9 +641,10 @@ internal sealed class AssistantPane : UserControl, IDisposable
         try
         {
             _client ??= CreateClient();
-            await _client.EnsureStartedAsync(_projectRoot);
-            SetStatus("Consultando Codex y los MCP locales…");
-            await _client.SendMessageWithAttachmentsAsync(prompt, attachments);
+            await _client.EnsureStartedAsync(_projectRoot, pinnedModel, effort);
+            _activeModelKey = modelKey;
+            SetStatus($"Consultando Codex ({TierName(tier)} · ≈{estimateTokens} tokens de entrada)…");
+            await _client.SendMessageWithAttachmentsAsync(prompt, attachments, pinnedModel, effort);
             if (clearComposer)
             {
                 _prompt.Clear();
@@ -618,8 +695,23 @@ internal sealed class AssistantPane : UserControl, IDisposable
         await SendPromptAsync(
             "Consulta mediante MCP, en modo de solo lectura, la vista activa y la selección de Revit. Resume el nombre/tipo de vista y, para la selección, cantidad, categorías e IDs. Si no hay un documento activo, indícalo. No cambies el modelo.",
             includeAttachments: false,
-            clearComposer: false);
+            clearComposer: false,
+            forceTier: ModelTier.Economico);
     }
+
+    private ModelTier SelectedTier()
+    {
+        if (_modelBox?.SelectedItem is ComboBoxItem selected && selected.Tag is ModelTier tier)
+            return tier;
+        return CodexModelSelection.Load(_projectRoot);
+    }
+
+    private static string TierName(ModelTier tier) => tier switch
+    {
+        ModelTier.Economico => "Económico",
+        ModelTier.Potente => "Potente",
+        _ => "Estándar",
+    };
 
     private async Task StopCurrentTurnAsync()
     {
