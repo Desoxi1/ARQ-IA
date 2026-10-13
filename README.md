@@ -15,7 +15,7 @@ Para ahorrar tokens, ARQ-IA consulta solo la vista, los elementos y parámetros 
 
 ### Ejemplo: “pinta de rojo los muros del primer piso”
 
-En Revit puede significar **sobrescritura gráfica en una vista** o **cambio de material**. El asistente debe consultar el nivel real y los muros, y preguntar solo cuál de esos dos efectos se busca si sigue ambiguo. Para color de presentación usa `revit_override_element_graphics` con los IDs encontrados y `#FF0000`; comprueba la vista y los elementos después. No hace falta Dynamo para esta tarea. [Detalle técnico](docs/COLOR_MUROS_PRIMER_PISO.md).
+En Revit puede significar **sobrescritura gráfica en una vista**, **pintura de caras** o **cambio de material del elemento/tipo**. El asistente debe consultar el nivel real y los muros, y preguntar cuál de esos efectos se busca si sigue ambiguo. Para color de presentación usa `revit_override_element_graphics` con los IDs encontrados y `#FF0000`; comprueba la vista y los elementos después. No hace falta Dynamo para esa operación. [Detalle técnico](docs/COLOR_MUROS_PRIMER_PISO.md).
 
 ## Instalar desde un clon
 
@@ -34,6 +34,7 @@ El instalador detecta rutas del equipo, instala los dos paneles y el bridge por 
 ## Estado real
 
 - **Comprobado antes de este cambio:** paneles instalados, conexión Codex app-server, consulta MCP de vista/selección y ejecución de una rutina fija PythonNet3 de solo lectura en un RVT descartable.
+- **Comprobado ahora:** consulta completa de 300 materiales definidos en el modelo arquitectónico de muestra, con propiedades detalladas de seis materiales. La lectura de materiales queda habilitada en la configuración local; el catálogo bruto se conserva solo en este PC.
 - **Corregido en el código:** se quitó el bloqueo local de frases como “pinta el piso”, se expuso la herramienta gráfica tipada y se actualizó la descarga para clones nuevos.
 - **Pendiente de validar en Revit:** la solicitud de muros rojos desde el panel, la ejecución de rutinas genéricas al cambiar de grafo y cualquier escritura compleja. No se promete “cualquier pedido” ni edición autónoma de modelos productivos.
 
@@ -58,3 +59,4 @@ Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar
 - [Glosario español ↔ Revit](docs/GLOSARIO_BIM_REVIT_ES_EN.md)
 - [Instalar y diagnosticar en otro PC](docs/INSTRUCCIONES_OTRO_PC.md)
 - [Estado actual del prototipo](docs/PROTOTYPE_STATUS.md)
+- [Materiales: catálogo, lectura e interpretación](docs/MATERIALES_REVIT.md)

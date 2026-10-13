@@ -172,10 +172,10 @@ if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
         $configText -notmatch ('(?m)^\[mcp_servers\.' + [regex]::Escape($_) + '\]$')
     })
     if ($missingServers.Count -eq 0) {
-        if ($configText -match '"open_dynamo_ui"' -and $configText -match '"revit_override_element_graphics"' -and $configText -match 'annotation,graphics') {
-            Write-Check PASS 'Configuracion MCP local contiene los tres servidores, Dynamo y overrides graficos'
+        if ($configText -match '"open_dynamo_ui"' -and $configText -match '"revit_override_element_graphics"' -and $configText -match '"revit_list_materials"' -and $configText -match '"revit_get_material_properties"' -and $configText -match 'annotation,graphics,materials') {
+            Write-Check PASS 'Configuracion MCP local contiene los tres servidores, Dynamo, graficos y consulta de materiales'
         } else {
-            Write-Check WAIT 'La configuración MCP no expone Dynamo o los overrides graficos; ejecuta setup.ps1 -ConfigureOnly y reinicia el panel de Codex'
+            Write-Check WAIT 'La configuración MCP no expone Dynamo, graficos o consulta de materiales; ejecuta setup.ps1 -ConfigureOnly y reinicia el panel de Codex'
         }
     } else {
         Write-Check FAIL ('Faltan servidores MCP en la configuracion local: ' + ($missingServers -join ', '))

@@ -6,9 +6,9 @@
 |---|---|---|
 | “muros” | Instancias de la categoría `Walls` | Muros del documento activo; excluir otros tipos de elemento. |
 | “primer piso” | Posible nivel base o vista de planta | Nombre/ID del nivel y propiedad de nivel de cada muro. No basta el nombre de la vista. |
-| “rojo” | `#FF0000` | Si el efecto es un override visual en una vista o un material del modelo. |
+| “rojo” | `#FF0000` | Si se busca un override de vista, pintura de caras, asignación de material o cambio de sus propiedades gráficas. |
 
-**Aclaración mínima si el usuario no especificó el efecto:** “¿Quieres que esos muros se vean rojos solo en la vista actual, o cambiar su material para que el color afecte otras vistas?” El asistente puede consultar Revit antes de preguntar. Si pide “en esta vista”, no se cambia ningún material ni tipo de muro.
+**Aclaración mínima si el usuario no especificó el efecto:** “¿Quieres que esos muros se vean rojos solo en esta vista, pintar sus caras o cambiar el material de sus capas?” El asistente puede consultar Revit antes de preguntar. Si pide “en esta vista”, no se cambia ningún material ni tipo de muro. [Guía de materiales](MATERIALES_REVIT.md).
 
 ## Ruta técnica para el color en una vista
 
