@@ -95,7 +95,9 @@ def find_server() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA")
     if not local_app_data:
         raise RuntimeError("LOCALAPPDATA is not set")
-    return Path(local_app_data) / "RvtMcp" / "rvt" / "server" / "0.6.2" / "rvt-mcp.exe"
+    current = Path(local_app_data) / "Bimwright" / "rvt-mcp" / "server" / "current" / "rvt-mcp.exe"
+    legacy = Path(local_app_data) / "RvtMcp" / "rvt" / "server" / "0.6.2" / "rvt-mcp.exe"
+    return current if current.is_file() else legacy
 
 
 def require_ok(response: dict[str, Any] | None) -> bool:
@@ -142,7 +144,7 @@ def main() -> int:
     try:
         executable = find_server()
         if not executable.is_file():
-            print("MCP_SERVER=FAIL (no se encontró rvt-mcp v0.6.2)")
+            print("MCP_SERVER=FAIL (no se encontró rvt-mcp instalado)")
             return 2
 
         client = McpStdioClient(executable)

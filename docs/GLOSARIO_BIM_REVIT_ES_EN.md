@@ -7,6 +7,8 @@ Este vocabulario ayuda a Codex a traducir entre lenguaje de oficina y términos 
 | Nivel, piso del edificio | Level | Elevación, nombre y nivel de restricción de los elementos. Un nivel del modelo no es lo mismo que una planta/vista. |
 | Eje, grilla | Grid | Línea de referencia y nombre; confirmar dirección, separación y extensiones. |
 | Muro, tabique | Wall / WallType | Instancia frente a tipo; ubicación, nivel, altura, espesor y restricciones. |
+| Pintar, colorear, poner rojo | View-specific graphic override / Material assignment | Un color de presentación en una vista usa `OverrideGraphicSettings`; cambiar material afecta la apariencia del elemento en otras vistas. Preguntar solo si la intención no queda clara tras leer el contexto. |
+| Muros del primer piso | Wall instances con nivel base / vista de planta | Confirmar el nivel mediante `Base Constraint` o detalles del elemento; una vista llamada “Piso 1” no demuestra que todos sus muros pertenezcan a ese nivel. |
 | Piso, losa | Floor / FloorType | El término local puede referirse a piso arquitectónico o losa estructural; confirmar tipo y contorno. |
 | Habitación, recinto | Room | Espacio colocado en un nivel y delimitado por elementos separadores; confirmar punto, nombre y número. |
 | Puerta/ventana/familia | Family / FamilySymbol / FamilyInstance | Familia es definición; tipo/símbolo es variante; instancia es el objeto colocado. Confirmar tipo y anfitrión para elementos hospedados. |

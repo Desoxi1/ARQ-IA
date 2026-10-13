@@ -172,10 +172,10 @@ if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
         $configText -notmatch ('(?m)^\[mcp_servers\.' + [regex]::Escape($_) + '\]$')
     })
     if ($missingServers.Count -eq 0) {
-        if ($configText -match '"open_dynamo_ui"') {
-            Write-Check PASS 'Configuracion MCP local contiene los tres servidores y la herramienta de apertura de Dynamo'
+        if ($configText -match '"open_dynamo_ui"' -and $configText -match '"revit_override_element_graphics"' -and $configText -match 'annotation,graphics') {
+            Write-Check PASS 'Configuracion MCP local contiene los tres servidores, Dynamo y overrides graficos'
         } else {
-            Write-Check WAIT 'La configuración MCP no expone open_dynamo_ui; ejecuta setup.ps1 -ConfigureOnly y reinicia el panel de Codex'
+            Write-Check WAIT 'La configuración MCP no expone Dynamo o los overrides graficos; ejecuta setup.ps1 -ConfigureOnly y reinicia el panel de Codex'
         }
     } else {
         Write-Check FAIL ('Faltan servidores MCP en la configuracion local: ' + ($missingServers -join ', '))
@@ -184,15 +184,15 @@ if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
     Write-Check WAIT 'Falta .codex/config.toml; ejecuta setup.ps1 y abre la carpeta como proyecto confiable en Codex'
 }
 
-$mcpRoot = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2'
-$mcpExe = Join-Path $mcpRoot 'rvt-mcp.exe'
+$mcpExe = Join-Path $env:LOCALAPPDATA 'Bimwright\rvt-mcp\server\current\rvt-mcp.exe'
+$legacyMcpExe = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
 $revitAddinsRoot = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
 $rvtMcpManifest = Join-Path $revitAddinsRoot 'RvtMcp.R27.addin'
 $rvtMcpPlugin = Join-Path $revitAddinsRoot 'RvtMcp\RvtMcp.Plugin.dll'
-if ((Test-Path -LiteralPath $mcpExe -PathType Leaf) -and
+if (((Test-Path -LiteralPath $mcpExe -PathType Leaf) -or (Test-Path -LiteralPath $legacyMcpExe -PathType Leaf)) -and
     (Test-Path -LiteralPath $rvtMcpManifest -PathType Leaf) -and
     (Test-Path -LiteralPath $rvtMcpPlugin -PathType Leaf)) {
-    Write-Check PASS 'rvt-mcp v0.6.2 instalado para Revit 2027'
+    Write-Check PASS 'rvt-mcp instalado para Revit 2027'
 } else {
     Write-Check WAIT 'rvt-mcp no esta completo; ejecuta setup.ps1'
 }

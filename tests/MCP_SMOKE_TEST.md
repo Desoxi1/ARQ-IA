@@ -1,5 +1,14 @@
 # Registro de pruebas MCP — actualizado el 2 de octubre de 2026
 
+<!-- PRODUCT-STATE-20261013:BEGIN -->
+
+## Lectura de esta evidencia — reconciliación 2026-10-13
+
+Las entradas del 01/02-10 sobre carga pendiente o fallo de carga son históricas. docs/PROTOTYPE_STATUS.md del 05-10 acredita carga del paquete y rutina fija de lectura en aquella sesión; supera esas entradas para ese alcance. El selector/paquete 0.4.0 del 08-10 y la ejecución genérica no tienen aceptación viva nueva acreditada. Consultar el estado canónico antes de reutilizar un PASS o WAIT de esta tabla. No se reejecutaron smokes ni se abrió el modelo en esta revisión.
+
+<!-- PRODUCT-STATE-20261013:END -->
+
+
 | Prueba | Resultado | Alcance |
 |---|---|---|
 | UI Asistente BIM 0.2.0, 1-10-2026 | PASS build/render | Build sin advertencias y render WPF 200 × 820 px; incluye botón Ver contexto, chat y composición de adjuntos. La build está instalada y espera la próxima sesión Revit/Dynamo para carga visual. |

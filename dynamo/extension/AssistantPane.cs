@@ -601,16 +601,6 @@ internal sealed class AssistantPane : UserControl, IDisposable
             prompt = "Analiza los adjuntos y relaciónalos con el contexto actual de Revit.";
         if (prompt.Length == 0) return;
 
-        // Escritura ambigua (p.ej. "píntame el piso 1 de rojo"): se aclara en local
-        // sin gastar un turno de Codex, como exige AGENTS.md.
-        if (forceTier is null && TaskRouter.NeedsClarification(prompt))
-        {
-            AddMessage("Tú", prompt, isUser: true);
-            AddMessage("ARQ-IA", TaskRouter.ClarifyingMessage(prompt), isUser: false);
-            SetStatus("Aclaración pedida en local · sin gasto de cuota.");
-            return;
-        }
-
         var tier = forceTier ?? SelectedTier();
         var effort = CodexModelSelection.EffortFor(tier);
         var pinnedModel = CodexModelSelection.PinnedModel(_projectRoot);

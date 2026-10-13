@@ -4,11 +4,12 @@ param([switch]$ConfigureOnly)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath($PSScriptRoot)
-$packagePath = Join-Path $repoRoot 'vendor\RvtMcp.Setup-v0.6.2-win-x64.zip'
-$packageUri = 'https://github.com/bimwright/rvt-mcp/releases/download/v0.6.2/RvtMcp.Setup-v0.6.2-win-x64.zip'
-$expectedHash = '0d6239afcab47c729c30b8c5b763214c20c38c4b72de7e30c5a7191b4131b1ae'
+$packagePath = Join-Path $repoRoot 'vendor\RvtMcp.Setup-v1.1.0-win-x64.zip'
+$packageUri = 'https://github.com/bimwright/rvt-mcp/releases/download/v1.1.0/RvtMcp.Setup-v1.1.0-win-x64.zip'
+$expectedHash = '0b3f93df2f993b0cb537426ecbb33330497aadd04360ac68e575663160e4c0bb'
 $revitAddins = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
-$serverPath = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
+$currentServerPath = Join-Path $env:LOCALAPPDATA 'Bimwright\rvt-mcp\server\current\rvt-mcp.exe'
+$legacyServerPath = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
 $addinManifest = Join-Path $revitAddins 'RvtMcp.R27.addin'
 $pluginDll = Join-Path $revitAddins 'RvtMcp\RvtMcp.Plugin.dll'
 $codexDir = Join-Path $repoRoot '.codex'
@@ -26,23 +27,25 @@ function Get-Sha256Hex([string]$Path) {
 }
 
 if ($ConfigureOnly) {
-    if (-not (Test-Path -LiteralPath $serverPath -PathType Leaf) -or
+    if (-not ((Test-Path -LiteralPath $currentServerPath -PathType Leaf) -or (Test-Path -LiteralPath $legacyServerPath -PathType Leaf)) -or
         -not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or
         -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) {
-        throw 'ConfigureOnly requiere que rvt-mcp v0.6.2 ya esté instalado para Revit 2027.'
+        throw 'ConfigureOnly requiere rvt-mcp instalado para Revit 2027.'
     }
     Write-Host 'Se actualizará solamente la configuración local MCP del proyecto.'
 } else {
     $runningRevit = Get-Process -Name Revit -ErrorAction SilentlyContinue
     if ($runningRevit) { throw 'Cierra todas las ventanas de Revit 2027 antes de instalar o actualizar add-ins.' }
 
-if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+$alreadyInstalled = ((Test-Path -LiteralPath $currentServerPath -PathType Leaf) -or (Test-Path -LiteralPath $legacyServerPath -PathType Leaf)) -and
+    (Test-Path -LiteralPath $addinManifest -PathType Leaf) -and (Test-Path -LiteralPath $pluginDll -PathType Leaf)
+if (-not $alreadyInstalled -and -not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     $vendorDir = Split-Path -Parent $packagePath
     New-Item -ItemType Directory -Force -Path $vendorDir | Out-Null
-    $downloadPath = Join-Path $env:TEMP ('RvtMcp-v0.6.2-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    $downloadPath = Join-Path $env:TEMP ('RvtMcp-v1.1.0-' + [Guid]::NewGuid().ToString('N') + '.zip')
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Write-Host 'Descargando el instalador oficial rvt-mcp v0.6.2…'
+        Write-Host 'Descargando el instalador oficial rvt-mcp v1.1.0…'
         Invoke-WebRequest -Uri $packageUri -OutFile $downloadPath -UseBasicParsing
         $downloadHash = Get-Sha256Hex $downloadPath
         if ($downloadHash -ne $expectedHash) { throw "El SHA-256 del instalador descargado no coincide. No se instalará: $downloadHash" }
@@ -52,13 +55,12 @@ if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     }
 }
 
-$actualHash = Get-Sha256Hex $packagePath
-if ($actualHash -ne $expectedHash) { throw "El hash del paquete no coincide. No se instalará. SHA-256 encontrado: $actualHash" }
-
-$needsInstall = -not ((Test-Path -LiteralPath $addinManifest) -and (Test-Path -LiteralPath $pluginDll) -and (Test-Path -LiteralPath $serverPath))
+$needsInstall = -not $alreadyInstalled
 if ($needsInstall) {
+    $actualHash = Get-Sha256Hex $packagePath
+    if ($actualHash -ne $expectedHash) { throw "El hash del paquete no coincide. No se instalará. SHA-256 encontrado: $actualHash" }
     $tempRoot = [IO.Path]::GetFullPath($env:TEMP)
-    $stageRoot = [IO.Path]::GetFullPath((Join-Path $tempRoot ('BIM-AI-POC-RvtMcp-v0.6.2-' + [Guid]::NewGuid().ToString('N'))))
+    $stageRoot = [IO.Path]::GetFullPath((Join-Path $tempRoot ('ARQ-IA-RvtMcp-v1.1.0-' + [Guid]::NewGuid().ToString('N'))))
     if (-not $stageRoot.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'El directorio temporal calculado está fuera de TEMP.' }
     New-Item -ItemType Directory -Path $stageRoot | Out-Null
     try {
@@ -72,7 +74,8 @@ if ($needsInstall) {
     }
 }
 
-if (-not (Test-Path -LiteralPath $serverPath -PathType Leaf)) { throw "No se encontró el servidor instalado: $serverPath" }
+$serverPath = if (Test-Path -LiteralPath $currentServerPath -PathType Leaf) { $currentServerPath } elseif (Test-Path -LiteralPath $legacyServerPath -PathType Leaf) { $legacyServerPath } else { $null }
+if (-not $serverPath) { throw 'No se encontró el servidor rvt-mcp instalado.' }
 if (-not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) { throw 'No se encontró el add-in de Revit 2027 después de instalar.' }
 }
 
@@ -107,7 +110,7 @@ $configText = @"
 # ARQ-IA managed config generated by setup.ps1. No secrets are stored here.
 [mcp_servers.rvt_mcp]
 command = "$revitServerEscaped"
-args = ["--toolsets", "query,create,modify,view,annotation", "--disable-toolbaker"]
+args = ["--toolsets", "query,create,modify,view,annotation,graphics", "--disable-toolbaker"]
 enabled_tools = [
   "revit_get_current_view_info", "revit_get_selected_elements", "revit_get_element_details",
   "revit_get_element_parameters", "revit_get_type_parameters", "revit_get_available_family_types",
@@ -115,7 +118,7 @@ enabled_tools = [
   "revit_list_worksets", "revit_get_material_quantities", "revit_analyze_model_statistics",
   "revit_create_level", "revit_create_grid", "revit_create_line_based_element",
   "revit_create_surface_based_element", "revit_create_room", "revit_create_point_based_element",
-  "revit_set_element_parameter_values", "revit_change_element_type", "revit_create_text_note",
+  "revit_set_element_parameter_values", "revit_change_element_type", "revit_override_element_graphics", "revit_create_text_note",
   "revit_create_dimensions", "revit_tag_elements"
 ]
 default_tools_approval_mode = "prompt"

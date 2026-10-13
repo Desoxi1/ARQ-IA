@@ -35,6 +35,5 @@
     <Compile Include="..\..\dynamo\extension\CodexModelSelection.cs" Link="Shared\CodexModelSelection.cs" />
     <Compile Include="..\..\dynamo\extension\LocalAttachmentStore.cs" Link="Shared\LocalAttachmentStore.cs" />
     <Compile Include="..\..\dynamo\extension\ProjectSettings.cs" Link="Shared\ProjectSettings.cs" />
-    <Compile Include="..\..\dynamo\extension\TaskRouter.cs" Link="Shared\TaskRouter.cs" />
   </ItemGroup>
 </Project>

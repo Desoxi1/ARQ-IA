@@ -24,8 +24,7 @@ foreach ($required in @(
     (Join-Path $repoRoot 'dynamo\extension\CodexAppServerClient.cs'),
     (Join-Path $repoRoot 'dynamo\extension\CodexModelSelection.cs'),
     (Join-Path $repoRoot 'dynamo\extension\LocalAttachmentStore.cs'),
-    (Join-Path $repoRoot 'dynamo\extension\ProjectSettings.cs'),
-    (Join-Path $repoRoot 'dynamo\extension\TaskRouter.cs')
+    (Join-Path $repoRoot 'dynamo\extension\ProjectSettings.cs')
 )) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "No se encontró un archivo requerido: $required" }
 }

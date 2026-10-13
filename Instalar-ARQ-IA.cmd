@@ -21,6 +21,13 @@ if not "%arqInstallExit%"=="0" (
 echo.
 echo Instalacion terminada. Comprobando componentes...
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0doctor.ps1"
+set "arqDoctorExit=%ERRORLEVEL%"
+if not "%arqDoctorExit%"=="0" (
+    echo El diagnostico encontro una instalacion incompleta. Lee el detalle anterior.
+    pause
+    popd
+    exit /b %arqDoctorExit%
+)
 echo.
 echo Abre Revit 2027 y Dynamo en una sesion nueva para usar ARQ-IA.
 echo Si Codex solicita confiar en esta carpeta, acepta para habilitar los MCP locales.

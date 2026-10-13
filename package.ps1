@@ -38,9 +38,12 @@ try {
             'ARQ-IA/setup.ps1',
             'ARQ-IA/doctor.ps1',
             'ARQ-IA/.codex/config.toml.example',
+            'ARQ-IA/docs/COLOR_MUROS_PRIMER_PISO.md',
+            'ARQ-IA/vendor/README.md',
+            'ARQ-IA/mcp/RoutineBuilderMcp.ps1',
+            'ARQ-IA/mcp/DynamoRunnerMcp.ps1',
             'ARQ-IA/dynamo/extension/README.md',
             'ARQ-IA/dynamo/extension/install.ps1',
-            'ARQ-IA/dynamo/extension/uninstall_legacy_programfiles.ps1',
             'ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll',
             'ARQ-IA/dynamo/extension/dist/BimAiDynamoAssistant.dll.sha256',
             'ARQ-IA/dynamo/extension/dist/pkg.json',
@@ -50,7 +53,9 @@ try {
             'ARQ-IA/revit/assistant/build.ps1',
             'ARQ-IA/revit/assistant/install.ps1',
             'ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.dll',
-            'ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.sha256'
+            'ARQ-IA/revit/assistant/dist/BimAiRevitAssistant.sha256',
+            'ARQ-IA/revit/bridge/dist/BimAiDynamoBridge.dll',
+            'ARQ-IA/revit/bridge/dist/BimAiDynamoBridge.sha256'
         )
         $entryNames = @($entries | ForEach-Object { $_.FullName })
         foreach ($requiredFile in $requiredFiles) {
@@ -85,6 +90,21 @@ try {
         finally { $revitHashReader.Dispose() }
         if ($declaredRevitHash -notmatch '^[0-9a-f]{64}$' -or $declaredRevitHash -ne $packagedRevitHash) {
             throw 'El DLL del add-in Revit no coincide con su manifiesto SHA-256.'
+        }
+
+        $bridgeDllEntry = $zip.GetEntry('ARQ-IA/revit/bridge/dist/BimAiDynamoBridge.dll')
+        $bridgeHashEntry = $zip.GetEntry('ARQ-IA/revit/bridge/dist/BimAiDynamoBridge.sha256')
+        $bridgeStream = $bridgeDllEntry.Open()
+        $bridgeSha256 = [Security.Cryptography.SHA256]::Create()
+        try { $packagedBridgeHash = [BitConverter]::ToString($bridgeSha256.ComputeHash($bridgeStream)).Replace('-', '').ToLowerInvariant() }
+        finally { $bridgeStream.Dispose() }
+        $bridgeSha256.Dispose()
+        $bridgeHashStream = $bridgeHashEntry.Open()
+        $bridgeHashReader = New-Object System.IO.StreamReader($bridgeHashStream, [Text.Encoding]::UTF8, $true)
+        try { $declaredBridgeHash = $bridgeHashReader.ReadToEnd().Trim().ToLowerInvariant() }
+        finally { $bridgeHashReader.Dispose() }
+        if ($declaredBridgeHash -notmatch '^[0-9a-f]{64}$' -or $declaredBridgeHash -ne $packagedBridgeHash) {
+            throw 'El DLL del bridge Revit-Dynamo no coincide con su manifiesto SHA-256.'
         }
 
         $tokenPattern = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b'

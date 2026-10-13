@@ -42,11 +42,6 @@ node_modules/
 .codex/config.toml
 .codex/config.toml.*
 !.codex/config.toml.example
-revit/test-models/**/*.rvt
-revit/test-models/**/*.rfa
-revit/test-models/**/*.rte
-revit/test-models/**/*.0001.rvt
 revit/test-models/**/*.slog
 revit/test-models/**/*.dat
 revit/test-models/**/*.zip
-logs/runner-results/**

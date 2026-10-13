@@ -9,7 +9,8 @@ $revitRoot = Join-Path $env:ProgramFiles 'Autodesk\Revit 2027'
 $revitExe = Join-Path $revitRoot 'Revit.exe'
 $dynamoRoot = Join-Path $revitRoot 'AddIns\DynamoForRevit'
 $revitAddins = Join-Path $env:APPDATA 'Autodesk\Revit\Addins\2027'
-$mcpExe = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
+$mcpExe = Join-Path $env:LOCALAPPDATA 'Bimwright\rvt-mcp\server\current\rvt-mcp.exe'
+$legacyMcpExe = Join-Path $env:LOCALAPPDATA 'RvtMcp\rvt\server\0.6.2\rvt-mcp.exe'
 $mcpManifest = Join-Path $revitAddins 'RvtMcp.R27.addin'
 $mcpPlugin = Join-Path $revitAddins 'RvtMcp\RvtMcp.Plugin.dll'
 $runningRevit = @(Get-Process -Name Revit -ErrorAction SilentlyContinue)
@@ -79,7 +80,7 @@ if ($CheckOnly) {
 
 # rvt-mcp instala su add-in de Revit y solo se actualiza con Revit cerrado.
 # Si ya existe, se puede regenerar la configuración local sin reiniciar la sesión.
-$mcpInstalled = (Test-Path -LiteralPath $mcpExe -PathType Leaf) -and
+$mcpInstalled = ((Test-Path -LiteralPath $mcpExe -PathType Leaf) -or (Test-Path -LiteralPath $legacyMcpExe -PathType Leaf)) -and
     (Test-Path -LiteralPath $mcpManifest -PathType Leaf) -and
     (Test-Path -LiteralPath $mcpPlugin -PathType Leaf)
 if ($runningRevit.Count -gt 0 -and -not $mcpInstalled) {

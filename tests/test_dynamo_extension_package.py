@@ -16,7 +16,7 @@ class DynamoExtensionPackageTests(unittest.TestCase):
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")
-        self.assertEqual(package["version"], "0.4.0")
+        self.assertEqual(package["version"], "0.4.1")
         self.assertEqual(package["engine"], "dynamo")
         self.assertTrue(package["engine_version"].startswith("4.0."))
         self.assertTrue(package["contains_binaries"])
@@ -38,31 +38,12 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn("StageWhileRevitOpen", installer)
         self.assertIn("DLL_SCOPE=CurrentUserPackage", installer)
 
-    def test_elevated_registration_targets_only_official_revit_2027_view_extensions_folder(self):
-        registration = (EXTENSION / "register_view_extension.ps1").read_text(encoding="utf-8")
-        self.assertIn("Autodesk\\Revit 2027\\AddIns\\DynamoForRevit", registration)
-        self.assertIn("'viewExtensions'", registration)
-        self.assertIn("$ManifestAssemblyPath = '..\\BimAiDynamoAssistant.dll'", registration)
-        self.assertIn("StageWhileRevitOpen", registration)
-        self.assertIn("BimAiDynamoAssistant.BimAiDynamoViewExtension", registration)
-        self.assertIn("Get-Process -Name Revit", registration)
-        self.assertIn("Get-FileHash", registration)
-        self.assertNotIn("Remove-Item -Recurse", registration)
-
     def test_doctor_checks_runtime_load_separately_from_file_installation(self):
         doctor = (ROOT / "doctor.ps1").read_text(encoding="utf-8")
         self.assertIn("Dynamo Revit\\27.0\\Logs", doctor)
         self.assertIn("view extension is added", doctor)
         self.assertIn("journal más reciente de Dynamo", doctor)
         self.assertIn("actualiza con install.ps1 -Force", doctor)
-
-    def test_legacy_remover_is_limited_to_verified_extension_paths(self):
-        remover = (EXTENSION / "uninstall_legacy_programfiles.ps1").read_text(encoding="utf-8")
-        self.assertIn("BimAiDynamoAssistant(?:\\.[0-9a-f]{16})?\\.dll", remover)
-        self.assertIn("BimAiDynamoAssistant_ViewExtensionDefinition.xml", remover)
-        self.assertIn("BimAiDynamoAssistant.BimAiDynamoViewExtension", remover)
-        self.assertIn("BimAiDynamoAssistant", remover)
-        self.assertNotIn("Remove-Item -Recurse", remover)
 
     def test_user_attachments_are_private_and_excluded_from_portable_packages(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")

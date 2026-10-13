@@ -20,7 +20,7 @@ Este documento define cómo Codex convierte una solicitud libre en una operació
 | Vista activa, selección y contexto de elementos | `rvt-mcp` con herramientas `query` | Solo lectura; comprobado en la sesión Revit abierta. |
 | Crear o editar operaciones tipadas habilitadas | `rvt-mcp` con aprobación `prompt` | El inventario/esquemas está revisado; cada operación de escritura aún requiere un modelo descartable y verificación real. |
 | Crear y conservar una rutina | MCP `bim_ai_routines` | Guarda fuente `.py`, grafo `.dyn` Manual, wrapper JSON y manifiesto con hashes bajo `routines/`. |
-| Ejecutar una rutina personalizada | MCP `bim_ai_dynamo_runner` + add-in local | `execute_saved_routine` valida el paquete y opera solo en un RVT local bajo `revit/test-models/`; toda ejecución genérica requiere aprobación y `authorize_possible_model_writes=true`, y las escrituras declaradas se contrastan con `affected_ids`. El protocolo fake pasa; falta la ejecución viva. |
+| Ejecutar una rutina personalizada | MCP `bim_ai_dynamo_runner` + add-in local | La rutina fija de lectura pasó en Revit real; el cambio de grafo genérico aún agotó tiempo. Solo opera en un RVT local bajo `revit/test-models/`, exige aprobación y `authorize_possible_model_writes=true`. |
 
 ## Límites que no debe ocultar el asistente
 
