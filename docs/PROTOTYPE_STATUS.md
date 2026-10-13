@@ -1,33 +1,40 @@
 # Estado de ARQ-IA
 
-**Actualizado:** 13 de octubre de 2026
-**Estado:** prototipo funcional con límites pendientes de validación; no es una herramienta de producción aprobada.
+- **Actualizado:** 13 de octubre de 2026
+- **Versión declarada del paquete Dynamo:** 0.5.1
+- **Estado:** prototipo funcional con capacidades que aún requieren validación en Revit/Dynamo; no es una herramienta aprobada para producción.
 
-## Qué incluye
+Este archivo es la fuente canónica del estado. Las pruebas antiguas se interpretan según su fecha y versión; no demuestran por sí solas el comportamiento de la versión 0.5.1 ni de una instalación nueva.
 
-- Add-in para Revit 2027 y extensión lateral para Dynamo 4.0.2.
-- Chat local de Codex app-server, adjuntos, selector de modelos e historial por carpeta de proyecto.
-- Configuración local de `rvt-mcp`, un MCP para crear y listar rutinas, y otro para invocar el bridge Revit/Dynamo.
-- Plantilla Dynamo con un nodo PythonNet3 en modo Manual y catálogo inicial de materiales sin IDs ni datos de modelos.
-- Instalador para Windows que configura las rutas del clon y verifica hashes de los binarios distribuidos.
+## Qué incluye el repositorio
 
-## Evidencia y límites
+- Add-in de chat para Revit 2027 y extensión lateral para Dynamo 4.0.2.
+- Cliente Codex app-server, adjuntos, selector de modelos e historial local por clon.
+- Configuración local de `rvt-mcp`, MCP para crear/listar rutinas y MCP Runner para hablar con el bridge Revit/Dynamo.
+- Rutinas de ejemplo, plantilla PythonNet3 en modo Manual, catálogo común de 208 nombres de materiales y un instalador por usuario.
 
-- Hay evidencia histórica de lectura de vista/selección mediante `rvt-mcp`, lectura de materiales en un modelo de muestra y ejecución de una rutina fija de solo lectura en un RVT descartable. Esto no valida todas las operaciones ni la versión `rvt-mcp` 1.1.0 de una instalación nueva.
-- La ejecución genérica de rutinas, las escrituras complejas y la experiencia completa en otro PC siguen pendientes de validación. El nombre de herramienta, los hashes o una compilación no equivalen a prueba de comportamiento.
-- No se ejecutaron Revit, Dynamo, el instalador ni pruebas de producto durante esta revisión de seguridad. La próxima prueba debe usar un RVT descartable.
+## Evidencia registrada y límites
 
-## Seguridad y datos
+- **Lectura de Revit:** consultas de vista y selección pasaron históricamente con `rvt-mcp` v0.6.2. Los clones nuevos fijan `rvt-mcp` v1.1.0; esa integración aún no tiene una validación completa en instalación limpia.
+- **Panel y Codex:** los registros históricos muestran una versión anterior de la extensión cargada y un smoke del cliente que procesó texto e imagen. La versión de paquete actual es 0.5.1; no hay una prueba documentada de instalación limpia de esa versión en otro PC.
+- **Dynamo:** la rutina fija `read_active_view_selection` pasó en Revit real con un RVT descartable el 5 de octubre de 2026. La ejecución genérica al cambiar de grafo agotó el tiempo en un intento anterior; el ajuste posterior sigue sin validación viva.
+- **Materiales:** el 13 de octubre una consulta en un modelo de muestra devolvió 300 de 300 materiales definidos. La base compartida contiene 208 nombres curados; no guarda el inventario completo de ese modelo ni sus IDs, cantidades o assets.
+- **Escrituras:** el cambio de color de muros y las escrituras complejas no tienen una ejecución viva verificada desde ARQ-IA. Una compilación, un hash válido o una respuesta de plan no prueban que el modelo haya cambiado correctamente.
+- **Pruebas de este ajuste documental:** no se ejecutaron el instalador, Revit, Dynamo ni la suite de producto. Se revisaron fuentes, documentos, rutas de Markdown y el contenido del repositorio.
 
-- **Acceso controlado** es el modo inicial. **Acceso completo** requiere confirmación al activarse y aplica `approvalPolicy=never` con `danger-full-access` solo a esa conversación; abrir o crear otra la devuelve a controlado. No cambia la configuración global de Codex.
-- Las rutinas PythonNet3 ejecutan dentro del proceso Revit con los permisos de Windows del usuario. La validación de ruta del RVT no es un sandbox del sistema: el código podría acceder a otros archivos o a la red. Inspecciona el código generado y ejecuta solo sobre una copia descartable.
-- `.arq-ia/`, el historial local y `logs/attachments/` están excluidos de Git y del ZIP. El historial no está cifrado; adjuntos y conversación pueden contener información de proyecto que Codex procese. Un cierre inesperado puede dejar archivos temporales locales.
-- Los manifiestos muestran **Branko Plaza**, pero los DLL no están firmados con un certificado confiable. El nombre de proveedor del manifiesto no autentica al editor; Revit puede seguir mostrando un aviso de editor desconocido.
+## Seguridad y datos locales
 
-## Repositorio público
+- **Acceso controlado** es el modo inicial. **Acceso completo** requiere confirmación y aplica permisos amplios solo a esa conversación; no cambia la configuración global de Codex.
+- PythonNet3 corre dentro del proceso Revit con los permisos de Windows del usuario. La restricción del runner sobre el RVT no aísla archivos ni red. Revisa el script y usa una copia descartable.
+- `.codex/` contiene configuración MCP local; `.arq-ia/` contiene perfil, historial y preferencias locales. El contenido operativo de `logs/`, `artifacts/` y `vendor/` se excluye de Git; los README de esas carpetas explican su propósito.
+- Los manifiestos indican **Branko Plaza**, pero los DLL no tienen firma de editor confiable. Revit puede seguir mostrando «Fabricante desconocido» hasta que se use un certificado de firma confiable.
 
-- La rama publicada es `main`. La carpeta versionada contiene código, documentación, plantillas, materiales de referencia y rutinas de ejemplo; el historial Git revisado no incluye modelos Revit ni configuración local.
-- No hay archivo `LICENSE`, política `SECURITY.md` ni flujo CI. Los rulesets de GitHub consultados no existen; el estado de protección clásica de `main` no se pudo leer. La licencia y los controles del repositorio requieren decisión/configuración del propietario.
-- La comprobación local de secretos es dirigida a formatos conocidos y rutas locales; no es un escáner exhaustivo. No se ejecutó un escáner automatizado en esta revisión.
+## Repositorio y uso previsto
 
-Consulta [la auditoría de seguridad](SECURITY_AUDIT.md), [la arquitectura](ARCHITECTURE_DECISION.md) y [las instrucciones de instalación](INSTRUCCIONES_OTRO_PC.md) antes de distribuir el prototipo.
+- La rama publicada es `main`. El repositorio está público; el uso previsto es entre colegas del equipo. La visibilidad pública significa que el contenido puede ser visto fuera del equipo.
+- No hay archivo `LICENSE`, `SECURITY.md` ni CI versionado. No se ha elegido una licencia de código abierto. Si el repositorio debe limitarse realmente al equipo, hay que cambiar su visibilidad a privado.
+- La búsqueda de secretos documentada fue dirigida a formatos conocidos; no equivale a un escáner exhaustivo. Consulta la [auditoría de seguridad](SECURITY_AUDIT.md).
+
+## Siguiente validación
+
+En una instalación limpia, cargar el panel actual y comprobar primero vista/selección con un RVT descartable; después validar la rutina fija de lectura y, en una copia desechable, probar por separado una escritura acotada y el caso de color. El [registro de evidencia](../tests/MCP_SMOKE_TEST.md) explica qué ya se probó y con qué límites.

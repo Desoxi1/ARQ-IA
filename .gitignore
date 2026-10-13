@@ -1,7 +1,6 @@
 # Secrets and local configuration
 .env
 .env.*
-!.env.example
 
 # Revit models and generated output
 *.rvt
@@ -17,12 +16,14 @@ routines/*.py
 routines/*.dyn
 routines/*.manifest.json
 
-# Local logs
-logs/*.log
-logs/*.jsonl
-logs/runner-results/
-logs/attachments/**
-logs/materials/**
+# Runtime logs and third-party installer cache remain local.
+# Keep only the folder guidance files in the repository.
+/logs/**
+!/logs/README.md
+/vendor/**
+!/vendor/README.md
+
+# Other generated logs and temporary files
 *.log
 *.tmp
 *.temp
@@ -36,9 +37,6 @@ obj/
 publish/
 artifacts/
 docs/assets/asistente-bim-preview.png
-
-# Large third-party installer is fetched from its pinned official release.
-vendor/*.zip
 
 # Python/Node tooling caches
 __pycache__/

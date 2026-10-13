@@ -20,9 +20,9 @@ Si la descarga falla, la instalación termina con un error explícito. También 
 
 Con un modelo **descartable**, pregunta en el panel: “Dime la vista activa y qué tengo seleccionado. No cambies el modelo”. Compara con Revit. Si falla, ejecuta `doctor.ps1` desde PowerShell o abre `Instalar-ARQ-IA.cmd` de nuevo con Revit cerrado. `doctor.ps1` solo diagnostica; `WAIT` indica un paso pendiente, `FAIL` indica instalación incompleta.
 
-Después prueba: “En esta vista, muestra en rojo los muros del Nivel 1; no cambies materiales. Lee primero cuántos son, enséñame el alcance y pide aprobación antes de aplicar”. Verifica nombre/ID del nivel: “Nivel 1” es un ejemplo, no una suposición. La ruta correcta usa el override gráfico tipado de Revit, no un script Dynamo. [Contrato de esta operación](COLOR_MUROS_PRIMER_PISO.md).
+Después prueba: “En esta vista, muestra en rojo los muros del Nivel 1; no cambies materiales. Lee primero cuántos son, enséñame el alcance y espera a que confirme antes de aplicar”. Verifica nombre/ID del nivel: “Nivel 1” es un ejemplo, no una suposición. En Acceso controlado, aprueba la llamada MCP; en Acceso completo, envía una confirmación explícita después de revisar el alcance. La ruta usa el override gráfico tipado de Revit, no un script Dynamo. [Contrato de esta operación](COLOR_MUROS_PRIMER_PISO.md).
 
-La ejecución de rutinas **genéricas** de Dynamo y las escrituras complejas siguen pendientes de validación viva. Para probarlas usa exclusivamente un RVT guardado en `revit/test-models/`, revisa el `.py` completo y aprueba la llamada concreta. Un resultado `revit_execution_timeout_unknown` obliga a consultar el modelo antes de repetir. No uses un proyecto productivo para aceptar esta versión.
+La ejecución de rutinas **genéricas** de Dynamo y las escrituras complejas siguen pendientes de validación viva. Para probarlas usa exclusivamente un RVT guardado en `revit/test-models/` y revisa el `.py` completo. En Acceso controlado, aprueba la llamada concreta; en Acceso completo, el pedido explícito debe abarcar la ejecución y el alcance revisado. Un resultado `revit_execution_timeout_unknown` obliga a consultar el modelo antes de repetir. No uses un proyecto productivo para aceptar esta versión.
 
 ## Qué copia Git
 

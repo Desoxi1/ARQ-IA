@@ -30,7 +30,7 @@ El acceso **controlado** puede pedir permiso para guardar el perfil local; **Acc
 
 **Acceso completo da a Codex permisos amplios en el equipo para sus herramientas de archivos, comandos y red durante esta conversación.** Actívalo solo cuando quieras que el chat ejecute esas acciones sin confirmación individual. Al cambiar de conversación vuelve a controlado; no se aplica a otros proyectos ni cambia la configuración global de Codex. PythonNet3 corre dentro de Revit con los permisos de Windows del usuario; la ruta del RVT de prueba no limita el acceso del script a otros archivos o a la red.
 
-El panel no contiene una credencial de API. Usa la sesión local autenticada de Codex CLI; busca el ejecutable en `PATH` y en la instalación de Codex Desktop. El protocolo local [`app-server`](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server) está marcado como experimental por Codex. La extensión sigue siendo un prototipo hasta pasar pruebas visuales y de Revit en una sesión limpia. Dynamo la carga con su API oficial de [View Extensions](https://github.com/DynamoDS/Dynamo/wiki/Dynamo-View-Extensions).
+El panel no contiene una credencial de API. Usa la sesión local autenticada de Codex CLI; busca el ejecutable en `PATH` y en la instalación de Codex Desktop. Dynamo carga la extensión mediante su API oficial de [View Extensions](https://github.com/DynamoDS/Dynamo/wiki/Dynamo-View-Extensions). El paquete actual declara la versión 0.5.1; una carga observada de una versión anterior no sustituye la validación de esta versión en una instalación limpia. Consulta el [estado canónico](../../docs/PROTOTYPE_STATUS.md).
 
 ## Compilar
 
@@ -52,9 +52,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 
 El instalador coloca un paquete de Dynamo en el perfil del usuario. Con Revit abierto, los archivos quedan preparados para el próximo reinicio; en una primera instalación de rvt-mcp, guarda/cierra Revit antes. Para reparar solo esta extensión, se conserva el instalador específico de abajo.
 
-El instalador Dynamo específico valida SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. Deja una sola DLL canónica en `bin/` y el XML de la extensión en `extra/`, según el [formato de paquetes con extensiones de Dynamo](https://developer.dynamobim.org/05-Package-Deployment/deploying-extensions-on-the-package-manager.html). Al actualizar, retira copias anteriores de ARQ-IA que tienen la misma identidad interna y bloquean la carga. No modifica modelos RVT. Para reparar manualmente, ejecuta `dynamo/extension/install.ps1 -Force` desde la raíz; el instalador completo es el recomendado.
+El instalador Dynamo específico valida SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. Deja una sola DLL canónica en `bin/` y el XML de la extensión en `extra/`, según el [formato de paquetes con extensiones de Dynamo](https://developer.dynamobim.org/05-Package-Deployment/deploying-extensions-on-the-package-manager.html). Al actualizar, retira copias anteriores de ARQ-IA que tienen la misma identidad interna y bloquean la carga. No modifica modelos RVT.
 
-El instalador individual valida el SHA-256 antes y después de copiar y comprueba que la ruta del manifiesto resuelva al DLL verificado. Para reemplazar una versión distinta, usa `dynamo/extension/install.ps1 -Force` desde la raíz y revisa el destino. No modifica modelos RVT.
+Para instalar o actualizar el producto completo, usa `Instalar-ARQ-IA.cmd` desde la raíz. Para reparar solo la extensión Dynamo, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File .\dynamo\extension\install.ps1 -Force` desde la raíz del clon. Ese instalador individual también valida el hash; no instala los MCP ni el panel Revit y no modifica modelos.
 
 ## Pruebas
 

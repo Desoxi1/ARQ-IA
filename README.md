@@ -11,7 +11,7 @@ Arquitecto → panel ARQ-IA → Codex → MCP rvt-mcp → API de Revit
                                   └→ MCP de rutinas → grafo Dynamo/PythonNet3 → bridge Revit
 ```
 
-Un **MCP** es el protocolo que ofrece herramientas concretas a Codex; no es otro modelo entrenado. `rvt-mcp` permite leer y ejecutar operaciones Revit tipadas. El MCP propio guarda scripts `.py`, grafos `.dyn` y manifiestos en `routines/`. El bridge puede abrir y ejecutar esas rutinas en Dynamo sobre un **RVT descartable**. Una rutina aprobada se conserva y puede repetirse sin volver a generarla con IA. El chat usa la sesión local de Codex; no guarda una API key.
+Un **MCP** ofrece herramientas concretas a Codex; no es otro modelo entrenado. `rvt-mcp` proporciona consultas y operaciones Revit tipadas. Los MCP propios guardan scripts `.py`, grafos `.dyn` y manifiestos en `routines/`; el Runner puede enviarlos al bridge para ejecutarlos en Dynamo, con la interfaz abierta y vinculada al mismo RVT local guardado dentro de `revit/test-models/`. Guardar una rutina no la ejecuta. La rutina fija de solo lectura tiene una prueba viva histórica; la ejecución genérica actual no está validada. El chat usa la sesión local de Codex y no guarda una API key.
 
 Para ahorrar tokens, ARQ-IA consulta solo la vista, los elementos y parámetros necesarios. Prefiere una herramienta Revit existente antes de generar un grafo. Mantiene rutinas revisadas en disco y responde con resúmenes e IDs, sin enviar el modelo entero en cada solicitud.
 
@@ -35,11 +35,13 @@ El instalador detecta rutas del equipo, instala los dos paneles y el bridge por 
 
 ## Estado real
 
-- **Comprobado antes de este cambio:** paneles instalados, conexión Codex app-server, consulta MCP de vista/selección y ejecución de una rutina fija PythonNet3 de solo lectura en un RVT descartable.
-- **Comprobado ahora:** consulta completa de 300 materiales definidos en el modelo arquitectónico de muestra, con propiedades detalladas de seis materiales. La lectura de materiales queda habilitada en la configuración local; el catálogo bruto se conserva solo en este PC.
-- **Interfaz preparada para el próximo inicio:** diseño de chat compacto según la referencia de Branko, selector con los modelos reales publicados por el Codex local, conversación nueva, respuestas con formato y tarjetas de llamadas MCP recibidas. El indicador verde aparece solo después de una respuesta MCP. La versión se compiló e instaló por usuario mientras Revit estaba abierto; todavía falta verla cargada en una sesión nueva.
-- **Corregido en el código:** se quitó el bloqueo local de frases como “pinta el piso”, se expuso la herramienta gráfica tipada y se actualizó la descarga para clones nuevos.
-- **Pendiente de validar en Revit:** la solicitud de muros rojos desde el panel, la ejecución de rutinas genéricas al cambiar de grafo y cualquier escritura compleja. No se promete “cualquier pedido” ni edición autónoma de modelos productivos.
+La versión declarada por el paquete Dynamo es **0.5.1**. El producto incluye paneles para Revit y Dynamo, adjuntos, historial local, selección de modelo Codex y MCP para contexto Revit, rutinas y bridge.
+
+- **Evidencia histórica:** consultas de vista y selección por `rvt-mcp` v0.6.2; carga de una versión anterior de la extensión Dynamo; intercambio Codex app-server con texto/imagen; y una rutina fija de lectura ejecutada en un RVT descartable. El listado de materiales de un modelo de muestra devolvió 300/300; `materials/base.csv` conserva 208 nombres curados, no el inventario del RVT.
+- **Pendiente:** validar una instalación limpia en otro PC, `rvt-mcp` v1.1.0 integrado, ejecución genérica de rutinas después de cambiar de grafo, escritura y el caso de muros rojos. Compilar o instalar un archivo no sustituye esas comprobaciones.
+- **Límite del producto:** ARQ-IA interpreta solicitudes y usa las herramientas disponibles; no garantiza cualquier operación ni modifica proyectos productivos mediante el runner genérico.
+
+La extensión visible en la sesión de desarrollo no demuestra que una instalación limpia en otro equipo vaya a funcionar igual. Consulta [el estado y la evidencia](docs/PROTOTYPE_STATUS.md) antes de considerar una capacidad validada.
 
 El chat ofrece **Acceso controlado** y **Acceso completo** por conversación. Acceso completo pide una confirmación al activarlo y evita las aprobaciones repetidas de Codex para esa conversación; al abrir o crear otra, vuelve a Acceso controlado. Codex puede usar archivos, comandos y red con permisos amplios en el PC. Los scripts PythonNet3 se ejecutan con los permisos de Revit y el runner limita qué RVT activo acepta, pero esa restricción **no** aísla el código del resto del sistema. Revisa la rutina antes de ejecutarla y usa solo un RVT descartable. [Estado y evidencia](docs/PROTOTYPE_STATUS.md).
 
@@ -51,13 +53,17 @@ El chat ofrece **Acceso controlado** y **Acceso completo** por conversación. Ac
 | `install.ps1` | Orquesta la instalación de Revit, Dynamo, bridge y MCP. |
 | `setup.ps1` | Obtiene/verifica `rvt-mcp` y genera la configuración Codex local para este clon. |
 | `doctor.ps1` | Comprueba componentes, rutas y conexión sin instalar ni modificar el modelo. |
+| `package.ps1` | Crea un ZIP portable desde un commit Git limpio y verifica los archivos/binarios requeridos. |
 | `AGENTS.md` | Instrucciones de Codex para lenguaje BIM, alcance, aprobaciones y verificación. |
 | `revit/assistant/`, `dynamo/extension/` | Paneles y binarios precompilados con hashes. |
 | `revit/bridge/`, `mcp/` | Ejecución y herramientas MCP locales. |
 | `routines/`, `dynamo/` | Rutinas guardadas, plantilla y wrapper PythonNet3. |
-| `docs/`, `tests/` | Diseño, estado y verificaciones de desarrollo. |
+| `materials/` | Base común curada y plantilla para preferencias locales. |
+| `docs/`, `tests/` | Arquitectura, límites, instalación y evidencia de desarrollo. |
 
-Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y la carpeta `.codex/` generada localmente quedan fuera de Git. `setup.ps1` crea ahí las rutas MCP específicas de ese PC; no copies esa carpeta entre equipos. Los manifiestos ya identifican a **Branko Plaza** como fabricante; el logo y encabezado del chat no muestran tu nombre. Revit puede seguir indicando «Fabricante desconocido» en su aviso de seguridad porque las DLL no tienen firma digital de un certificado de editor confiable. Para que el aviso identifique a un editor verificado se necesita firmar la publicación con ese certificado. [Seguridad de complementos de Revit](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm) · [Firma digital de complementos](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Digitally_Signing_Your_Revit_Add_in/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Digitally_Signing_Your_App_html.html).
+Los scripts `build.ps1` sirven al desarrollador; no hacen falta para instalar en otro PC. `install.ps1` coordina `setup.ps1` y los instaladores de cada complemento; `doctor.ps1` diagnostica y no instala. `Instalar-ARQ-IA.cmd` es la entrada recomendada para arquitectos. `.codex/` guarda la configuración MCP específica de este clon; `.arq-ia/` guarda perfiles, preferencias e historial locales. Ambas se excluyen de Git y no deben copiarse entre PCs. Los archivos de runtime bajo `logs/`, las cachés bajo `vendor/` y los resultados bajo `artifacts/` son locales. Git conserva los README de orientación de `logs/` y `vendor/`; `artifacts/` no forma parte del clon. Modelos RVT y adjuntos no se incluyen en el repo.
+
+Los manifiestos identifican a **Branko Plaza** como fabricante. Revit puede seguir mostrando «Fabricante desconocido» porque las DLL no tienen firma digital de un certificado de editor confiable. Para que el aviso identifique a un editor verificado se requiere esa firma. [Seguridad de complementos de Revit](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm) · [Firma digital de complementos](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Digitally_Signing_Your_Revit_Add_in/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Digitally_Signing_Your_App_html.html).
 
 `materials/base.csv` contiene la base de referencia inicial con 208 nombres y atributos visuales, saneada sin IDs, archivos, cantidades ni takeoffs. Sirve para encontrar vocabulario y candidatos; Revit activo sigue siendo la fuente de verdad y la base no es una especificación técnica. Cada PC puede mantener preferencias propias en `.arq-ia/materials/local.csv`; todo `.arq-ia/`, perfil, inventario del modelo e historial quedan ignorados y no se incluyen en Git ni en el paquete. La base común no se modifica automáticamente.
 
@@ -77,6 +83,6 @@ Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por G
 - [Estado actual del prototipo](docs/PROTOTYPE_STATUS.md)
 - [Materiales: catálogo, lectura e interpretación](docs/MATERIALES_REVIT.md)
 
-## Licencia
+## Uso previsto y permisos
 
-El repositorio es público, pero aún no tiene un archivo `LICENSE`. La visibilidad pública de GitHub no concede por sí sola permisos de reutilización o redistribución. Define la licencia antes de invitar a terceros a basarse en el código.
+El uso previsto es con colegas del equipo. El repositorio está **público** y no tiene un archivo `LICENSE`: cualquiera puede verlo en GitHub, por lo que la intención de uso interno no restringe quién puede acceder al código. No se ha elegido una licencia de código abierto. Si más adelante debe ser realmente interno, cambia la visibilidad del repositorio a privado. [Qué implica publicar un repositorio sin licencia](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).

@@ -1,6 +1,6 @@
 # Validación
 
-El registro y el estado actual están en [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md). La suite offline comprueba generación MCP, guardado/reutilización de rutinas, hashes, autorización de ejecución, wrapper JSON y named pipe con un bridge simulado. No carga Revit ni Dynamo.
+Este directorio contiene validaciones de desarrollo. El [estado vigente del producto](../docs/PROTOTYPE_STATUS.md) es la fuente de verdad; [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md) conserva el último resumen de evidencias históricas y sus límites. Las pruebas offline comprueban generación MCP, guardado/reutilización de rutinas, hashes, autorización de ejecución, wrapper JSON y named pipe con un bridge simulado. No cargan Revit ni Dynamo.
 
 El historial local se verifica de forma aislada, sin iniciar Revit, Dynamo ni Codex:
 

@@ -8,7 +8,7 @@ Un material definido no demuestra que esté aplicado a un elemento. Las bibliote
 
 ## Base de referencia y extensión local
 
-`materials/base.csv` contiene 208 filas tomadas de la lista de materiales revisada para preparar ARQ-IA. Se conservaron solo nombre, clase, categoría, color y transparencia; se excluyeron IDs de Revit/asset, nombre del modelo, cantidades, recuentos de uso y takeoffs. Es una base común de búsqueda y lenguaje arquitectónico, no una norma de oficina ni una ficha técnica. Verifica siempre que el material exista en el documento activo y confirma sus propiedades antes de asignarlo.
+`materials/base.csv` contiene 208 entradas curadas para búsqueda y lenguaje arquitectónico. Se conservaron solo nombre, clase, categoría, color y transparencia; se excluyeron IDs de Revit/asset, nombre del modelo, cantidades, recuentos de uso y takeoffs. Es una base común, no una norma de oficina ni una ficha técnica. Su cantidad no representa el inventario de un RVT. Verifica siempre que el material exista en el documento activo y confirma sus propiedades antes de asignarlo.
 
 Cada PC puede guardar convenciones locales en `.arq-ia/materials/local.csv`, usando las columnas de `materials/local-materials.template.csv`. Añade solo una preferencia que el usuario haya definido o un resultado reutilizable ya verificado. No copies el inventario completo de un RVT a la base común; `.arq-ia/` está ignorada por Git, así cada equipo amplía su propia colección sin compartir el modelo.
 
@@ -16,11 +16,11 @@ Según Autodesk, un material puede tener datos de **identidad**, **gráficos** p
 
 ## Lectura comprobada en este PC
 
-El 13-10-2026 se abrió **Snowdon Towers Sample Architectural.rvt**, copia local del ejemplo Autodesk, en Revit 2027. El conector local `rvt-mcp` v0.6.2 devolvió `total=300`, `returned=300`, `limit_hit=false`, `skipped=0` con `limit=1000`. Por tanto, el listado de **materiales definidos en ese modelo** quedó completo. La respuesta avisó que el resultado era grande (77.924 bytes); en trabajo normal conviene filtrar por nombre o clase y pedir propiedades solo de los candidatos.
+El 13-10-2026 se abrió **Snowdon Towers Sample Architectural.rvt**, copia local del ejemplo Autodesk, en Revit 2027. El conector local `rvt-mcp` v0.6.2 devolvió `total=300`, `returned=300`, `limit_hit=false`, `skipped=0` con `limit=1000`. Por tanto, el listado de **materiales definidos en ese modelo** quedó completo. Esta lectura de 300 es independiente del catálogo curado de 208 entradas de `materials/base.csv`; no se espera que las cantidades coincidan. La respuesta avisó que el resultado era grande (77.924 bytes); en trabajo normal conviene filtrar por nombre o clase y pedir propiedades solo de los candidatos.
 
 Distribución por clase declarada en el ejemplo: Generic 71, Unassigned 60, Metal 49, Wood 24, Plastic 20, Miscellaneous 16, Masonry 11, Paint 9, Glass 8, Concrete 7, System 6, Stone 6, Ceramic 3 y otras clases minoritarias. Los 300 registran un asset de apariencia; 124 tienen asset estructural y 128 asset térmico. Se consultaron detalladamente seis candidatos de hormigón, vidrio, ladrillo, madera, yeso y aislación; el conector devolvió gráficos, patrones, identidad, assets y parámetros. El ejemplo muestra que un nombre comercial o genérico puede coexistir con assets físicos/térmicos de nombres distintos. **No tomar sus valores como ficha técnica del proyecto.**
 
-El inventario íntegro del ejemplo y esas respuestas detalladas quedan solo en `logs/materials/` de este PC, excluido de Git y del ZIP. El escaneo no activó `includeUseCount`; no hay evidencia de cuáles de los 300 se usan en elementos ni de sus cantidades. Se identificaron 14 archivos `.adsklib` Autodesk instalados, sin afirmar que sus contenidos estén cargados en el RVT. Cada PC generará su propio perfil al abrir su modelo; la base común de 208 nombres se usa solo como vocabulario de referencia.
+Los resultados completos de esa consulta se conservan solo en almacenamiento local, fuera de Git y del ZIP. El repositorio mantiene únicamente la base común saneada de 208 entradas. El escaneo no activó `includeUseCount`; no hay evidencia de cuáles de los 300 se usan en elementos ni de sus cantidades. Se identificaron 14 archivos `.adsklib` Autodesk instalados, sin afirmar que sus contenidos estén cargados en el RVT. Cada PC generará su propio perfil al abrir su modelo; la base común se usa solo como vocabulario de referencia.
 
 ## Cómo resolver una petición de un arquitecto
 

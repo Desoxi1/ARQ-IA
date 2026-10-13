@@ -14,7 +14,7 @@ No se ejecutaron el instalador, Revit, Dynamo ni rutinas. No se modificó un mod
 - Acceso completo requiere una confirmación única con una explicación de sus permisos. El permiso se restablece al crear o abrir otra conversación, y el estado inicial sigue siendo Acceso controlado.
 - El empaquetador bloquea más rutas y extensiones locales sensibles y reconoce patrones comunes de tokens y llaves. Su salida se llama `TARGETED_SECRET_PATTERNS_AND_LOCAL_ARTIFACTS`; no pretende reemplazar un escáner de secretos.
 - Se retiraron de la documentación pública registros históricos contradictorios y detalles de estado local que ya no servían como instrucciones. Los documentos de entorno y estado ahora distinguen evidencia histórica de capacidades pendientes.
-- README aclara que la carpeta pública aún no tiene licencia: la visibilidad en GitHub no concede derechos de reutilización.
+- README aclara el uso previsto entre colegas, la visibilidad pública y que no se eligió una licencia de código abierto.
 
 ## Hallazgos que siguen abiertos
 
@@ -28,7 +28,7 @@ Los manifiestos Revit identifican `Branko Plaza` y los scripts verifican SHA-256
 
 ### Medio — faltan controles de publicación
 
-- No existe `LICENSE`; la reutilización y redistribución por terceros no están autorizadas por una licencia explícita.
+- No existe `LICENSE`. El uso previsto declarado es entre colegas del equipo, pero el repositorio está público y ese propósito no restringe quién puede ver su contenido. No se ha elegido una licencia de código abierto; si se requiere acceso solo interno, el propietario debe cambiar la visibilidad a privada.
 - No existe una política `SECURITY.md` ni un canal privado de reporte documentado.
 - No hay CI versionado. La API de GitHub mostró cero rulesets; la lectura de protección clásica de `main` no estuvo disponible, así que ese ajuste queda sin confirmar.
 
@@ -42,7 +42,7 @@ El historial de `.arq-ia/` se guarda como texto local sin cifrar. Los adjuntos s
 - La configuración MCP y la confianza de Codex se crean para la ruta exacta del clon; no se guarda una API key en el repositorio.
 - El bridge usa una tubería local limitada al usuario actual, solicitudes acotadas y un conjunto cerrado de operaciones.
 - Las rutinas Dynamo generadas se guardan como grafos Manuales; el creador no las ejecuta. La ejecución genérica requiere un RVT bajo `revit/test-models/` y pasa por validación de integridad.
-- `.gitignore` y el empaquetador excluyen `.codex/`, `.arq-ia/`, modelos, adjuntos, registros, resultados y paquetes locales.
+- `.gitignore` y el empaquetador excluyen `.codex/`, `.arq-ia/`, modelos, adjuntos, contenido operativo de `logs/`, resultados y cachés de `vendor/`; los README de esas carpetas sí se versionan para explicar su propósito.
 
 ## Cierre
 

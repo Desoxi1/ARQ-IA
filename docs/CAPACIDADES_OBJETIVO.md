@@ -12,7 +12,7 @@ El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualq
 
 | Capacidad | Implementación | Evidencia |
 |---|---|---|
-| Chat y adjuntos en Revit y Dynamo | Paneles propios con Codex app-server | Cliente conectado y procesamiento de adjuntos comprobados fuera del panel visible; carga histórica del panel de Dynamo. |
+| Chat y adjuntos en Revit y Dynamo | Paneles propios con Codex app-server; paquete Dynamo 0.5.1 | El cliente procesó texto e imagen en un smoke; hay registro de carga de una versión anterior del panel. La instalación limpia de 0.5.1 no está validada en otro PC. |
 | Vista activa y selección | `rvt-mcp` de bimwright | Consulta de solo lectura pasada en Revit. |
 | Operaciones tipadas de creación/edición | Lista acotada de `rvt-mcp`; control de Codex según modo del chat | Inventario de herramientas; cada escritura requiere prueba individual. |
 | Color de presentación por elemento | `revit_override_element_graphics` de `rvt-mcp` | Esquema disponible en el binario local; habilitado en el perfil ARQ-IA, sin prueba viva de color. |
