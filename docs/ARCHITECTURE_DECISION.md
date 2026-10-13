@@ -7,7 +7,7 @@
 ARQ-IA combina tres piezas locales:
 
 1. `bimwright/rvt-mcp` ofrece consultas y acciones tipadas sobre Revit 2027. La instalación local 0.6.2 pasó consultas de vista activa/selección y expone `revit_override_element_graphics`, que no estaba habilitada en ARQ-IA. Un clon nuevo descarga la versión 1.1.0 fijada por hash. No se ha probado cada herramienta de escritura ni la versión 1.1.0 integrada con ARQ-IA.
-2. Un MCP propio crea/lista rutinas versionables (`.py`, `.dyn`, manifiesto con hashes) y otro pide su ejecución al add-in Revit. El grafo usa un nodo PythonNet3 en modo Manual.
+2. Un MCP propio crea/lista rutinas versionables (`.py`, `.dyn`, manifiesto con hashes); otro puede pedir que un borrador se cargue en la sesión Dynamo del documento activo en Manual para que el usuario lo revise. Una operación separada pide la ejecución al add-in Revit y conserva la puerta de `revit/test-models/`.
 3. El chat en el panel Revit y la extensión lateral de Dynamo usan Codex app-server con los MCP configurados para la carpeta clonada. Aceptan texto, imágenes y archivos. El contenido adjunto se trata como referencia, no como código ejecutable por sí mismo.
 
 Se reutiliza `rvt-mcp` porque ya aporta una superficie de Revit tipada para la versión instalada. El bridge propio cubre la función que `rvt-mcp` no ofrece aquí: guardar y lanzar rutinas Dynamo. Reescribir todas las herramientas de Revit aumentaría mantenimiento y no resolvería el problema actual de sincronización de Dynamo.
@@ -33,7 +33,9 @@ El fallo de “pinta los muros del primer piso de rojo” tuvo dos causas de pro
 
 ## Límites de ejecución
 
+- La preparación `prepare_saved_routine_in_dynamo` acepta el documento activo incluso si es un modelo de trabajo, pero solo solicita abrir el grafo; no llama al ejecutor ni guarda el RVT. Rechaza una sesión Dynamo ligada a otro documento y no reemplaza un workspace con nodos/notas. La apertura sin ejecución no está aún validada con Dynamo 4.0.2 instalado.
 - El runner propio solo acepta un RVT local y descartable bajo `revit/test-models/`; en acceso controlado exige confirmación de posibles escrituras. Compara los cambios declarados por la rutina con `DocumentChanged` de Revit. No se ha demostrado todavía una escritura exitosa y verificada.
+- El usuario puede revisar el `.py` cargado y decidir si ejecutarlo manualmente en Dynamo sobre el documento abierto. Esa ejecución no pasa por las restricciones ni por la verificación de cambios del runner MCP; PythonNet3 tiene permisos del proceso Revit.
 - Los scripts PythonNet3 corren con los permisos del usuario dentro de Revit. La restricción de RVT no es un sandbox de sistema operativo. Revisa el script y el alcance antes de cualquier escritura; Acceso controlado muestra aprobación por llamada, y Acceso completo depende de la petición explícita del usuario dentro de esa conversación.
 - `rvt-mcp` puede modificar el modelo mediante acciones tipadas. El panel ahora ofrece un modo controlado y otro de acceso completo por sesión; Codex app-server confirmó creación/listado de rutina sin ventanas de aprobación en el smoke. Las escrituras de Revit aún deben validarse en vivo, y no existe garantía general de reversión.
 - Los manifiestos `.addin` registran `VendorDescription=Branko Plaza`, pero las DLL siguen sin firma de editor confiable. Revit puede indicar «Fabricante desconocido» en el diálogo de seguridad hasta que se use un certificado de firma de código confiable.

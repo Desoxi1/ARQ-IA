@@ -36,6 +36,18 @@ function Get-ToolDefinitions {
             inputSchema = [ordered]@{ type = 'object'; properties = [ordered]@{}; additionalProperties = $false }
         },
         [ordered]@{
+            name = 'prepare_saved_routine_in_dynamo'
+            description = 'Request Dynamo to load one hash-validated ARQ-IA PythonNet3 graph for the currently active Revit document, including a working project, with Manual mode and no execution requested. This tool does not call the routine executor or save the RVT. It refuses to replace a Dynamo workspace containing nodes or notes and refuses a session bound to another document. Dynamo startup may mark the RVT modified. The response confirms the loaded path, not runtime proof that this installed Dynamo build did not execute a node while opening; that behavior remains unverified until a live check on the installed version. Use only after the user asks to prepare a routine for review in the already-open model.'
+            inputSchema = [ordered]@{
+                type = 'object'
+                properties = [ordered]@{
+                    routine_id = [ordered]@{ type = 'string'; pattern = '^[a-z][a-z0-9_-]{1,47}$'; description = 'The slug returned by create_dynamo_routine.' }
+                }
+                required = @('routine_id')
+                additionalProperties = $false
+            }
+        },
+        [ordered]@{
             name = 'execute_saved_readonly_routine'
             description = 'Run only the exact hash-pinned read_active_view_selection PythonNet3 graph inside Revit 2027/Dynamo. Dynamo UI must already be open and bound to the active document; the bridge will not initialize Dynamo silently. It refuses dirty or modifiable documents, validates the .py/.dyn/manifest and verifies unchanged selection/view/document state. It cannot execute user-supplied code or write routines.'
             inputSchema = [ordered]@{
@@ -70,7 +82,7 @@ function Get-Sha256Hex([string]$Path) {
     finally { $stream.Dispose(); $sha.Dispose() }
 }
 
-function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite) {
+function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite, [switch]$AllowWithoutWriteAuthorization) {
     if ($RoutineId -notmatch '^[a-z][a-z0-9_-]{1,47}$') { throw 'routine_id_invalid' }
     $paths = @{
         py = [IO.Path]::GetFullPath((Join-Path $routinesRoot ($RoutineId + '.py')))
@@ -87,7 +99,7 @@ function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite) {
         (Get-Item -LiteralPath $paths.dyn).Length -gt 524288 -or (Get-Item -LiteralPath $paths.manifest).Length -gt 16384) { throw 'routine_package_too_large' }
     $manifest = Get-Content -LiteralPath $paths.manifest -Raw | ConvertFrom-Json
     $isWriter = [bool]$manifest.writes_model
-    if (-not $ConfirmModelWrite) { throw 'generic_execution_confirmation_required' }
+    if (-not $ConfirmModelWrite -and -not $AllowWithoutWriteAuthorization) { throw 'generic_execution_confirmation_required' }
     if ([string]$manifest.name -ne $RoutineId -or [string]$manifest.python_engine -ne 'PythonNet3' -or
         [string]$manifest.result_contract -ne 'bim-ai-json-v1' -or
         [bool]$manifest.confirm_model_write -ne $isWriter) { throw 'routine_manifest_invalid' }
@@ -160,6 +172,14 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                         }
                         'ping_revit_dynamo_bridge' {
                             $bridge = Invoke-RevitBridge -Operation 'ping' -RoutineId $null
+                        }
+                        'prepare_saved_routine_in_dynamo' {
+                            $routineId = [string]$request.params.arguments.routine_id
+                            $manifestPath = Join-Path $routinesRoot ($routineId + '.manifest.json')
+                            if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'routine_files_missing' }
+                            $savedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+                            [void](Assert-SavedRoutine -RoutineId $routineId -ConfirmModelWrite ([bool]$savedManifest.confirm_model_write) -AllowWithoutWriteAuthorization)
+                            $bridge = Invoke-RevitBridge -Operation 'prepare_saved_routine_in_dynamo' -RoutineId $routineId
                         }
                         'execute_saved_readonly_routine' {
                             $routineId = [string]$request.params.arguments.routine_id

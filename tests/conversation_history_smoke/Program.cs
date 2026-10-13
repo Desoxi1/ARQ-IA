@@ -16,7 +16,8 @@ internal static class Program
             var attachmentPath = Path.Combine(Path.GetTempPath(), "Private", "Plano A.png");
             store.AddMessage(record, "Tú", "Resume los niveles y materiales del modelo.", true,
                 new[] { attachmentPath });
-            store.AddMessage(record, "ARQ-IA", "La ficha se consultó en modo de solo lectura.", false);
+            store.AddMessage(record, "ARQ-IA", "La ficha se consultó en modo de solo lectura.", false,
+                modelDisplayName: "GPT-6-Luna", reasoningEffort: "high");
             store.UpsertTool(record, new McpToolActivity("tool-1", "rvt_mcp", "revit_get_model_statistics", "completed", "{\"categories\":4}"));
 
             var reloadedStore = new ConversationHistoryStore(root);
@@ -26,6 +27,9 @@ internal static class Program
                 throw new InvalidOperationException("Conversation history did not survive a reload.");
             if (loaded.Title != "Resume los niveles y materiales del modelo.")
                 throw new InvalidOperationException("Conversation title was not derived from the first prompt.");
+            var assistantReply = loaded.Entries.Single(entry => entry.Speaker == "ARQ-IA");
+            if (assistantReply.ModelDisplayName != "GPT-6-Luna" || assistantReply.ReasoningEffort != "high")
+                throw new InvalidOperationException("Conversation history did not preserve the model and reasoning effort used for the reply.");
 
             var jsonPath = Path.Combine(root, ".arq-ia", "conversations", record.Id + ".json");
             var json = File.ReadAllText(jsonPath);

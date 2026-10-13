@@ -16,7 +16,7 @@ class DynamoExtensionPackageTests(unittest.TestCase):
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")
-        self.assertEqual(package["version"], "0.5.0")
+        self.assertEqual(package["version"], "0.5.1")
         self.assertEqual(package["engine"], "dynamo")
         self.assertTrue(package["engine_version"].startswith("4.0."))
         self.assertTrue(package["contains_binaries"])
@@ -51,8 +51,8 @@ class DynamoExtensionPackageTests(unittest.TestCase):
     def test_user_attachments_are_private_and_excluded_from_portable_packages(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         packager = (ROOT / "package.ps1").read_text(encoding="utf-8")
-        self.assertIn("logs/attachments/**", gitignore)
-        self.assertIn("runner-results|attachments", packager)
+        self.assertIn("/logs/**", gitignore)
+        self.assertIn("logs/(?!README", packager)
 
     def test_assistant_ui_exposes_image_paste_drag_drop_and_revit_mcp_context(self):
         pane = (EXTENSION / "AssistantPane.cs").read_text(encoding="utf-8")
@@ -96,8 +96,16 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn('Geometry.Parse("M7.5,25.5 L16,6.8 L24.5,25.5")', pane)
         self.assertIn('Text = "Asistente BIM · Revit 2027"', pane)
         self.assertIn('Content = "Automático", Tag = null', pane)
-        self.assertIn("CodexModelSelection.Save(selected.Tag as string)", pane)
-        self.assertIn("Width = 142", pane)
+        self.assertIn("CodexModelSelection.Save(GetSelectedModelId(), GetRequestedEffort())", pane)
+        self.assertIn('Text = "Razonamiento"', pane)
+        self.assertIn("Width = 125", pane)
+        self.assertIn("Width = 96", pane)
+        self.assertIn("private RichTextBox AddMessage(", pane)
+        self.assertIn('CreateButton("Copiar"', pane)
+        self.assertIn("private static void RenderMarkdown(RichTextBox target, string raw)", pane)
+        self.assertIn("RichTextBox Detail", pane)
+        self.assertIn("ModelEffortSelectionFallback", pane)
+        self.assertIn("ModelDisplayName = isUser ? string.Empty : Clean(modelDisplayName, 120)", (EXTENSION / "ConversationHistoryStore.cs").read_text(encoding="utf-8"))
         self.assertIn("ButtonDisabledSurface", pane)
         self.assertIn("ButtonDisabledBorder", pane)
         self.assertIn("ButtonDisabledText", pane)

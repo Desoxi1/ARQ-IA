@@ -20,7 +20,7 @@ No se ejecutaron el instalador, Revit, Dynamo ni rutinas. No se modificó un mod
 
 ### Alto — las rutinas PythonNet3 no están aisladas del sistema operativo
 
-El bridge limita el RVT activo a `revit/test-models/`, valida hashes y exige que la llamada declare posibles escrituras. Eso ayuda a controlar el documento, pero el código PythonNet3 corre dentro del proceso Revit con los permisos de Windows del usuario y puede acceder a otros archivos o a la red. El modo Acceso completo también entrega a Codex `danger-full-access` para la conversación confirmada. No ejecutes rutinas generadas que no hayas revisado ni uses modelos productivos. Resolver el aislamiento real requiere cambiar la arquitectura de ejecución; la puerta por ruta no puede hacerlo.
+El ejecutor MCP limita el RVT activo a `revit/test-models/`, valida hashes y exige que la llamada declare posibles escrituras. La nueva operación de preparación sí puede cargar el borrador en el documento activo, pero no invoca el ejecutor; que la apertura no ejecute automáticamente el nodo aún debe comprobarse en Dynamo 4.0.2. Si el usuario pulsa Ejecutar manualmente, esa ejecución queda fuera de la puerta por ruta y de la verificación del bridge. PythonNet3 corre dentro de Revit con los permisos de Windows del usuario y puede acceder a otros archivos o a la red. El modo Acceso completo también entrega a Codex `danger-full-access` para la conversación confirmada. Revisa el Python y el alcance antes de pulsar Ejecutar. Resolver el aislamiento real requiere cambiar la arquitectura; la puerta por ruta solo protege las operaciones del ejecutor MCP.
 
 ### Medio — los binarios no autentican al editor
 
@@ -41,7 +41,7 @@ El historial de `.arq-ia/` se guarda como texto local sin cifrar. Los adjuntos s
 - El release de `rvt-mcp` se descarga desde su URL oficial con versión y SHA-256 fijados.
 - La configuración MCP y la confianza de Codex se crean para la ruta exacta del clon; no se guarda una API key en el repositorio.
 - El bridge usa una tubería local limitada al usuario actual, solicitudes acotadas y un conjunto cerrado de operaciones.
-- Las rutinas Dynamo generadas se guardan como grafos Manuales; el creador no las ejecuta. La ejecución genérica requiere un RVT bajo `revit/test-models/` y pasa por validación de integridad.
+- Las rutinas Dynamo generadas se guardan como grafos Manuales. La preparación pide abrir el borrador en el documento activo sin invocar el ejecutor y se detiene si el workspace tiene nodos/notas; la ausencia de ejecución automática está pendiente de validación viva. La ejecución genérica mediante el MCP requiere un RVT bajo `revit/test-models/` y pasa por validación de integridad.
 - `.gitignore` y el empaquetador excluyen `.codex/`, `.arq-ia/`, modelos, adjuntos, contenido operativo de `logs/`, resultados y cachés de `vendor/`; los README de esas carpetas sí se versionan para explicar su propósito.
 
 ## Cierre

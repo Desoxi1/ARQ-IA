@@ -55,17 +55,20 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private Popup? _historyPopup;
     private bool _fullAccessEnabled;
     private ComboBox? _modelBox;
+    private ComboBox? _effortBox;
     private IReadOnlyList<CodexModelInfo> _availableModels = Array.Empty<CodexModelInfo>();
     private bool _loadingModels;
+    private string _activeTurnModelName = "Codex predeterminado";
+    private string _activeTurnEffort = "medium";
     private readonly List<LocalAttachment> _pendingAttachments = new();
     private LocalAttachmentStore? _attachmentStore;
     private CodexAppServerClient? _client;
     private ConversationHistoryStore? _conversationStore;
     private ConversationHistoryRecord? _activeConversation;
     private bool _continueLocalConversation;
-    private TextBlock? _streamingText;
+    private RichTextBox? _streamingText;
     private string _streamingRaw = string.Empty;
-    private readonly Dictionary<string, (TextBlock Status, TextBlock Detail)> _toolCards = new();
+    private readonly Dictionary<string, (TextBlock Status, RichTextBox Detail)> _toolCards = new();
     private bool _disposed;
     private bool _turnInProgress;
     private bool _turnCancellationRequested;
@@ -543,22 +546,25 @@ internal sealed class AssistantPane : UserControl, IDisposable
 
     private FrameworkElement BuildModelRow()
     {
-        var row = new DockPanel { Margin = new Thickness(5, 0, 8, 0), LastChildFill = false, VerticalAlignment = VerticalAlignment.Center };
-        var label = new TextBlock
+        var row = new StackPanel
         {
-            Text = "Codex · Revit MCP",
-            Foreground = Muted,
-            FontSize = 10,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 7, 0)
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(5, 0, 8, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
         };
-        DockPanel.SetDock(label, Dock.Left);
-        row.Children.Add(label);
-
+        row.Children.Add(new TextBlock
+        {
+            Text = "Modelo",
+            Foreground = Muted,
+            FontSize = 9,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 5, 0)
+        });
         _modelBox = new ComboBox
         {
             FontSize = 10,
-            Width = 142,
+            Width = 125,
             MaxDropDownHeight = 280,
             Background = SurfaceRaised,
             Foreground = TextBrush,
@@ -579,14 +585,140 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _modelBox.SelectionChanged += (_, _) =>
         {
             if (_loadingModels || _modelBox?.SelectedItem is not ComboBoxItem selected) return;
-            CodexModelSelection.Save(selected.Tag as string);
-            SetStatus($"Modelo {selected.Content} · se aplicará al próximo envío.");
+            var model = selected.Tag as string;
+            RefreshEffortChoices(CodexModelSelection.LoadEffort(model));
+            SaveModelPreferences();
+            SetStatus($"Modelo {selected.Content} · razonamiento {GetSelectedEffortLabel(model)} · próximo envío.");
         };
-        DockPanel.SetDock(_modelBox, Dock.Right);
         row.Children.Add(_modelBox);
+
+        row.Children.Add(new TextBlock
+        {
+            Text = "Razonamiento",
+            Foreground = Muted,
+            FontSize = 9,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(7, 0, 5, 0)
+        });
+        _effortBox = new ComboBox
+        {
+            FontSize = 10,
+            Width = 96,
+            MaxDropDownHeight = 240,
+            Background = SurfaceRaised,
+            Foreground = TextBrush,
+            BorderBrush = PanelBorder,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(4, 2, 4, 2),
+            Template = CreateDarkComboBoxTemplate(),
+            ToolTip = "Nivel de razonamiento enviado a Codex: predeterminado, mínimo, bajo, medio, alto o máximo; las opciones dependen del modelo."
+        };
+        _effortBox.ItemContainerStyle = itemStyle;
+        _effortBox.IsEnabled = _projectRoot is not null;
+        _effortBox.SelectionChanged += (_, _) =>
+        {
+            if (_loadingModels) return;
+            SaveModelPreferences();
+            var model = GetSelectedModelId();
+            SetStatus($"Razonamiento {GetSelectedEffortLabel(model)} · se aplicará al próximo envío.");
+        };
+        row.Children.Add(_effortBox);
+        RefreshEffortChoices(CodexModelSelection.LoadEffort(null));
 
         return row;
     }
+
+    private void RefreshEffortChoices(string? preferredEffort)
+    {
+        if (_effortBox is null) return;
+        var restoreLoading = _loadingModels;
+        _loadingModels = true;
+        try
+        {
+            _effortBox.Items.Clear();
+            var modelId = GetSelectedModelId();
+            var model = modelId is null ? null : _availableModels.FirstOrDefault(item => item.Id == modelId);
+            var defaultEffort = model?.DefaultEffort ?? _availableModels.FirstOrDefault(item => item.IsDefault)?.DefaultEffort ?? "medium";
+            var defaultLabel = modelId is null ? "Predeterminado" : $"Predeterminado · {EffortDisplayName(defaultEffort)}";
+            _effortBox.Items.Add(new ComboBoxItem { Content = defaultLabel, Tag = null });
+
+            IEnumerable<string> supported;
+            if (modelId is not null)
+                supported = model?.SupportedEfforts ?? Array.Empty<string>();
+            else
+            {
+                var modelEfforts = _availableModels
+                    .Where(item => item.SupportedEfforts.Count > 0)
+                    .Select(item => item.SupportedEfforts.ToHashSet(StringComparer.OrdinalIgnoreCase))
+                    .ToArray();
+                supported = modelEfforts.Length == 0
+                    ? Array.Empty<string>()
+                    : modelEfforts.Skip(1).Aggregate(modelEfforts[0], (common, next) =>
+                    {
+                        common.IntersectWith(next);
+                        return common;
+                    });
+            }
+
+            foreach (var effort in supported.Distinct(StringComparer.OrdinalIgnoreCase)
+                         .OrderBy(EffortOrder).ThenBy(value => value, StringComparer.OrdinalIgnoreCase))
+            {
+                _effortBox.Items.Add(new ComboBoxItem { Content = EffortDisplayName(effort), Tag = effort });
+            }
+
+            var chosen = _effortBox.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => item.Tag is string value && string.Equals(value, preferredEffort, StringComparison.OrdinalIgnoreCase));
+            _effortBox.SelectedItem = chosen ?? _effortBox.Items[0];
+        }
+        finally
+        {
+            _loadingModels = restoreLoading;
+        }
+    }
+
+    private string? GetSelectedModelId() => (_modelBox?.SelectedItem as ComboBoxItem)?.Tag as string;
+
+    private string GetSelectedEffortLabel(string? modelId)
+    {
+        if (_effortBox?.SelectedItem is ComboBoxItem { Tag: string effort }) return EffortDisplayName(effort);
+        var model = modelId is null ? _availableModels.FirstOrDefault(item => item.IsDefault) :
+            _availableModels.FirstOrDefault(item => item.Id == modelId);
+        return EffortDisplayName(model?.DefaultEffort ?? "medium");
+    }
+
+    private string? GetRequestedEffort() => (_effortBox?.SelectedItem as ComboBoxItem)?.Tag as string;
+
+    private void SaveModelPreferences()
+    {
+        if (_modelBox is null) return;
+        CodexModelSelection.Save(GetSelectedModelId(), GetRequestedEffort());
+    }
+
+    private static string EffortDisplayName(string effort) => effort.ToLowerInvariant() switch
+    {
+        "none" => "Sin razonamiento",
+        "minimal" => "Mínimo",
+        "low" => "Bajo",
+        "medium" => "Medio",
+        "high" => "Alto",
+        "xhigh" => "Muy alto",
+        "max" => "Máximo",
+        "ultra" => "Ultra",
+        _ => string.IsNullOrWhiteSpace(effort) ? "Predeterminado" : char.ToUpperInvariant(effort[0]) + effort[1..]
+    };
+
+    private static int EffortOrder(string effort) => effort.ToLowerInvariant() switch
+    {
+        "none" => 0,
+        "minimal" => 1,
+        "low" => 2,
+        "medium" => 3,
+        "high" => 4,
+        "xhigh" => 5,
+        "max" => 6,
+        "ultra" => 7,
+        _ => 8
+    };
 
     private async Task LoadModelChoicesAsync()
     {
@@ -606,6 +738,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 _modelBox.Items.Add(new ComboBoxItem { Content = model.DisplayName, Tag = model.Id });
             _modelBox.SelectedItem = _modelBox.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(item => item.Tag is string id && id == saved) ?? _modelBox.Items[0];
+            RefreshEffortChoices(CodexModelSelection.LoadEffort(GetSelectedModelId()));
             _loadingModels = false;
             SetStatus(models.Count > 0
                 ? $"{models.Count} modelos disponibles en el catálogo de Codex."
@@ -614,6 +747,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         catch (Exception ex)
         {
             _loadingModels = false;
+            RefreshEffortChoices(CodexModelSelection.LoadEffort(GetSelectedModelId()));
             SetStatus($"Modelos no disponibles ({ex.GetType().Name}); se usará el predeterminado.");
             var client = _client;
             _client = null;
@@ -639,6 +773,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         if (_historyButton is not null) _historyButton.IsEnabled = true;
         UpdateHistoryButton();
         if (_modelBox is not null) _modelBox.IsEnabled = true;
+        if (_effortBox is not null) _effortBox.IsEnabled = true;
         _status.Text = "Listo · Codex se conecta al enviar";
         _layout.Children.Remove(_contextCard);
         _contextCard = BuildContextCard(projectReady: true);
@@ -822,7 +957,14 @@ internal sealed class AssistantPane : UserControl, IDisposable
 
         var selectedModel = ResolveModel(prompt, preferLightweight);
         var modelInfo = _availableModels.FirstOrDefault(candidate => candidate.Id == selectedModel);
-        var effort = modelInfo?.DefaultEffort ?? "medium";
+        var requestedEffort = GetRequestedEffort();
+        var effort = requestedEffort ?? modelInfo?.DefaultEffort ?? "medium";
+        var unsupportedEffort = requestedEffort is not null && modelInfo is not null &&
+            modelInfo.SupportedEfforts.Count > 0 &&
+            !modelInfo.SupportedEfforts.Contains(requestedEffort, StringComparer.OrdinalIgnoreCase);
+        if (unsupportedEffort) effort = modelInfo!.DefaultEffort;
+        _activeTurnModelName = modelInfo?.DisplayName ?? selectedModel ?? "Codex predeterminado";
+        _activeTurnEffort = effort;
         var attachments = includeAttachments ? _pendingAttachments.ToArray() : Array.Empty<LocalAttachment>();
         var estimateTokens = (prompt.Length + attachments.Where(a => a.TextContent is not null).Sum(a => a.TextContent!.Length)) / 4;
         var continuationContext = _continueLocalConversation && _activeConversation is not null
@@ -842,6 +984,8 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _turnCancellationRequested = false;
         _prompt.IsEnabled = false;
         _attachButton.IsEnabled = false;
+        if (_modelBox is not null) _modelBox.IsEnabled = false;
+        if (_effortBox is not null) _effortBox.IsEnabled = false;
         if (_contextButton is not null) _contextButton.IsEnabled = false;
         _sendButton.Content = "Detener";
         _sendButton.Background = ButtonBusy;
@@ -856,7 +1000,10 @@ internal sealed class AssistantPane : UserControl, IDisposable
             _client ??= CreateClient();
             _client.FullAccessEnabled = _fullAccessEnabled;
             await _client.EnsureStartedAsync(_projectRoot, selectedModel, effort);
-            SetStatus($"Consultando Codex ({modelInfo?.DisplayName ?? "predeterminado"} · ≈{estimateTokens} tokens de entrada)…");
+            var modelAndEffort = $"{_activeTurnModelName} · {EffortDisplayName(effort)}";
+            SetStatus(unsupportedEffort
+                ? $"{EffortDisplayName(requestedEffort!)} no está disponible en {_activeTurnModelName}; se usará {EffortDisplayName(effort)} · ≈{estimateTokens} tokens…"
+                : $"Consultando Codex ({modelAndEffort} · ≈{estimateTokens} tokens de entrada)…");
             await _client.SendMessageWithContextAsync(
                 prompt,
                 attachments,
@@ -897,7 +1044,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         finally
         {
             if (!string.IsNullOrWhiteSpace(_streamingRaw))
-                PersistMessage("ARQ-IA", _streamingRaw, isUser: false);
+                PersistMessage("ARQ-IA", _streamingRaw, isUser: false,
+                    modelDisplayName: _activeTurnModelName,
+                    reasoningEffort: _activeTurnEffort);
             _turnInProgress = false;
             _turnCancellationRequested = false;
             _streamingText = null;
@@ -905,6 +1054,8 @@ internal sealed class AssistantPane : UserControl, IDisposable
             {
                 _prompt.IsEnabled = true;
                 _attachButton.IsEnabled = true;
+                if (_modelBox is not null) _modelBox.IsEnabled = true;
+                if (_effortBox is not null) _effortBox.IsEnabled = true;
                 if (_contextButton is not null) _contextButton.IsEnabled = true;
                 _sendButton.Content = "↑";
                 _sendButton.Background = BrushFromRgb(30, 30, 30);
@@ -954,10 +1105,18 @@ internal sealed class AssistantPane : UserControl, IDisposable
     {
         var client = new CodexAppServerClient { FullAccessEnabled = _fullAccessEnabled };
         client.StatusChanged += value => Dispatcher.Invoke(() => SetStatus(value));
+        client.ModelEffortSelectionFallback += () => Dispatcher.Invoke(() =>
+        {
+            _activeTurnModelName = "Codex predeterminado";
+            _activeTurnEffort = "Predeterminado";
+            SetStatus("Este servidor Codex no admite fijar modelo o razonamiento; se aplicarán sus valores predeterminados.");
+        });
         client.TextReceived += value => Dispatcher.Invoke(() =>
         {
             if (_streamingText is null)
-                _streamingText = AddMessage("ARQ-IA", string.Empty, isUser: false);
+                _streamingText = AddMessage("ARQ-IA", string.Empty, isUser: false,
+                    modelDisplayName: _activeTurnModelName,
+                    reasoningEffort: _activeTurnEffort);
             _streamingRaw += value;
             RenderMarkdown(_streamingText, _streamingRaw);
             _conversationScroll.ScrollToEnd();
@@ -965,8 +1124,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
         client.ToolActivity += activity => Dispatcher.Invoke(() => UpdateToolCard(activity));
         client.TurnFailed += value => Dispatcher.Invoke(() =>
         {
-            AddMessage("Codex", value, isUser: false);
-            PersistMessage("Codex", value, isUser: false);
+            AddMessage("Codex", value, isUser: false,
+                modelDisplayName: _activeTurnModelName,
+                reasoningEffort: _activeTurnEffort);
+            PersistMessage("Codex", value, isUser: false,
+                modelDisplayName: _activeTurnModelName,
+                reasoningEffort: _activeTurnEffort);
         });
         client.ApprovalRequested = request => Dispatcher.InvokeAsync(() => ConfirmRequest(request)).Task;
         return client;
@@ -1060,7 +1223,10 @@ internal sealed class AssistantPane : UserControl, IDisposable
         foreach (var entry in record.Entries)
         {
             if (entry.Kind == "message")
-                AddMessage(entry.Speaker, entry.Text, entry.IsUser, attachmentNames: entry.AttachmentNames);
+                AddMessage(entry.Speaker, entry.Text, entry.IsUser,
+                    attachmentNames: entry.AttachmentNames,
+                    modelDisplayName: entry.ModelDisplayName,
+                    reasoningEffort: entry.ReasoningEffort);
             else if (entry.Kind == "tool")
                 UpdateToolCard(new McpToolActivity(entry.Id, entry.Server, entry.Tool, entry.Status, entry.Detail), persistHistory: false, updateStatus: false);
         }
@@ -1101,12 +1267,25 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 Foreground = TextBrush,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap
+                TextWrapping = TextWrapping.Wrap,
             });
             stack.Children.Add(top);
             var state = new TextBlock { Foreground = Muted, FontSize = 10, Margin = new Thickness(0, 4, 0, 0) };
             stack.Children.Add(state);
-            var detail = new TextBlock { Foreground = Muted, FontSize = 10, TextWrapping = TextWrapping.Wrap };
+            var detail = new RichTextBox
+            {
+                Foreground = Muted,
+                FontSize = 10,
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Cursor = Cursors.IBeam
+            };
+            detail.Document.PagePadding = new Thickness(0);
+            detail.Document.Background = Brushes.Transparent;
             stack.Children.Add(new Expander
             {
                 Header = "Detalles técnicos",
@@ -1132,7 +1311,8 @@ internal sealed class AssistantPane : UserControl, IDisposable
             activity.Status == "failed" ? BrushFromRgb(255, 153, 153) : Muted;
         if (!string.IsNullOrWhiteSpace(activity.Detail))
         {
-            fields.Detail.Text = activity.Detail.Length > 3000 ? activity.Detail[..3000] + "…" : activity.Detail;
+            var detailText = activity.Detail.Length > 3000 ? activity.Detail[..3000] + "…" : activity.Detail;
+            RenderPlainText(fields.Detail, detailText);
             if (fields.Detail.Parent is Expander expander) expander.Visibility = Visibility.Visible;
         }
         if (persistHistory && _activeConversation is not null && _conversationStore is not null)
@@ -1168,12 +1348,14 @@ internal sealed class AssistantPane : UserControl, IDisposable
         return activity.Server + " · " + activity.Tool;
     }
 
-    private TextBlock AddMessage(
+    private RichTextBox AddMessage(
         string speaker,
         string message,
         bool isUser,
         IReadOnlyList<LocalAttachment>? attachments = null,
-        IReadOnlyList<string>? attachmentNames = null)
+        IReadOnlyList<string>? attachmentNames = null,
+        string? modelDisplayName = null,
+        string? reasoningEffort = null)
     {
         var messageStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
         if (!isUser)
@@ -1182,6 +1364,25 @@ internal sealed class AssistantPane : UserControl, IDisposable
             heading.Children.Add(new TextBlock { Text = "◉", Foreground = TextBrush, FontSize = 11, Margin = new Thickness(0, 0, 7, 0) });
             heading.Children.Add(new TextBlock { Text = speaker, Foreground = TextBrush, FontSize = 12, FontWeight = FontWeights.SemiBold });
             heading.Children.Add(new TextBlock { Text = "Respuesta del asistente", Foreground = Muted, FontSize = 9, Margin = new Thickness(7, 2, 0, 0) });
+            if (!string.IsNullOrWhiteSpace(modelDisplayName))
+            {
+                var modelBadge = new Border
+                {
+                    Background = SurfaceRaised,
+                    BorderBrush = PanelBorder,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(6, 1, 6, 1),
+                    Margin = new Thickness(8, 0, 0, 0),
+                    Child = new TextBlock
+                    {
+                        Text = $"{modelDisplayName} · {EffortDisplayName(reasoningEffort ?? "medium")}",
+                        Foreground = BrushFromRgb(177, 213, 225),
+                        FontSize = 9
+                    }
+                };
+                heading.Children.Add(modelBadge);
+            }
             messageStack.Children.Add(heading);
         }
 
@@ -1196,13 +1397,22 @@ internal sealed class AssistantPane : UserControl, IDisposable
             MaxWidth = double.PositiveInfinity
         };
         var contents = new StackPanel();
-        var body = new TextBlock
+        var body = new RichTextBox
         {
             Foreground = TextBrush,
             FontSize = 13,
-            TextWrapping = TextWrapping.Wrap
+            IsReadOnly = true,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
+            Background = Brushes.Transparent,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Cursor = Cursors.IBeam,
+            Tag = message
         };
-        if (isUser) body.Text = message;
+        body.Document.PagePadding = new Thickness(0);
+        body.Document.Background = Brushes.Transparent;
+        if (isUser) RenderPlainText(body, message);
         else RenderMarkdown(body, message);
         contents.Children.Add(body);
         var displayedAttachmentNames = attachments is { Count: > 0 }
@@ -1216,78 +1426,122 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 Foreground = Muted,
                 FontSize = 10,
                 Margin = new Thickness(0, 6, 0, 0),
-                TextWrapping = TextWrapping.Wrap
+                TextWrapping = TextWrapping.Wrap,
+                Cursor = Cursors.IBeam
             };
             contents.Children.Add(files);
         }
         bubble.Child = contents;
         messageStack.Children.Add(bubble);
-        if (!isUser)
-        {
-            var copy = CreateButton("▢", Brushes.Transparent, Muted, 13);
-            copy.Padding = new Thickness(3, 1, 3, 1);
-            copy.Margin = new Thickness(5, 3, 0, 0);
-            copy.HorizontalAlignment = HorizontalAlignment.Left;
-            copy.ToolTip = "Copiar esta respuesta";
-            copy.Click += (_, _) =>
-            {
-                if (body.Tag is string content && content.Length > 0)
-                    Clipboard.SetText(content);
-            };
-            messageStack.Children.Add(copy);
-        }
+        var copy = CreateButton("Copiar", Brushes.Transparent, Muted, 10);
+        copy.Padding = new Thickness(5, 2, 5, 2);
+        copy.Margin = new Thickness(4, 3, 0, 0);
+        copy.HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        copy.ToolTip = "Copiar el texto completo del mensaje";
+        copy.Click += (_, _) => CopyMessageToClipboard(body.Tag as string);
+        messageStack.Children.Add(copy);
         _messages.Children.Add(messageStack);
         _conversationScroll.ScrollToEnd();
         return body;
     }
 
-    private static void RenderMarkdown(TextBlock target, string raw)
+    private static void RenderMarkdown(RichTextBox target, string raw)
     {
         target.Tag = raw;
-        target.Inlines.Clear();
+        target.Document.Blocks.Clear();
+        var paragraph = new Paragraph { Margin = new Thickness(0), LineHeight = 19 };
         var lines = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         var inCode = false;
         var fence = new string((char)96, 3);
         for (var index = 0; index < lines.Length; index++)
         {
             var line = lines[index];
-            if (line.TrimStart().StartsWith(fence, StringComparison.Ordinal))
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith(fence, StringComparison.Ordinal))
             {
+                if (!inCode && index > 0) paragraph.Inlines.Add(new LineBreak());
                 inCode = !inCode;
                 continue;
             }
-            if (index > 0) target.Inlines.Add(new LineBreak());
+            if (index > 0) paragraph.Inlines.Add(new LineBreak());
             if (inCode)
             {
-                target.Inlines.Add(new Run(line)
+                paragraph.Inlines.Add(new Run(string.IsNullOrEmpty(line) ? " " : line)
                 {
                     FontFamily = new FontFamily("Consolas"),
-                    Foreground = BrushFromRgb(184, 213, 231)
+                    Foreground = BrushFromRgb(190, 222, 235),
+                    Background = BrushFromRgb(43, 51, 60)
                 });
                 continue;
             }
-            var heading = line.StartsWith("### ", StringComparison.Ordinal) ? 3 :
-                line.StartsWith("## ", StringComparison.Ordinal) ? 2 :
-                line.StartsWith("# ", StringComparison.Ordinal) ? 1 : 0;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var heading = trimmed.StartsWith("### ", StringComparison.Ordinal) ? 3 :
+                trimmed.StartsWith("## ", StringComparison.Ordinal) ? 2 :
+                trimmed.StartsWith("# ", StringComparison.Ordinal) ? 1 : 0;
             if (heading > 0)
             {
-                target.Inlines.Add(new Run(line[(heading + 1)..])
+                paragraph.Inlines.Add(new Run(trimmed[(heading + 1)..])
                 {
                     FontWeight = FontWeights.SemiBold,
-                    FontSize = heading == 1 ? 15 : heading == 2 ? 14 : 13
+                    FontSize = heading == 1 ? 15 : heading == 2 ? 14 : 13,
+                    Foreground = BrushFromRgb(202, 232, 241)
                 });
                 continue;
             }
-            if (line.StartsWith("- ", StringComparison.Ordinal))
+            if (trimmed.StartsWith("> ", StringComparison.Ordinal))
             {
-                target.Inlines.Add(new Run("• "));
-                line = line[2..];
+                paragraph.Inlines.Add(new Run("│ ") { Foreground = ButtonAccent, FontWeight = FontWeights.Bold });
+                paragraph.Inlines.Add(new Run(trimmed[2..]) { FontStyle = FontStyles.Italic, Foreground = BrushFromRgb(205, 211, 220) });
+                continue;
             }
-            AppendInlineFormatting(target, line);
+            var listItem = Regex.Match(line, @"^(\s*)([-*+]|\d+[.)])\s+(.+)$");
+            if (listItem.Success)
+            {
+                var indentation = listItem.Groups[1].Value.Length;
+                if (indentation > 0) paragraph.Inlines.Add(new Run(new string(' ', Math.Min(indentation, 8))));
+                var marker = listItem.Groups[2].Value;
+                paragraph.Inlines.Add(new Run(char.IsDigit(marker[0]) ? marker + "  " : "•  ")
+                {
+                    Foreground = ButtonAccent,
+                    FontWeight = FontWeights.SemiBold
+                });
+                AppendInlineFormatting(paragraph, listItem.Groups[3].Value);
+                continue;
+            }
+            AppendInlineFormatting(paragraph, line);
+        }
+        target.Document.Blocks.Add(paragraph);
+    }
+
+    private static void RenderPlainText(RichTextBox target, string raw)
+    {
+        target.Tag = raw;
+        target.Document.Blocks.Clear();
+        var paragraph = new Paragraph { Margin = new Thickness(0), LineHeight = 19 };
+        var lines = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            if (index > 0) paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new Run(lines[index]));
+        }
+        target.Document.Blocks.Add(paragraph);
+    }
+
+    private void CopyMessageToClipboard(string? content)
+    {
+        if (string.IsNullOrEmpty(content)) return;
+        try
+        {
+            Clipboard.SetText(content);
+            SetStatus("Mensaje copiado al portapapeles.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"No se pudo copiar el mensaje ({exception.GetType().Name}). Selecciónalo y usa Ctrl+C.");
         }
     }
 
-    private static void AppendInlineFormatting(TextBlock target, string line)
+    private static void AppendInlineFormatting(Paragraph target, string line)
     {
         // Render only a small, safe subset. Tool output stays plain text and never becomes active markup.
         var marker = new string((char)96, 1);
@@ -1337,12 +1591,19 @@ internal sealed class AssistantPane : UserControl, IDisposable
         catch { return true; }
     }
 
-    private void PersistMessage(string speaker, string message, bool isUser, IEnumerable<string>? attachmentNames = null)
+    private void PersistMessage(
+        string speaker,
+        string message,
+        bool isUser,
+        IEnumerable<string>? attachmentNames = null,
+        string? modelDisplayName = null,
+        string? reasoningEffort = null)
     {
         if (_activeConversation is null || _conversationStore is null) return;
         try
         {
-            _conversationStore.AddMessage(_activeConversation, speaker, message, isUser, attachmentNames);
+            _conversationStore.AddMessage(_activeConversation, speaker, message, isUser, attachmentNames,
+                modelDisplayName, reasoningEffort);
             UpdateHistoryButton();
         }
         catch (Exception ex)

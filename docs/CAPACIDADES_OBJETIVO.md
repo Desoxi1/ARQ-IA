@@ -17,6 +17,7 @@ El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualq
 | Operaciones tipadas de creación/edición | Lista acotada de `rvt-mcp`; control de Codex según modo del chat | Inventario de herramientas; cada escritura requiere prueba individual. |
 | Color de presentación por elemento | `revit_override_element_graphics` de `rvt-mcp` | Esquema disponible en el binario local; habilitado en el perfil ARQ-IA, sin prueba viva de color. |
 | Guardar `.py` + `.dyn` + manifiesto | MCP propio de rutinas | Creación/listado y hashes comprobados fuera de Revit. |
+| Dejar un borrador visible en Dynamo sobre el documento activo | `prepare_saved_routine_in_dynamo` + bridge | Bridge compilado, empaquetado y preparado para la próxima sesión Revit: solicita apertura en Manual, no llama al ejecutor y se detiene si el workspace tiene nodos/notas. Pendiente validar la apertura sin ejecución con Dynamo 4.0.2 instalado. |
 | Ejecutar rutina fija PythonNet3 de lectura | MCP runner + bridge Revit/Dynamo | Pasó en RVT descartable el 05-10-2026. |
 | Ejecutar una rutina genérica | Runner restringido a `revit/test-models/` | Pendiente: el cambio de grafo agotó tiempo en la última prueba viva. |
 

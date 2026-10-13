@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -170,7 +171,8 @@ namespace BimAiDynamoBridge
                             (confirmation.ValueKind != JsonValueKind.True && confirmation.ValueKind != JsonValueKind.False)) return null;
                         confirmModelWrite = confirmation.GetBoolean();
                     }
-                    if (op != "ping" && op != "open_dynamo_ui" && op != "run_saved_readonly_routine" && op != "run_saved_routine") return null;
+                    if (op != "ping" && op != "open_dynamo_ui" && op != "prepare_saved_routine_in_dynamo" &&
+                        op != "run_saved_readonly_routine" && op != "run_saved_routine") return null;
                     return new BridgeRequest(op, routineId, confirmModelWrite);
                 }
             }
@@ -245,6 +247,10 @@ namespace BimAiDynamoBridge
         public string[] VerificationFailures { get; set; }
         public int? ChangedElementCount { get; set; }
         public string[] ChangedElementTypes { get; set; }
+        public bool? RoutineLoaded { get; set; }
+        public string RoutineRunModeRequested { get; set; }
+        public bool? RoutineExecutionRequested { get; set; }
+        public bool? DocumentModifiedOnOpen { get; set; }
 
         internal static BridgeResponse Fail(string status) => new BridgeResponse { Ok = false, Status = status };
     }
@@ -338,6 +344,8 @@ namespace BimAiDynamoBridge
             }
 
             if (request.Operation == "open_dynamo_ui") return OpenDynamoUi(application);
+
+            if (request.Operation == "prepare_saved_routine_in_dynamo") return PrepareSavedRoutineInDynamo(application, request.RoutineId);
 
             if (request.Operation == "run_saved_routine") return HandleSavedRoutine(application, request);
 
@@ -520,6 +528,104 @@ namespace BimAiDynamoBridge
                 RevitMajor = application.Application.VersionNumber,
                 DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString(),
                 DynamoReadyForActiveDocument = false
+            };
+        }
+
+        private BridgeResponse PrepareSavedRoutineInDynamo(UIApplication application, string routineId)
+        {
+            if (String.IsNullOrWhiteSpace(routineId) || !Regex.IsMatch(routineId, "^[a-z][a-z0-9_-]{1,47}$", RegexOptions.CultureInvariant))
+                return BridgeResponse.Fail("routine_id_invalid");
+
+            var uiDocument = application.ActiveUIDocument;
+            if (uiDocument?.Document == null) return BridgeResponse.Fail("no_active_document");
+            var document = uiDocument.Document;
+            if (document.IsModifiable) return BridgeResponse.Fail("document_must_be_idle");
+
+            string pythonPath;
+            string graphPath;
+            string manifestPath;
+            try
+            {
+                pythonPath = InRoutinesRoot(routineId + ".py");
+                graphPath = InRoutinesRoot(routineId + ".dyn");
+                manifestPath = InRoutinesRoot(routineId + ".manifest.json");
+                if (ContainsReparsePoint(pythonPath) || ContainsReparsePoint(graphPath) || ContainsReparsePoint(manifestPath))
+                    return BridgeResponse.Fail("routine_path_invalid");
+                ValidateGeneratedRoutine(routineId, pythonPath, graphPath, manifestPath, out _);
+            }
+            catch
+            {
+                return BridgeResponse.Fail("routine_integrity_check_failed");
+            }
+
+            var dynamoModel = GetDynamoModel();
+            var dynamoState = GetDynamoModelState(dynamoModel);
+            if (dynamoState == "StartedUI")
+            {
+                if (!IsDynamoBoundToDocument(application, document))
+                    return BridgeResponse.Fail("dynamo_ui_bound_to_other_document");
+                if (IsCurrentDynamoWorkspace(graphPath))
+                {
+                    return new BridgeResponse
+                    {
+                        Ok = true,
+                        Status = "routine_already_loaded_mode_unverified",
+                        RoutineId = routineId,
+                        RoutineLoaded = true,
+                        RoutineExecutionRequested = false,
+                        DynamoReadyForActiveDocument = true,
+                        RevitMajor = application.Application.VersionNumber,
+                        DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString()
+                    };
+                }
+                if (!TryGetDynamoWorkspaceContentState(dynamoModel, out var workspaceHasContent))
+                    return BridgeResponse.Fail("dynamo_workspace_state_unavailable");
+                if (workspaceHasContent)
+                    return BridgeResponse.Fail("dynamo_workspace_not_empty");
+            }
+
+            if (!IsApplicationActiveDocument(application, document)) return BridgeResponse.Fail("active_document_changed_before_open");
+            var wasModified = document.IsModified;
+            var journal = new Dictionary<string, string>
+            {
+                [JournalKeys.AutomationModeKey] = "false",
+                [JournalKeys.ShowUiKey] = "true",
+                [JournalKeys.DynPathKey] = graphPath,
+                [JournalKeys.DynPathExecuteKey] = "false",
+                [JournalKeys.ForceManualRunKey] = "true",
+                [JournalKeys.DynPathCheckExisting] = "false"
+            };
+
+            Result result;
+            try
+            {
+                result = new DynamoRevit().ExecuteCommand(new DynamoRevitCommandData
+                {
+                    Application = application,
+                    JournalData = journal
+                });
+            }
+            catch
+            {
+                return BridgeResponse.Fail("dynamo_open_failed");
+            }
+            if (result != Result.Succeeded) return BridgeResponse.Fail("dynamo_open_failed");
+            if (!IsApplicationActiveDocument(application, document)) return BridgeResponse.Fail("active_document_changed_during_open");
+            if (!IsDynamoBoundToDocument(application, document)) return BridgeResponse.Fail("dynamo_ui_not_bound_to_active_document");
+            if (!IsCurrentDynamoWorkspace(graphPath)) return BridgeResponse.Fail("dynamo_graph_not_loaded");
+
+            return new BridgeResponse
+            {
+                Ok = true,
+                Status = "routine_loaded_manual_mode_requested",
+                RoutineId = routineId,
+                RoutineLoaded = true,
+                RoutineRunModeRequested = "Manual",
+                RoutineExecutionRequested = false,
+                DocumentModifiedOnOpen = !wasModified && document.IsModified,
+                DynamoReadyForActiveDocument = true,
+                RevitMajor = application.Application.VersionNumber,
+                DynamoAssemblyVersion = typeof(DynamoRevitCommandData).Assembly.GetName().Version?.ToString()
             };
         }
 
@@ -816,6 +922,70 @@ namespace BimAiDynamoBridge
         {
             var modelProperty = typeof(DynamoRevit).GetProperty("RevitDynamoModel", BindingFlags.Public | BindingFlags.Static);
             return modelProperty?.GetValue(null);
+        }
+
+        private static bool IsDynamoBoundToDocument(UIApplication application, Document document)
+        {
+            try
+            {
+                if (!IsApplicationActiveDocument(application, document)) return false;
+                if (GetDynamoModelState(GetDynamoModel()) != "StartedUI") return false;
+                var managerType = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(assembly => assembly.GetType("RevitServices.Persistence.DocumentManager", false))
+                    .FirstOrDefault(type => type != null);
+                var instanceProperty = managerType?.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                var manager = instanceProperty?.GetValue(null);
+                var currentDocumentProperty = managerType?.GetProperty("CurrentUIDocument", BindingFlags.Public | BindingFlags.Instance);
+                var dynamoDocument = (currentDocumentProperty?.GetValue(manager) as UIDocument)?.Document;
+                return SameRevitDocument(dynamoDocument, document);
+            }
+            catch { return false; }
+        }
+
+        private static bool IsApplicationActiveDocument(UIApplication application, Document document)
+        {
+            try
+            {
+                return SameRevitDocument(application?.ActiveUIDocument?.Document, document);
+            }
+            catch { return false; }
+        }
+
+        private static bool SameRevitDocument(Document left, Document right)
+        {
+            if (left == null || right == null) return false;
+            if (ReferenceEquals(left, right)) return true;
+            try
+            {
+                if (String.IsNullOrWhiteSpace(left.PathName) || String.IsNullOrWhiteSpace(right.PathName)) return false;
+                return String.Equals(Path.GetFullPath(left.PathName), Path.GetFullPath(right.PathName), StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static bool TryGetDynamoWorkspaceContentState(object model, out bool hasContent)
+        {
+            hasContent = false;
+            try
+            {
+                var workspace = model?.GetType().GetProperty("CurrentWorkspace", BindingFlags.Public | BindingFlags.Instance)?.GetValue(model);
+                if (workspace == null) return false;
+                foreach (var propertyName in new[] { "Nodes", "Notes" })
+                {
+                    var property = workspace.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                    if (property == null || !property.CanRead) return false;
+                    var entries = property.GetValue(workspace) as IEnumerable;
+                    if (entries == null) return false;
+                    foreach (var entry in entries)
+                    {
+                        if (entry == null) continue;
+                        hasContent = true;
+                        return true;
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
         }
 
         private static bool IsCurrentDynamoWorkspace(string path)

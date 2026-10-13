@@ -92,7 +92,14 @@ internal sealed class ConversationHistoryStore
         return record;
     }
 
-    internal void AddMessage(ConversationHistoryRecord record, string speaker, string text, bool isUser, IEnumerable<string>? attachmentNames = null)
+    internal void AddMessage(
+        ConversationHistoryRecord record,
+        string speaker,
+        string text,
+        bool isUser,
+        IEnumerable<string>? attachmentNames = null,
+        string? modelDisplayName = null,
+        string? reasoningEffort = null)
     {
         if (string.IsNullOrWhiteSpace(text) && (attachmentNames is null || !attachmentNames.Any())) return;
         var now = DateTimeOffset.UtcNow;
@@ -103,6 +110,8 @@ internal sealed class ConversationHistoryStore
             Speaker = Clean(speaker, 80),
             Text = Clean(text, MaxEntryText),
             IsUser = isUser,
+            ModelDisplayName = isUser ? string.Empty : Clean(modelDisplayName, 120),
+            ReasoningEffort = isUser ? string.Empty : Clean(reasoningEffort, 32),
             AttachmentNames = (attachmentNames ?? Array.Empty<string>())
                 .Select(name => Path.GetFileName(name.Replace('/', Path.DirectorySeparatorChar)))
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -220,6 +229,8 @@ internal sealed class ConversationHistoryEntry
     public string Speaker { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
     public bool IsUser { get; set; }
+    public string ModelDisplayName { get; set; } = string.Empty;
+    public string ReasoningEffort { get; set; } = string.Empty;
     public List<string> AttachmentNames { get; set; } = new();
     public string Server { get; set; } = string.Empty;
     public string Tool { get; set; } = string.Empty;

@@ -36,7 +36,7 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'create_dynamo_routine'
-            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. Model-writing routines can run only through the approved runner on a disposable local RVT under revit/test-models; writes_model and confirm_model_write must both be true.'
+            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. After the user asks to prepare the routine in the active model, use prepare_saved_routine_in_dynamo to request opening the graph for manual review; that tool does not call the executor. Generic MCP execution remains limited to a disposable local RVT under revit/test-models; writes_model and confirm_model_write must both be true for model-writing routines.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -207,7 +207,7 @@ function Save-DynamoRoutine([object]$Payload) {
         files = @("routines/$name.py", "routines/$name.dyn", "routines/$name.manifest.json")
         writes_model = $writesModel
         status = 'draft_not_validated'
-        next_step = 'Review the complete Python source including the result wrapper. The graph is Manual-run; execute_saved_routine is restricted to a disposable RVT under revit/test-models and requests approval.'
+        next_step = 'Review the complete Python source including the result wrapper. If the user asked to work in the open model, call prepare_saved_routine_in_dynamo to request loading it in Manual mode for their review; do not execute it. The generic MCP executor remains restricted to a disposable RVT under revit/test-models.'
     }
 }
 

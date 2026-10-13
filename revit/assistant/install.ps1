@@ -35,7 +35,7 @@ try {
     $projectRoot = [IO.Directory]::GetParent($routinesRoot).FullName
     if (-not (Test-Path -LiteralPath $routinesRoot -PathType Container) -or
         -not (Test-Path -LiteralPath (Join-Path $projectRoot 'AGENTS.md') -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $projectRoot '.codex\config.toml.example') -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $projectRoot '.codex\config.toml') -PathType Leaf) -or
         -not (Test-Path -LiteralPath (Join-Path $projectRoot 'dynamo\extension\README.md') -PathType Leaf) -or
         -not (Test-Path -LiteralPath (Join-Path $projectRoot 'mcp') -PathType Container)) {
         throw 'No se encontró el proyecto ARQ-IA configurado en bridge.json.'

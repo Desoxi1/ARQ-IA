@@ -15,6 +15,7 @@ Este archivo resume resultados anteriores y el alcance de cada uno. No es una af
 | Inventario de materiales de muestra | PASS histórico, 13 de octubre | Revit devolvió 300/300 materiales definidos, sin límite ni omisiones, en un modelo de muestra. No representa todos los modelos ni identifica por sí solo los materiales usados por elementos. `materials/base.csv` contiene 208 nombres curados. |
 | Suite offline | Último registro: PASS, 44 pruebas, 2 de octubre | El código del repositorio cambió después; este conteo no se atribuye al commit actual. La limpieza documental no ejecutó pruebas. |
 | Runner genérico al cambiar de grafo | PENDIENTE | Un intento anterior agotó el tiempo; el ajuste posterior no tiene una ejecución viva registrada. Un smoke contra bridge falso valida contratos, no Revit/Dynamo. |
+| Preparar rutina en el Dynamo del documento activo | PENDIENTE | El bridge compiló, se empaquetó y quedó preparado para la próxima sesión Revit. La sesión actual conserva la versión cargada antes del cambio. Aún no se ha comprobado en Dynamo 4.0.2 que abrir el `.dyn` no ejecute un nodo. |
 | Escrituras y caso de muros rojos | PENDIENTE | No hay resultado vivo verificado desde ARQ-IA para la escritura de Comments, color gráfico u otras ediciones. |
 | Instalación limpia en otro PC | PENDIENTE | No se ha validado el flujo completo desde un clon nuevo con la versión actual. |
 
