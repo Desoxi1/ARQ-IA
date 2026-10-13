@@ -46,6 +46,7 @@ __pycache__/
 node_modules/
 
 # Per-machine Codex wiring contains absolute executable paths
+.arq-ia/
 .codex/config.toml
 .codex/config.toml.*
 !.codex/config.toml.example

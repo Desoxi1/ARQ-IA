@@ -1,6 +1,6 @@
 # ARQ-IA
 
-**Asistente para Revit 2027 y Dynamo 4.0.2.** Desarrollado por Branko Plaza. Abre un chat en Revit y en **Dynamo → Extensiones → Abrir ARQ-IA**, acepta texto e imágenes/archivos, y usa Codex para interpretar solicitudes BIM.
+**Asistente para Revit 2027 y Dynamo 4.0.2.** Desarrollado por Branko Plaza. Abre un chat en Revit y en **Dynamo → Extensiones → Abrir ARQ-IA**, acepta texto e imágenes/archivos, conserva el historial local por carpeta de proyecto y usa Codex para interpretar solicitudes BIM.
 
 ## Cómo funciona
 
@@ -39,7 +39,7 @@ El instalador detecta rutas del equipo, instala los dos paneles y el bridge por 
 - **Corregido en el código:** se quitó el bloqueo local de frases como “pinta el piso”, se expuso la herramienta gráfica tipada y se actualizó la descarga para clones nuevos.
 - **Pendiente de validar en Revit:** la solicitud de muros rojos desde el panel, la ejecución de rutinas genéricas al cambiar de grafo y cualquier escritura compleja. No se promete “cualquier pedido” ni edición autónoma de modelos productivos.
 
-Las herramientas que escriben requieren aprobación por llamada. Los scripts PythonNet3 se ejecutan con los permisos de Revit y el runner los limita a modelos locales bajo `revit/test-models/`; esa restricción **no** es un sandbox del sistema. Revisa el código antes de ejecutarlo. [Estado y evidencia](docs/PROTOTYPE_STATUS.md).
+El chat ofrece **Acceso controlado** y **Acceso completo** por sesión. Completo elimina las aprobaciones repetidas de Codex y permite sus herramientas de archivos, comandos y red con permisos amplios en el PC. Los scripts PythonNet3 se ejecutan con los permisos de Revit y el runner los limita a modelos locales bajo `revit/test-models/`; esa restricción **no** es un sandbox del sistema. [Estado y evidencia](docs/PROTOTYPE_STATUS.md).
 
 ## Carpetas y archivos necesarios
 
@@ -52,7 +52,15 @@ Las herramientas que escriben requieren aprobación por llamada. Los scripts Pyt
 | `routines/`, `dynamo/` | Rutinas guardadas, plantilla y wrapper PythonNet3. |
 | `docs/`, `tests/` | Diseño, estado y verificaciones de desarrollo. |
 
-Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y `.codex/config.toml` local quedan fuera de Git. El nombre de fabricante **Branko Plaza** figura en la metadata, pero un aviso de Windows de “fabricante desconocido” solo se elimina con firma de código confiable.
+Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y `.codex/config.toml` local quedan fuera de Git. Los manifiestos ya identifican a **Branko Plaza** como fabricante. Revit seguirá mostrando el aviso de fabricante desconocido porque las DLL aún no tienen una firma digital de un certificado de confianza; para mostrar un editor verificado y retirar ese aviso se necesita firmar la publicación con un certificado de firma de código confiable. [Seguridad de complementos de Revit](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm) · [Firma digital de complementos](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Digitally_Signing_Your_Revit_Add_in/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Digitally_Signing_Your_App_html.html).
+
+En este PC puede existir `.arq-ia/model-profile.md` con un perfil de solo lectura y el catálogo de materiales del modelo actualmente revisado. `.arq-ia/` está ignorada y no se incluye en Git ni en el paquete; cada arquitecto construye su propio contexto a partir de su modelo.
+
+El botón de historial `◷` abre las conversaciones guardadas en `.arq-ia/conversations/`. Al clonar el repositorio en otro PC, el historial empieza vacío y permanece en esa carpeta local; solo conserva texto, estados/resúmenes de herramientas y nombres de adjuntos, no los archivos adjuntos. Al abrir una conversación anterior y continuar, ARQ-IA entrega a Codex los últimos mensajes de texto con un límite de contexto y vuelve a consultar Revit antes de proponer cambios.
+
+En el primer envío de cada copia local sin perfil, ARQ-IA pide a Codex una ficha concisa del proyecto abierto mediante MCP de solo lectura: documento, niveles, fases, cantidades por categoría y un resumen acotado de materiales. La ficha queda en `.arq-ia/model-profile.md`, no se sube a Git. También puede existir `.arq-ia/project-memory.md` con convenciones y correcciones locales verificadas; esto conserva contexto para el proyecto, pero no entrena el modelo ni comparte información entre PCs.
+
+La carpeta `.arq-ia` contiene texto local sin cifrar; no guardes secretos allí. En **Acceso controlado**, Codex puede pedir permiso para crear o actualizar el perfil y las notas; **Acceso completo** aplica los permisos elegidos para esa sesión.
 
 Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por Git. Revisa su código, elimina rutas específicas del PC y valida su comportamiento en un RVT descartable antes de compartirlas; una rutina aprobada puede añadirse explícitamente al repositorio.
 

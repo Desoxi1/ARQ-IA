@@ -48,18 +48,23 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private readonly TextBlock _placeholder;
     private readonly Button _attachButton;
     private readonly Button _sendButton;
-    private readonly TextBlock _status;
+    private TextBlock _status = null!;
     private Button? _contextButton;
+    private Button? _accessButton;
+    private Button? _historyButton;
+    private Popup? _historyPopup;
+    private bool _fullAccessEnabled;
     private ComboBox? _modelBox;
     private IReadOnlyList<CodexModelInfo> _availableModels = Array.Empty<CodexModelInfo>();
     private bool _loadingModels;
     private readonly List<LocalAttachment> _pendingAttachments = new();
     private LocalAttachmentStore? _attachmentStore;
     private CodexAppServerClient? _client;
+    private ConversationHistoryStore? _conversationStore;
+    private ConversationHistoryRecord? _activeConversation;
+    private bool _continueLocalConversation;
     private TextBlock? _streamingText;
     private string _streamingRaw = string.Empty;
-    private TextBlock? _connectionLabel;
-    private Border? _connectionBadge;
     private readonly Dictionary<string, (TextBlock Status, TextBlock Detail)> _toolCards = new();
     private bool _disposed;
     private bool _turnInProgress;
@@ -68,6 +73,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     public AssistantPane(string? projectRoot)
     {
         _projectRoot = projectRoot;
+        if (projectRoot is not null) _conversationStore = new ConversationHistoryStore(projectRoot);
         Background = Surface;
         Focusable = true;
 
@@ -187,7 +193,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _attachButton = CreateButton("⊕", Brushes.Transparent, TextBrush, 18);
+        _attachButton = CreateButton("+", Brushes.Transparent, ButtonAccent, 18);
         _attachButton.Padding = new Thickness(5, 1, 5, 1);
         _attachButton.ToolTip = "Adjunta imágenes, documentos, archivos de Dynamo o referencias BIM.";
         _attachButton.IsEnabled = projectRoot is not null;
@@ -221,18 +227,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         Grid.SetRow(composer, 3);
         layout.Children.Add(composer);
 
-        _status = new TextBlock
-        {
-            Text = projectRoot is null
-                ? "Primera instalación pendiente"
-                : "Listo · Codex se conecta al enviar",
-            Foreground = Muted,
-            FontSize = 10,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(2, 0, 2, 0)
-        };
-        Grid.SetRow(_status, 4);
-        layout.Children.Add(_status);
+        var footer = BuildFooter(projectRoot is not null);
+        Grid.SetRow(footer, 4);
+        layout.Children.Add(footer);
 
         Content = layout;
         AllowDrop = true;
@@ -266,51 +263,43 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _contextButton.Click += async (_, _) => await RequestContextAsync();
         DockPanel.SetDock(_contextButton, Dock.Right);
         outer.Children.Add(_contextButton);
-        _connectionLabel = new TextBlock
-        {
-            Text = "MCP sin verificar",
-            FontSize = 10,
-            Foreground = Muted
-        };
-        _connectionBadge = new Border
-        {
-            Child = _connectionLabel,
-            Background = BrushFromRgb(65, 65, 65),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(7, 2, 7, 2),
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0)
-        };
-        DockPanel.SetDock(_connectionBadge, Dock.Right);
-        outer.Children.Add(_connectionBadge);
+        var historyButton = CreateButton("◷", Brushes.Transparent, TextBrush, 16);
+        _historyButton = historyButton;
+        historyButton.Padding = new Thickness(4, 2, 4, 2);
+        historyButton.ToolTip = "Historial de conversaciones guardado localmente en este proyecto";
+        historyButton.IsEnabled = _projectRoot is not null;
+        historyButton.Click += (_, _) => ToggleHistoryPopup(historyButton);
+        DockPanel.SetDock(_historyButton, Dock.Right);
+        outer.Children.Add(_historyButton);
+        UpdateHistoryButton();
         var markCanvas = new Canvas { Width = 32, Height = 32 };
-        foreach (var (x, y) in new[] { (9d, 9d), (17d, 9d), (9d, 17d) })
+        markCanvas.Children.Add(new System.Windows.Shapes.Path
         {
-            var square = new System.Windows.Shapes.Rectangle
-            {
-                Width = 6, Height = 6, RadiusX = 1, RadiusY = 1,
-                Stroke = TextBrush, StrokeThickness = 1.2
-            };
-            Canvas.SetLeft(square, x);
-            Canvas.SetTop(square, y);
-            markCanvas.Children.Add(square);
-        }
-        var lastSquare = new System.Windows.Shapes.Rectangle
+            Data = Geometry.Parse("M7.5,25.5 L16,6.8 L24.5,25.5"),
+            Stroke = Brushes.White,
+            StrokeThickness = 2.5,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round
+        });
+        markCanvas.Children.Add(new System.Windows.Shapes.Path
         {
-            Width = 6, Height = 6, RadiusX = 1, RadiusY = 1,
-            Fill = TextBrush
-        };
-        Canvas.SetLeft(lastSquare, 17);
-        Canvas.SetTop(lastSquare, 17);
-        markCanvas.Children.Add(lastSquare);
+            Data = Geometry.Parse("M11.5,19.4 L20.5,19.4"),
+            Stroke = BrushFromRgb(177, 245, 250),
+            StrokeThickness = 2.2,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round
+        });
         var mark = new Border
         {
             Width = 32,
             Height = 32,
             CornerRadius = new CornerRadius(7),
-            Background = BrushFromRgb(35, 35, 35),
+            Background = new LinearGradientBrush(Color.FromRgb(20, 107, 167), Color.FromRgb(16, 57, 111), 70),
+            BorderBrush = BrushFromRgb(89, 200, 230),
+            BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = "ARQ-IA · Gestor: Branko Plaza",
+            ToolTip = "ARQ-IA · Asistente BIM · Branko Plaza",
             Child = markCanvas
         };
         DockPanel.SetDock(mark, Dock.Left);
@@ -325,7 +314,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         });
         title.Children.Add(new TextBlock
         {
-            Text = "Asistente BIM · Revit 2027",
+            Text = "Gestor: Branko Plaza · Asistente BIM · Revit 2027",
             FontSize = 10,
             Foreground = Muted
         });
@@ -339,6 +328,174 @@ internal sealed class AssistantPane : UserControl, IDisposable
         Grid.SetRow(divider, 1);
         header.Children.Add(divider);
         return header;
+    }
+
+    private void ToggleHistoryPopup(Button anchor)
+    {
+        if (_historyPopup is { IsOpen: true })
+        {
+            _historyPopup.IsOpen = false;
+            return;
+        }
+
+        var records = _conversationStore?.ListRecent(500) ?? Array.Empty<ConversationHistoryRecord>();
+        var items = new StackPanel();
+        items.Children.Add(new TextBlock
+        {
+            Text = $"Historial local · {records.Count} conversaciones",
+            Foreground = TextBrush,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(8, 7, 8, 8)
+        });
+
+        Button? firstItem = null;
+        if (records.Count == 0)
+        {
+            items.Children.Add(new TextBlock
+            {
+                Text = "Tus conversaciones aparecerán aquí y se guardan solo en este PC, dentro de la carpeta del proyecto.",
+                Foreground = Muted,
+                FontSize = 10,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(8, 0, 8, 10)
+            });
+        }
+        else
+        {
+            foreach (var record in records)
+            {
+                var item = CreateButton(string.Empty, Brushes.Transparent, TextBrush, 11);
+                item.HorizontalContentAlignment = HorizontalAlignment.Left;
+                item.Padding = new Thickness(8, 7, 8, 7);
+                item.Margin = new Thickness(2, 1, 2, 1);
+                item.ToolTip = $"{record.Title}\n{ConversationHistoryStore.Preview(record)}";
+                var content = new StackPanel();
+                var titleRow = new DockPanel { LastChildFill = true };
+                var date = new TextBlock
+                {
+                    Text = record.UpdatedUtc.ToLocalTime().ToString("dd MMM · HH:mm"),
+                    Foreground = Muted,
+                    FontSize = 9,
+                    Margin = new Thickness(8, 1, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Right
+                };
+                DockPanel.SetDock(date, Dock.Right);
+                titleRow.Children.Add(date);
+                titleRow.Children.Add(new TextBlock
+                {
+                    Text = record.Title,
+                    Foreground = TextBrush,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                content.Children.Add(titleRow);
+                content.Children.Add(new TextBlock
+                {
+                    Text = ConversationHistoryStore.Preview(record),
+                    Foreground = Muted,
+                    FontSize = 9,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxHeight = 34,
+                    Margin = new Thickness(0, 3, 0, 0)
+                });
+                item.Content = content;
+                item.Click += async (_, _) =>
+                {
+                    if (_historyPopup is not null) _historyPopup.IsOpen = false;
+                    await OpenConversationAsync(record.Id);
+                };
+                firstItem ??= item;
+                items.Children.Add(item);
+            }
+        }
+
+        var scroll = new ScrollViewer
+        {
+            Content = items,
+            Width = 310,
+            MaxHeight = 390,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            CanContentScroll = true
+        };
+        var surface = new Border
+        {
+            Background = SurfaceRaised,
+            BorderBrush = PanelBorder,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(4),
+            Child = scroll
+        };
+        var popup = new Popup
+        {
+            PlacementTarget = anchor,
+            Placement = PlacementMode.Bottom,
+            HorizontalOffset = -282,
+            AllowsTransparency = true,
+            StaysOpen = false,
+            Focusable = true,
+            Child = surface
+        };
+        surface.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Escape) return;
+            popup.IsOpen = false;
+            anchor.Focus();
+            args.Handled = true;
+        };
+        popup.Opened += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (firstItem is not null) firstItem.Focus();
+            else anchor.Focus();
+        }));
+        popup.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_historyPopup, popup)) _historyPopup = null;
+        };
+        _historyPopup = popup;
+        popup.IsOpen = true;
+    }
+
+    private void UpdateHistoryButton()
+    {
+        if (_historyButton is null) return;
+        var count = _conversationStore?.Count ?? 0;
+        _historyButton.ToolTip = count == 0
+            ? "Historial local de conversaciones (vacío)"
+            : $"Historial local · {count} conversaciones";
+    }
+
+    private FrameworkElement BuildFooter(bool projectReady)
+    {
+        var footer = new Grid { Margin = new Thickness(2, 2, 2, 0), VerticalAlignment = VerticalAlignment.Center };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _status = new TextBlock
+        {
+            Text = projectReady ? "Listo · Codex se conecta al enviar" : "Primera instalación pendiente",
+            Foreground = Muted,
+            FontSize = 10,
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        Grid.SetColumn(_status, 0);
+        footer.Children.Add(_status);
+
+        _accessButton = CreateButton("Acceso controlado", SurfaceRaised, Muted, 10);
+        _accessButton.ToolTip = "Alterna los permisos de Codex para este chat. Acceso completo habilita comandos, archivos y red sin aprobaciones repetidas.";
+        _accessButton.Padding = new Thickness(9, 4, 9, 4);
+        _accessButton.MinHeight = 25;
+        _accessButton.Template = CreateButtonTemplate(12);
+        _accessButton.IsEnabled = projectReady;
+        _accessButton.Click += (_, _) => ToggleAccessMode();
+        Grid.SetColumn(_accessButton, 1);
+        footer.Children.Add(_accessButton);
+        return footer;
     }
 
     private FrameworkElement BuildContextCard(bool projectReady)
@@ -401,7 +558,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _modelBox = new ComboBox
         {
             FontSize = 10,
-            Width = 112,
+            Width = 142,
             MaxDropDownHeight = 280,
             Background = SurfaceRaised,
             Foreground = TextBrush,
@@ -409,7 +566,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
             BorderThickness = new Thickness(1),
             Padding = new Thickness(4, 2, 4, 2),
             Template = CreateDarkComboBoxTemplate(),
-            ToolTip = "Modelos reales que ofrece Codex en este equipo. Automático usa Luna para consultas breves y el modelo predeterminado para tareas generales."
+            ToolTip = "Elige Automático o selecciona a mano uno de los modelos disponibles de Codex. La elección se aplica al próximo mensaje."
         };
         var itemStyle = new Style(typeof(ComboBoxItem));
         itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, SurfaceRaised));
@@ -440,7 +597,6 @@ internal sealed class AssistantPane : UserControl, IDisposable
             await _client.EnsureInitializedAsync(_projectRoot);
             var models = await _client.ListModelsAsync();
             if (_disposed || _modelBox is null) return;
-            if (_connectionLabel is not null) _connectionLabel.Text = "MCP sin verificar";
             _availableModels = models;
             _loadingModels = true;
             var saved = CodexModelSelection.Load();
@@ -472,12 +628,16 @@ internal sealed class AssistantPane : UserControl, IDisposable
         if (projectRoot is null) return;
 
         _projectRoot = projectRoot;
+        _conversationStore = new ConversationHistoryStore(projectRoot);
         _readinessTimer.Stop();
         _prompt.IsEnabled = true;
         _attachButton.IsEnabled = true;
         _sendButton.IsEnabled = true;
+        if (_accessButton is not null) _accessButton.IsEnabled = true;
         _placeholder.Text = "Pregunta sobre tu modelo, adjunta archivos o solicita una rutina Dynamo…";
         if (_contextButton is not null) _contextButton.IsEnabled = true;
+        if (_historyButton is not null) _historyButton.IsEnabled = true;
+        UpdateHistoryButton();
         if (_modelBox is not null) _modelBox.IsEnabled = true;
         _status.Text = "Listo · Codex se conecta al enviar";
         _layout.Children.Remove(_contextCard);
@@ -665,7 +825,17 @@ internal sealed class AssistantPane : UserControl, IDisposable
         var effort = modelInfo?.DefaultEffort ?? "medium";
         var attachments = includeAttachments ? _pendingAttachments.ToArray() : Array.Empty<LocalAttachment>();
         var estimateTokens = (prompt.Length + attachments.Where(a => a.TextContent is not null).Sum(a => a.TextContent!.Length)) / 4;
+        var continuationContext = _continueLocalConversation && _activeConversation is not null
+            ? ConversationHistoryStore.BuildContinuationContext(_activeConversation)
+            : null;
+        var initializeProjectProfile = NeedsProjectProfile();
+        if (_activeConversation is null && _conversationStore is not null)
+        {
+            try { _activeConversation = _conversationStore.Create(selectedModel); }
+            catch (Exception ex) { SetStatus($"No se pudo iniciar el historial local ({ex.GetType().Name}); el chat seguirá disponible."); }
+        }
         AddMessage("Tú", prompt, isUser: true, attachments);
+        PersistMessage("Tú", prompt, isUser: true, attachments.Select(item => item.Name));
         _streamingText = null;
         _streamingRaw = string.Empty;
         _turnInProgress = true;
@@ -677,14 +847,24 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _sendButton.Background = ButtonBusy;
         _sendButton.Foreground = ButtonBusyText;
         _sendButton.IsEnabled = true;
-        SetStatus("Conectando con Codex…");
+        SetStatus(initializeProjectProfile
+            ? "Primera consulta · preparando inventario local de Revit en solo lectura…"
+            : "Conectando con Codex…");
 
         try
         {
             _client ??= CreateClient();
+            _client.FullAccessEnabled = _fullAccessEnabled;
             await _client.EnsureStartedAsync(_projectRoot, selectedModel, effort);
             SetStatus($"Consultando Codex ({modelInfo?.DisplayName ?? "predeterminado"} · ≈{estimateTokens} tokens de entrada)…");
-            await _client.SendMessageWithAttachmentsAsync(prompt, attachments, selectedModel, effort);
+            await _client.SendMessageWithContextAsync(
+                prompt,
+                attachments,
+                selectedModel,
+                effort,
+                continuationContext,
+                initializeProjectProfile);
+            _continueLocalConversation = false;
             if (clearComposer)
             {
                 _prompt.Clear();
@@ -695,7 +875,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 }
             }
             _messages.Children.Add(new Border { Height = 7, Opacity = 0 });
-            SetStatus("Respuesta lista · el modelo sigue bajo tu control.");
+            SetStatus(initializeProjectProfile && NeedsProjectProfile()
+                ? "Respuesta lista · la ficha local de Revit sigue pendiente."
+                : "Respuesta lista · el modelo sigue bajo tu control.");
         }
         catch (Exception ex)
         {
@@ -704,14 +886,18 @@ internal sealed class AssistantPane : UserControl, IDisposable
             else
             {
                 AddMessage("Conexión", $"No se pudo completar el envío ({ex.GetType().Name}). Revisa que Codex esté instalado, iniciado y que el MCP esté configurado.", isUser: false);
+                PersistMessage("Conexión", $"No se pudo completar el envío ({ex.GetType().Name}). Revisa que Codex esté instalado, iniciado y que el MCP esté configurado.", isUser: false);
                 SetStatus("No se pudo conectar con Codex.");
             }
+            _continueLocalConversation = _activeConversation is not null;
             var failedClient = _client;
             _client = null;
             if (failedClient is not null) _ = failedClient.DisposeAsync();
         }
         finally
         {
+            if (!string.IsNullOrWhiteSpace(_streamingRaw))
+                PersistMessage("ARQ-IA", _streamingRaw, isUser: false);
             _turnInProgress = false;
             _turnCancellationRequested = false;
             _streamingText = null;
@@ -766,7 +952,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
 
     private CodexAppServerClient CreateClient()
     {
-        var client = new CodexAppServerClient();
+        var client = new CodexAppServerClient { FullAccessEnabled = _fullAccessEnabled };
         client.StatusChanged += value => Dispatcher.Invoke(() => SetStatus(value));
         client.TextReceived += value => Dispatcher.Invoke(() =>
         {
@@ -777,9 +963,26 @@ internal sealed class AssistantPane : UserControl, IDisposable
             _conversationScroll.ScrollToEnd();
         });
         client.ToolActivity += activity => Dispatcher.Invoke(() => UpdateToolCard(activity));
-        client.TurnFailed += value => Dispatcher.Invoke(() => AddMessage("Codex", value, isUser: false));
+        client.TurnFailed += value => Dispatcher.Invoke(() =>
+        {
+            AddMessage("Codex", value, isUser: false);
+            PersistMessage("Codex", value, isUser: false);
+        });
         client.ApprovalRequested = request => Dispatcher.InvokeAsync(() => ConfirmRequest(request)).Task;
         return client;
+    }
+
+    private void ToggleAccessMode()
+    {
+        if (_turnInProgress || _accessButton is null) return;
+        _fullAccessEnabled = !_fullAccessEnabled;
+        _accessButton.Content = _fullAccessEnabled ? "● Acceso completo" : "Acceso controlado";
+        _accessButton.Background = _fullAccessEnabled ? BrushFromRgb(76, 50, 28) : SurfaceRaised;
+        _accessButton.Foreground = _fullAccessEnabled ? BrushFromRgb(255, 175, 91) : Muted;
+        if (_client is not null) _client.FullAccessEnabled = _fullAccessEnabled;
+        SetStatus(_fullAccessEnabled
+            ? "Acceso completo activo en este chat: Codex ejecutará acciones sin pedir aprobación por llamada."
+            : "Acceso controlado activo: Codex volverá a pedir aprobación cuando corresponda.");
     }
 
     private async Task NewConversationAsync()
@@ -787,22 +990,62 @@ internal sealed class AssistantPane : UserControl, IDisposable
         if (_disposed || _turnInProgress) return;
         var old = _client;
         _client = null;
+        _activeConversation = null;
+        _continueLocalConversation = false;
         _streamingText = null;
         _streamingRaw = string.Empty;
         _toolCards.Clear();
         _messages.Children.Clear();
+        _prompt.Clear();
+        _pendingAttachments.Clear();
+        RefreshAttachmentChips();
         AddMessage("ARQ-IA", "Nueva conversación. El modelo Revit permanece sin cambios.", isUser: false);
-        if (_connectionLabel is not null)
-        {
-            _connectionLabel.Text = "MCP sin verificar";
-            _connectionLabel.Foreground = Muted;
-            if (_connectionBadge is not null) _connectionBadge.Background = BrushFromRgb(65, 65, 65);
-        }
         if (old is not null) await old.DisposeAsync();
         if (_projectRoot is not null) await LoadModelChoicesAsync();
     }
 
-    private void UpdateToolCard(McpToolActivity activity)
+    private async Task OpenConversationAsync(string id)
+    {
+        if (_disposed || _turnInProgress || _conversationStore is null) return;
+        ConversationHistoryRecord? record;
+        try { record = _conversationStore.Load(id); }
+        catch (Exception ex)
+        {
+            SetStatus($"No se pudo abrir el historial local ({ex.GetType().Name}).");
+            return;
+        }
+        if (record is null)
+        {
+            SetStatus("Esta conversación ya no está disponible en el historial local.");
+            return;
+        }
+
+        var old = _client;
+        _client = null;
+        _activeConversation = record;
+        _continueLocalConversation = true;
+        _streamingText = null;
+        _streamingRaw = string.Empty;
+        _toolCards.Clear();
+        _messages.Children.Clear();
+        _prompt.Clear();
+        _pendingAttachments.Clear();
+        RefreshAttachmentChips();
+
+        foreach (var entry in record.Entries)
+        {
+            if (entry.Kind == "message")
+                AddMessage(entry.Speaker, entry.Text, entry.IsUser, attachmentNames: entry.AttachmentNames);
+            else if (entry.Kind == "tool")
+                UpdateToolCard(new McpToolActivity(entry.Id, entry.Server, entry.Tool, entry.Status, entry.Detail), persistHistory: false, updateStatus: false);
+        }
+        AddMessage("ARQ-IA", "Historial local abierto. Si continúas, Codex recibirá los mensajes recientes como contexto; vuelve a adjuntar los archivos que necesites.", isUser: false);
+        SetStatus($"Historial local · {record.UpdatedUtc.ToLocalTime():dd MMM yyyy HH:mm}");
+        if (old is not null) await old.DisposeAsync();
+        _prompt.Focus();
+    }
+
+    private void UpdateToolCard(McpToolActivity activity, bool persistHistory = true, bool updateStatus = true)
     {
         var key = string.IsNullOrWhiteSpace(activity.Id) ? activity.Server + "." + activity.Tool : activity.Id;
         if (!_toolCards.TryGetValue(key, out var fields))
@@ -867,12 +1110,17 @@ internal sealed class AssistantPane : UserControl, IDisposable
             fields.Detail.Text = activity.Detail.Length > 3000 ? activity.Detail[..3000] + "…" : activity.Detail;
             if (fields.Detail.Parent is Expander expander) expander.Visibility = Visibility.Visible;
         }
-        if (activity.Status == "completed" && _connectionLabel is not null)
+        if (persistHistory && _activeConversation is not null && _conversationStore is not null)
         {
-            _connectionLabel.Text = "MCP conectado";
-            _connectionLabel.Foreground = BrushFromRgb(85, 219, 110);
-            if (_connectionBadge is not null) _connectionBadge.Background = BrushFromRgb(39, 65, 42);
+            try
+            {
+                _conversationStore.UpsertTool(_activeConversation, activity);
+                UpdateHistoryButton();
+            }
+            catch (Exception ex) { SetStatus($"No se pudo guardar el resultado MCP en el historial ({ex.GetType().Name})."); }
         }
+        if (updateStatus && activity.Status == "completed") SetStatus("MCP conectado · respuesta recibida");
+        else if (updateStatus && activity.Status == "failed") SetStatus("No se pudo completar la consulta MCP");
         _conversationScroll.ScrollToEnd();
     }
 
@@ -895,7 +1143,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
         return activity.Server + " · " + activity.Tool;
     }
 
-    private TextBlock AddMessage(string speaker, string message, bool isUser, IReadOnlyList<LocalAttachment>? attachments = null)
+    private TextBlock AddMessage(
+        string speaker,
+        string message,
+        bool isUser,
+        IReadOnlyList<LocalAttachment>? attachments = null,
+        IReadOnlyList<string>? attachmentNames = null)
     {
         var messageStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
         if (!isUser)
@@ -927,11 +1180,14 @@ internal sealed class AssistantPane : UserControl, IDisposable
         if (isUser) body.Text = message;
         else RenderMarkdown(body, message);
         contents.Children.Add(body);
-        if (attachments is { Count: > 0 })
+        var displayedAttachmentNames = attachments is { Count: > 0 }
+            ? attachments.Select(item => item.Name).ToArray()
+            : attachmentNames?.ToArray() ?? Array.Empty<string>();
+        if (displayedAttachmentNames.Length > 0)
         {
             var files = new TextBlock
             {
-                Text = string.Join("\n", attachments.Select(item => item.IsImage ? "▣ " : "▤ ").Zip(attachments, (symbol, item) => symbol + item.Name)),
+                Text = string.Join("\n", displayedAttachmentNames.Select(name => "▤ " + name)),
                 Foreground = Muted,
                 FontSize = 10,
                 Margin = new Thickness(0, 6, 0, 0),
@@ -1046,6 +1302,28 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private void SetStatus(string value)
     {
         if (!_disposed) _status.Text = value;
+    }
+
+    private bool NeedsProjectProfile()
+    {
+        if (_projectRoot is null) return false;
+        var path = Path.Combine(_projectRoot, ".arq-ia", "model-profile.md");
+        try { return !File.Exists(path) || new FileInfo(path).Length < 80; }
+        catch { return true; }
+    }
+
+    private void PersistMessage(string speaker, string message, bool isUser, IEnumerable<string>? attachmentNames = null)
+    {
+        if (_activeConversation is null || _conversationStore is null) return;
+        try
+        {
+            _conversationStore.AddMessage(_activeConversation, speaker, message, isUser, attachmentNames);
+            UpdateHistoryButton();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"El chat sigue disponible, pero no se pudo guardar el historial local ({ex.GetType().Name}).");
+        }
     }
 
     private static Button CreateButton(string content, Brush background, Brush foreground, double fontSize) => new()

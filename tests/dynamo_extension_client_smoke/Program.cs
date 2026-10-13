@@ -46,6 +46,7 @@ statusChanged.AddEventHandler(client, new Action<string>(status => statuses.Appe
 var createApprovalCount = 0;
 var listApprovalCount = 0;
 var approvalProperty = clientType.GetProperty("ApprovalRequested")!;
+clientType.GetProperty("FullAccessEnabled")!.SetValue(client, true);
 var approvalDelegateType = approvalProperty.PropertyType;
 var requestType = approvalDelegateType.GenericTypeArguments[0];
 var request = Expression.Parameter(requestType, "request");
@@ -80,17 +81,17 @@ try
 
     var ensureStarted = (Task)clientType.GetMethod("EnsureStartedAsync")!.Invoke(client, new object?[] { projectRoot, null, null, CancellationToken.None })!;
     await ensureStarted;
-    Console.WriteLine("CODEX_APP_SERVER_CSHARP_THREAD=PASS");
+    Console.WriteLine("CODEX_APP_SERVER_CSHARP_THREAD=PASS access=dangerFullAccess");
 
     var createPrompt = $"Use bim_ai_routines.create_dynamo_routine exactly once to save a read-only routine named {routineName}. Use description 'Temporary app-server integration smoke test; does not access Revit'. Use python_code exactly `OUT = \"APP_SERVER_GENERATED_PROBE\"`. Set scope to active_view, writes_model to false, and confirm_model_write to false. Do not call rvt_mcp, the Dynamo runner, shell, or any other tool. After saving, respond with the exact routine name.";
     var create = (Task)clientType.GetMethod("SendMessageAsync")!.Invoke(client, new object[] { createPrompt, CancellationToken.None })!;
     await create;
 
-    if (createApprovalCount != 1)
+    if (createApprovalCount != 0)
     {
         var reply = text.ToString();
         Console.WriteLine($"CODEX_APP_SERVER_CSHARP_CREATE_DIAGNOSTICS statuses={statuses.ToString().Trim()}; reply={(reply.Length > 800 ? reply[^800..] : reply)}");
-        throw new InvalidOperationException($"Expected one approved routine creation call; got {createApprovalCount}.");
+        throw new InvalidOperationException($"Full access should complete routine creation without approval prompts; saw {createApprovalCount}.");
     }
     if (listApprovalCount > 2)
         throw new InvalidOperationException($"Unexpected number of list calls during routine creation: {listApprovalCount}.");
@@ -125,19 +126,19 @@ try
             throw new InvalidDataException("Generated Dynamo graph is not a Manual PythonNet3 graph.");
     }
 
-    Console.WriteLine("CODEX_APP_SERVER_CSHARP_MCP_CREATE=PASS routine_saved=true writes_model=false");
+    Console.WriteLine("CODEX_APP_SERVER_CSHARP_MCP_CREATE=PASS routine_saved=true writes_model=false approvals=0");
 
     text.Clear();
     var listApprovalBaseline = listApprovalCount;
     const string listPrompt = "Call bim_ai_routines.list_saved_routines exactly once. Report whether codex_probe_ is present and include the exact name of the probe routine from the current conversation. Do not call any other tool.";
     var list = (Task)clientType.GetMethod("SendMessageAsync")!.Invoke(client, new object[] { listPrompt, CancellationToken.None })!;
     await list;
-    if (listApprovalCount != listApprovalBaseline + 1 ||
+    if (listApprovalCount != listApprovalBaseline ||
         !text.ToString().Contains(routineName, StringComparison.Ordinal))
-        throw new InvalidOperationException("The saved routine was not listed through the app-server MCP connection.");
+        throw new InvalidOperationException("The saved routine was not listed through the full access app-server MCP connection without approval prompts.");
 
-    Console.WriteLine("CODEX_APP_SERVER_CSHARP_APPROVAL=PASS create_and_list_approved=true");
-    Console.WriteLine("CODEX_APP_SERVER_CSHARP_MCP_LIST=PASS saved_routine_returned=true");
+    Console.WriteLine("CODEX_APP_SERVER_CSHARP_APPROVAL=PASS approval_prompts=0");
+    Console.WriteLine("CODEX_APP_SERVER_CSHARP_MCP_LIST=PASS saved_routine_returned=true approvals=0");
 
     Directory.CreateDirectory(attachmentProbeDirectory);
     var probeToken = "BIM_ATTACHMENT_PROBE_" + Guid.NewGuid().ToString("N")[..12];

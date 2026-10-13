@@ -31,7 +31,7 @@ if ($expectedHash -notmatch '^[0-9a-f]{64}$' -or
     (Get-FileHash -LiteralPath $sourceDll -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedHash) {
     throw 'La DLL de ARQ-IA no coincide con su SHA-256.'
 }
-$targetDllName = 'BimAiDynamoAssistant.' + $expectedHash.Substring(0, 16) + '.dll'
+$targetDllName = 'BimAiDynamoAssistant.dll'
 $targetDll = Join-Path $packageBin $targetDllName
 $packageInfo = Get-Content -LiteralPath $sourcePackage -Raw | ConvertFrom-Json
 if ($packageInfo.name -ne 'ARQ-IA' -or $packageInfo.engine -ne 'dynamo' -or
@@ -56,9 +56,21 @@ if (Test-Path -LiteralPath $targetPackage) {
 }
 
 New-Item -ItemType Directory -Path $packageBin,$packageExtra -Force | Out-Null
-if (-not (Test-Path -LiteralPath $targetDll -PathType Leaf)) {
-    Copy-Item -LiteralPath $sourceDll -Destination $targetDll
+# Dynamo scans package bin before loading View Extensions. Every old hashed DLL has
+# the same .NET assembly identity, so even one stale copy prevents the menu loading.
+$legacyDlls = @(Get-ChildItem -LiteralPath $packageBin -File -Filter 'BimAiDynamoAssistant.*.dll' -ErrorAction SilentlyContinue)
+foreach ($legacyDll in $legacyDlls) {
+    try { Remove-Item -LiteralPath $legacyDll.FullName -Force -ErrorAction Stop }
+    catch { throw "No se pudo retirar la DLL anterior $($legacyDll.FullName). Cierra Revit y Dynamo e instala de nuevo." }
 }
+if (Test-Path -LiteralPath $targetDll -PathType Leaf) {
+    $currentHash = (Get-FileHash -LiteralPath $targetDll -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($currentHash -ne $expectedHash) {
+        try { Remove-Item -LiteralPath $targetDll -Force -ErrorAction Stop }
+        catch { throw "No se pudo actualizar $targetDll. Cierra Revit y Dynamo e instala de nuevo." }
+    }
+}
+if (-not (Test-Path -LiteralPath $targetDll -PathType Leaf)) { Copy-Item -LiteralPath $sourceDll -Destination $targetDll }
 Copy-Item -LiteralPath $sourcePackage -Destination $targetPackage -Force
 [xml]$manifest = Get-Content -LiteralPath $sourceManifest -Raw
 if ($manifest.ViewExtensionDefinition.TypeName -ne 'BimAiDynamoAssistant.BimAiDynamoViewExtension') {

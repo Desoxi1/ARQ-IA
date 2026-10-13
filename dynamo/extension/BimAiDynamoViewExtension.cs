@@ -16,8 +16,6 @@ public sealed class BimAiDynamoViewExtension : ViewExtensionBase
 
     public override void Loaded(ViewLoadedParams p)
     {
-        _pane = new AssistantPane(ProjectSettings.TryGetProjectRoot());
-
         var openAssistant = new MenuItem
         {
             Header = "Abrir ARQ-IA",
@@ -26,6 +24,7 @@ public sealed class BimAiDynamoViewExtension : ViewExtensionBase
         openAssistant.Click += (_, _) => p.OpenViewExtension(Name);
         p.AddExtensionMenuItem(openAssistant);
 
+        _pane = new AssistantPane(ProjectSettings.TryGetProjectRoot());
         p.AddToExtensionsSideBar(this, new ContentControl { Content = _pane });
         p.OpenViewExtension(Name);
     }

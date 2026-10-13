@@ -16,7 +16,7 @@ class DynamoExtensionPackageTests(unittest.TestCase):
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")
-        self.assertEqual(package["version"], "0.4.1")
+        self.assertEqual(package["version"], "0.5.0")
         self.assertEqual(package["engine"], "dynamo")
         self.assertTrue(package["engine_version"].startswith("4.0."))
         self.assertTrue(package["contains_binaries"])
@@ -37,6 +37,9 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn("$manifest.ViewExtensionDefinition.AssemblyPath = '..\\bin\\' + $targetDllName", installer)
         self.assertIn("StageWhileRevitOpen", installer)
         self.assertIn("DLL_SCOPE=CurrentUserPackage", installer)
+        self.assertIn("$targetDllName = 'BimAiDynamoAssistant.dll'", installer)
+        self.assertIn("$legacyDlls", installer)
+        self.assertIn("Remove-Item -LiteralPath $legacyDll.FullName", installer)
 
     def test_doctor_checks_runtime_load_separately_from_file_installation(self):
         doctor = (ROOT / "doctor.ps1").read_text(encoding="utf-8")
@@ -68,14 +71,33 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn("p.AddExtensionMenuItem(openAssistant)", extension)
         self.assertIn("p.AddToExtensionsSideBar(this", extension)
         self.assertIn("p.OpenViewExtension(Name)", extension)
+        self.assertLess(extension.index("p.AddExtensionMenuItem(openAssistant)"), extension.index("new AssistantPane("))
+
+    def test_codex_full_access_is_explicit_and_overrides_per_call_approvals(self):
+        pane = (EXTENSION / "AssistantPane.cs").read_text(encoding="utf-8")
+        client = (EXTENSION / "CodexAppServerClient.cs").read_text(encoding="utf-8")
+        self.assertIn('CreateButton("Acceso controlado"', pane)
+        self.assertIn('"● Acceso completo"', pane)
+        self.assertIn("private FrameworkElement BuildFooter(bool projectReady)", pane)
+        self.assertLess(pane.index("private FrameworkElement BuildHeader()"), pane.index("private FrameworkElement BuildFooter(bool projectReady)"))
+        self.assertNotIn('Text = "MCP sin verificar"', pane)
+        self.assertIn('FullAccessEnabled ? "never" : "on-request"', client)
+        self.assertIn('FullAccessEnabled ? "danger-full-access" : "read-only"', client)
+        self.assertIn('FullAccessEnabled ? "dangerFullAccess" : "readOnly"', client)
+        self.assertIn("FullAccessEnabled || (ApprovalRequested is not null", client)
 
     def test_assistant_buttons_define_readable_disabled_colors(self):
         pane = (EXTENSION / "AssistantPane.cs").read_text(encoding="utf-8")
         self.assertIn("CreateButtonTemplate()", pane)
         self.assertIn("ButtonAccent = BrushFromRgb(89, 200, 230)", pane)
-        self.assertIn('CreateButton("⊕", Brushes.Transparent, TextBrush', pane)
+        self.assertIn('CreateButton("+", Brushes.Transparent, ButtonAccent', pane)
         self.assertIn('CreateButton("↑", BrushFromRgb(30, 30, 30), TextBrush', pane)
         self.assertIn('CreateButtonTemplate(16)', pane)
+        self.assertIn('Geometry.Parse("M7.5,25.5 L16,6.8 L24.5,25.5")', pane)
+        self.assertIn('Text = "Gestor: Branko Plaza · Asistente BIM · Revit 2027"', pane)
+        self.assertIn('Content = "Automático", Tag = null', pane)
+        self.assertIn("CodexModelSelection.Save(selected.Tag as string)", pane)
+        self.assertIn("Width = 142", pane)
         self.assertIn("ButtonDisabledSurface", pane)
         self.assertIn("ButtonDisabledBorder", pane)
         self.assertIn("ButtonDisabledText", pane)

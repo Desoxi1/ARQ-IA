@@ -22,6 +22,7 @@ foreach ($required in @(
     (Join-Path $RevitRoot 'RevitAPIUI.dll'),
     (Join-Path $repoRoot 'dynamo\extension\AssistantPane.cs'),
     (Join-Path $repoRoot 'dynamo\extension\CodexAppServerClient.cs'),
+    (Join-Path $repoRoot 'dynamo\extension\ConversationHistoryStore.cs'),
     (Join-Path $repoRoot 'dynamo\extension\CodexModelSelection.cs'),
     (Join-Path $repoRoot 'dynamo\extension\LocalAttachmentStore.cs'),
     (Join-Path $repoRoot 'dynamo\extension\ProjectSettings.cs')

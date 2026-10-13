@@ -4,7 +4,7 @@
 
 ## Resultado buscado
 
-Un arquitecto describe en español habitual o técnico lo que necesita; ARQ-IA consulta el modelo activo, identifica categorías, niveles, vistas, tipos, parámetros y unidades reales, pregunta solo lo que cambia el resultado, muestra un plan y solicita aprobación para las operaciones que escriben. Después lee el modelo para comprobar el resultado. Las rutinas Dynamo/PythonNet3 revisadas quedan guardadas y se pueden volver a ejecutar sin una nueva generación con IA.
+Un arquitecto describe en español habitual o técnico lo que necesita; ARQ-IA consulta el modelo activo, identifica categorías, niveles, vistas, tipos, parámetros y unidades reales, pregunta solo lo que cambia el resultado y después comprueba el resultado. El panel ofrece acceso controlado y acceso completo por sesión; completo evita confirmaciones repetidas de Codex cuando el usuario pide la acción. Las rutinas Dynamo/PythonNet3 quedan guardadas para reutilizarse.
 
 El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualquier conversación. Un MCP expone herramientas; Codex las descubre y decide cuáles usar. El conocimiento persistente proviene de este glosario, guías técnicas y rutinas verificadas en Git. Añadir otro MCP exige revisar compatibilidad, licencia, seguridad y autoridad de escritura.
 
@@ -14,7 +14,7 @@ El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualq
 |---|---|---|
 | Chat y adjuntos en Revit y Dynamo | Paneles propios con Codex app-server | Cliente conectado y procesamiento de adjuntos comprobados fuera del panel visible; carga histórica del panel de Dynamo. |
 | Vista activa y selección | `rvt-mcp` de bimwright | Consulta de solo lectura pasada en Revit. |
-| Operaciones tipadas de creación/edición | Lista acotada de `rvt-mcp` con aprobación por llamada | Inventario de herramientas; cada escritura requiere prueba individual. |
+| Operaciones tipadas de creación/edición | Lista acotada de `rvt-mcp`; control de Codex según modo del chat | Inventario de herramientas; cada escritura requiere prueba individual. |
 | Color de presentación por elemento | `revit_override_element_graphics` de `rvt-mcp` | Esquema disponible en el binario local; habilitado en el perfil ARQ-IA, sin prueba viva de color. |
 | Guardar `.py` + `.dyn` + manifiesto | MCP propio de rutinas | Creación/listado y hashes comprobados fuera de Revit. |
 | Ejecutar rutina fija PythonNet3 de lectura | MCP runner + bridge Revit/Dynamo | Pasó en RVT descartable el 05-10-2026. |

@@ -114,7 +114,7 @@ if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
             $manifestTypeMatches = $registeredExtension.ViewExtensionDefinition.TypeName -eq 'BimAiDynamoAssistant.BimAiDynamoViewExtension'
             $registrationMatches = $installedPackageInfo.name -eq 'ARQ-IA' -and
                 [String]::Equals($registeredAssemblyRoot, $expectedAssemblyRoot, [StringComparison]::OrdinalIgnoreCase) -and
-                [IO.Path]::GetFileName($registeredAssembly) -match '^BimAiDynamoAssistant\.[0-9a-f]{16}\.dll$' -and
+                [IO.Path]::GetFileName($registeredAssembly) -eq 'BimAiDynamoAssistant.dll' -and
                 (Test-Path -LiteralPath $registeredAssembly -PathType Leaf)
         } catch {
             $manifestTypeMatches = $false
@@ -125,6 +125,8 @@ if ((Test-Path -LiteralPath $extensionPackageDll -PathType Leaf) -and
             Write-Check FAIL 'El manifiesto de Dynamo es inválido o pertenece a otra extensión'
         } elseif (-not $registrationMatches) {
             Write-Check WAIT 'ARQ-IA aún apunta a una ruta antigua; actualiza con install.ps1 -Force'
+        } elseif (@(Get-ChildItem -LiteralPath $expectedAssemblyRoot -File -Filter 'BimAiDynamoAssistant.*.dll' -ErrorAction SilentlyContinue).Count -gt 0) {
+            Write-Check WAIT 'Hay DLL antiguas de ARQ-IA que impiden cargar la extensión; cierra Revit e instala de nuevo'
         } elseif ($installedExtensionHash -eq $expectedExtensionHash) {
             $extensionRegistrationReady = $true
             Write-Check PASS 'ARQ-IA instalado como paquete Dynamo 4.0.2 del usuario; manifiesto y SHA-256 coinciden'

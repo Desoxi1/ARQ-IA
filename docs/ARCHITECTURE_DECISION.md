@@ -33,9 +33,9 @@ El fallo de “pinta los muros del primer piso de rojo” tuvo dos causas de pro
 
 ## Límites de ejecución
 
-- El runner propio solo acepta un RVT local y descartable bajo `revit/test-models/`; para rutinas genéricas exige confirmación de posibles escrituras. Compara los cambios declarados por la rutina con `DocumentChanged` de Revit. No se ha demostrado todavía una escritura exitosa y verificada.
+- El runner propio solo acepta un RVT local y descartable bajo `revit/test-models/`; en acceso controlado exige confirmación de posibles escrituras. Compara los cambios declarados por la rutina con `DocumentChanged` de Revit. No se ha demostrado todavía una escritura exitosa y verificada.
 - Los scripts PythonNet3 corren con los permisos del usuario dentro de Revit. La restricción de RVT no es un sandbox de sistema operativo. La aprobación debe mostrar el script y el alcance antes de una escritura.
-- `rvt-mcp` puede modificar el modelo al aprobar una acción tipada; el perfil de Codex pide aprobación por llamada. No existe garantía general de previsualización o reversión.
+- `rvt-mcp` puede modificar el modelo mediante acciones tipadas. El panel ahora ofrece un modo controlado y otro de acceso completo por sesión; Codex app-server confirmó creación/listado de rutina sin ventanas de aprobación en el smoke. Las escrituras de Revit aún deben validarse en vivo, y no existe garantía general de reversión.
 - Los DLL tienen `Company`/`VendorDescription` de **Branko Plaza**. Siguen sin firma de editor confiable, por lo que Windows puede indicar «Fabricante desconocido».
 
 ## pyRevit y otras opciones
