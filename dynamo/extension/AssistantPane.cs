@@ -16,11 +16,11 @@ namespace BimAiDynamoAssistant;
 /// <summary>A focused chat surface embedded in Dynamo's side panel.</summary>
 internal sealed class AssistantPane : UserControl, IDisposable
 {
-    private static readonly Brush Surface = BrushFromRgb(28, 34, 43);
-    private static readonly Brush SurfaceRaised = BrushFromRgb(37, 45, 57);
-    private static readonly Brush SurfaceInput = BrushFromRgb(21, 26, 34);
-    private static readonly Brush PanelBorder = BrushFromRgb(56, 68, 84);
-    private static readonly Brush Muted = BrushFromRgb(159, 174, 193);
+    private static readonly Brush Surface = BrushFromRgb(47, 47, 47);
+    private static readonly Brush SurfaceRaised = BrushFromRgb(53, 53, 53);
+    private static readonly Brush SurfaceInput = BrushFromRgb(46, 46, 46);
+    private static readonly Brush PanelBorder = BrushFromRgb(77, 77, 77);
+    private static readonly Brush Muted = BrushFromRgb(177, 181, 187);
     private static readonly Brush Accent = BrushFromRgb(71, 137, 247);
     private static readonly Brush ButtonAccent = BrushFromRgb(89, 200, 230);
     private static readonly Brush ButtonAccentText = BrushFromRgb(9, 37, 47);
@@ -51,7 +51,6 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private readonly TextBlock _status;
     private Button? _contextButton;
     private ComboBox? _modelBox;
-    private TextBlock? _modelHint;
     private IReadOnlyList<CodexModelInfo> _availableModels = Array.Empty<CodexModelInfo>();
     private bool _loadingModels;
     private readonly List<LocalAttachment> _pendingAttachments = new();
@@ -60,6 +59,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private TextBlock? _streamingText;
     private string _streamingRaw = string.Empty;
     private TextBlock? _connectionLabel;
+    private Border? _connectionBadge;
     private readonly Dictionary<string, (TextBlock Status, TextBlock Detail)> _toolCards = new();
     private bool _disposed;
     private bool _turnInProgress;
@@ -71,7 +71,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         Background = Surface;
         Focusable = true;
 
-        _layout = new Grid { Margin = new Thickness(10) };
+        _layout = new Grid { Margin = new Thickness(12) };
         var layout = _layout;
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -105,7 +105,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         composer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         composer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var attachmentHeader = new DockPanel { Margin = new Thickness(1, 0, 1, 5), LastChildFill = false };
+        var attachmentHeader = new DockPanel { Margin = new Thickness(1, 0, 1, 5), LastChildFill = false, Visibility = Visibility.Collapsed };
         _attachmentCount = new TextBlock
         {
             Text = "Adjuntos",
@@ -144,19 +144,19 @@ internal sealed class AssistantPane : UserControl, IDisposable
             Background = SurfaceInput,
             BorderBrush = PanelBorder,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(9),
-            Padding = new Thickness(8, 6, 8, 5)
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(11, 10, 9, 8)
         };
         var inputLayout = new Grid();
         inputLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         inputLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var inputArea = new Grid { MinHeight = 60 };
+        var inputArea = new Grid { MinHeight = 42 };
         _prompt = new TextBox
         {
             AcceptsReturn = true,
             TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MinHeight = 60,
+            MinHeight = 42,
             MaxHeight = 132,
             Padding = new Thickness(2),
             FontSize = 13,
@@ -172,7 +172,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         {
             Text = projectRoot is null
                 ? "El chat estará disponible al terminar la instalación inicial."
-                : "Describe lo que necesitas…",
+                : "Pregunta sobre tu modelo, adjunta archivos o solicita una rutina Dynamo…",
             Foreground = BrushFromRgb(123, 139, 159),
             Margin = new Thickness(4, 4, 4, 4),
             IsHitTestVisible = false,
@@ -187,22 +187,24 @@ internal sealed class AssistantPane : UserControl, IDisposable
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _attachButton = CreateButton("＋ Adjuntar", ButtonAccent, ButtonAccentText, 11);
-        _attachButton.Padding = new Thickness(8, 5, 8, 5);
-        _attachButton.BorderBrush = ButtonAccent;
-        _attachButton.BorderThickness = new Thickness(1);
+        _attachButton = CreateButton("⊕", Brushes.Transparent, TextBrush, 18);
+        _attachButton.Padding = new Thickness(5, 1, 5, 1);
         _attachButton.ToolTip = "Adjunta imágenes, documentos, archivos de Dynamo o referencias BIM.";
         _attachButton.IsEnabled = projectRoot is not null;
         _attachButton.Click += (_, _) => ChooseAttachments();
         Grid.SetColumn(_attachButton, 0);
         actions.Children.Add(_attachButton);
 
-        _sendButton = CreateButton("Enviar  ↑", ButtonAccent, ButtonAccentText, 12);
+        var modelRow = BuildModelRow();
+        Grid.SetColumn(modelRow, 1);
+        actions.Children.Add(modelRow);
+
+        _sendButton = CreateButton("↑", BrushFromRgb(30, 30, 30), TextBrush, 17);
         _sendButton.FontWeight = FontWeights.SemiBold;
-        _sendButton.Padding = new Thickness(12, 7, 12, 7);
-        _sendButton.BorderBrush = ButtonAccent;
-        _sendButton.BorderThickness = new Thickness(1);
-        _sendButton.MinWidth = 75;
+        _sendButton.Padding = new Thickness(4, 1, 4, 1);
+        _sendButton.Width = 31;
+        _sendButton.Height = 31;
+        _sendButton.Template = CreateButtonTemplate(16);
         _sendButton.IsEnabled = projectRoot is not null;
         _sendButton.Click += async (_, _) =>
         {
@@ -239,9 +241,8 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _prompt.TextChanged += (_, _) => _placeholder.Visibility = string.IsNullOrEmpty(_prompt.Text) ? Visibility.Visible : Visibility.Collapsed;
         _prompt.PreviewKeyDown += OnPromptPreviewKeyDown;
 
-        AddMessage("ARQ-IA", projectRoot is null
-            ? "Instala ARQ-IA una sola vez desde la carpeta del proyecto. El panel se activará automáticamente al terminar."
-            : "Describe lo que quieres resolver en Revit o Dynamo. Puedo usar la vista y la selección como contexto, revisar adjuntos y preparar rutinas PythonNet3 reutilizables. Antes de ejecutar cambios en el modelo, revisarás la propuesta.", isUser: false);
+        if (projectRoot is null)
+            AddMessage("ARQ-IA", "Instala ARQ-IA una sola vez desde la carpeta del proyecto. El panel se activará automáticamente al terminar.", isUser: false);
 
         _readinessTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _readinessTimer.Tick += (_, _) => TryActivateProject();
@@ -251,43 +252,65 @@ internal sealed class AssistantPane : UserControl, IDisposable
 
     private FrameworkElement BuildHeader()
     {
-        var outer = new DockPanel { Margin = new Thickness(1, 1, 1, 8), LastChildFill = true };
-        var newChat = CreateButton("＋", Brushes.Transparent, Muted, 16);
+        var outer = new DockPanel { Margin = new Thickness(1, 1, 1, 12), LastChildFill = true };
+        var newChat = CreateButton("▢", Brushes.Transparent, TextBrush, 16);
         newChat.ToolTip = "Nueva conversación de ARQ-IA";
-        newChat.Padding = new Thickness(7, 2, 7, 2);
+        newChat.Padding = new Thickness(4, 2, 4, 2);
         newChat.Click += async (_, _) => await NewConversationAsync();
         DockPanel.SetDock(newChat, Dock.Right);
         outer.Children.Add(newChat);
+        _contextButton = CreateButton("↻", Brushes.Transparent, TextBrush, 17);
+        _contextButton.ToolTip = "Volver a consultar la vista y selección de Revit (solo lectura)";
+        _contextButton.Padding = new Thickness(4, 2, 4, 2);
+        _contextButton.IsEnabled = _projectRoot is not null;
+        _contextButton.Click += async (_, _) => await RequestContextAsync();
+        DockPanel.SetDock(_contextButton, Dock.Right);
+        outer.Children.Add(_contextButton);
+        _connectionLabel = new TextBlock
+        {
+            Text = "MCP sin verificar",
+            FontSize = 10,
+            Foreground = Muted
+        };
+        _connectionBadge = new Border
+        {
+            Child = _connectionLabel,
+            Background = BrushFromRgb(65, 65, 65),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(7, 2, 7, 2),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        DockPanel.SetDock(_connectionBadge, Dock.Right);
+        outer.Children.Add(_connectionBadge);
         var markCanvas = new Canvas { Width = 32, Height = 32 };
-        var markStroke = new SolidColorBrush(Color.FromRgb(248, 253, 255));
-        var markCrossbar = new SolidColorBrush(Color.FromRgb(113, 229, 244));
-        markCanvas.Children.Add(new System.Windows.Shapes.Line
+        foreach (var (x, y) in new[] { (9d, 9d), (17d, 9d), (9d, 17d) })
         {
-            X1 = 8, Y1 = 26, X2 = 16, Y2 = 7,
-            Stroke = markStroke, StrokeThickness = 3.5,
-            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
-        });
-        markCanvas.Children.Add(new System.Windows.Shapes.Line
+            var square = new System.Windows.Shapes.Rectangle
+            {
+                Width = 6, Height = 6, RadiusX = 1, RadiusY = 1,
+                Stroke = TextBrush, StrokeThickness = 1.2
+            };
+            Canvas.SetLeft(square, x);
+            Canvas.SetTop(square, y);
+            markCanvas.Children.Add(square);
+        }
+        var lastSquare = new System.Windows.Shapes.Rectangle
         {
-            X1 = 16, Y1 = 7, X2 = 24, Y2 = 26,
-            Stroke = markStroke, StrokeThickness = 3.5,
-            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
-        });
-        markCanvas.Children.Add(new System.Windows.Shapes.Line
-        {
-            X1 = 12, Y1 = 20, X2 = 20, Y2 = 20,
-            Stroke = markCrossbar, StrokeThickness = 2.7,
-            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
-        });
+            Width = 6, Height = 6, RadiusX = 1, RadiusY = 1,
+            Fill = TextBrush
+        };
+        Canvas.SetLeft(lastSquare, 17);
+        Canvas.SetTop(lastSquare, 17);
+        markCanvas.Children.Add(lastSquare);
         var mark = new Border
         {
             Width = 32,
             Height = 32,
-            CornerRadius = new CornerRadius(9),
-            Background = new LinearGradientBrush(Color.FromRgb(20, 107, 167), Color.FromRgb(16, 57, 111), 70),
-            BorderBrush = ButtonAccent,
-            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Background = BrushFromRgb(35, 35, 35),
             Margin = new Thickness(0, 0, 8, 0),
+            ToolTip = "ARQ-IA · Gestor: Branko Plaza",
             Child = markCanvas
         };
         DockPanel.SetDock(mark, Dock.Left);
@@ -296,7 +319,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         title.Children.Add(new TextBlock
         {
             Text = "ARQ-IA",
-            FontSize = 16,
+            FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White
         });
@@ -306,27 +329,21 @@ internal sealed class AssistantPane : UserControl, IDisposable
             FontSize = 10,
             Foreground = Muted
         });
-        _connectionLabel = new TextBlock
-        {
-            Text = "Codex sin iniciar · MCP sin verificar",
-            FontSize = 10,
-            Margin = new Thickness(0, 2, 0, 0),
-            Foreground = Muted
-        };
-        title.Children.Add(_connectionLabel);
-        title.Children.Add(new TextBlock
-        {
-            Text = "Gestor: Branko Plaza",
-            FontSize = 9,
-            Margin = new Thickness(0, 1, 0, 0),
-            Foreground = BrushFromRgb(125, 143, 164)
-        });
         outer.Children.Add(title);
-        return outer;
+        var header = new Grid();
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(outer, 0);
+        header.Children.Add(outer);
+        var divider = new Border { Height = 1, Background = BrushFromRgb(62, 62, 62), Margin = new Thickness(0, 0, 0, 6) };
+        Grid.SetRow(divider, 1);
+        header.Children.Add(divider);
+        return header;
     }
 
     private FrameworkElement BuildContextCard(bool projectReady)
     {
+        if (projectReady) return new Border { Visibility = Visibility.Collapsed };
         var card = new Border
         {
             Background = SurfaceRaised,
@@ -345,24 +362,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
             FontSize = 11,
             FontWeight = FontWeights.SemiBold
         };
-        if (projectReady)
-        {
-            _contextButton = CreateButton("Ver", BrushFromRgb(49, 69, 96), TextBrush, 10);
-            _contextButton.Padding = new Thickness(8, 3, 8, 3);
-            _contextButton.ToolTip = "Consultar ahora la vista activa y la selección mediante MCP, solo lectura.";
-            _contextButton.Click += async (_, _) => await RequestContextAsync();
-            DockPanel.SetDock(_contextButton, Dock.Right);
-            topRow.Children.Add(_contextButton);
-        }
-        else
-        {
-            var retry = CreateButton("Revisar", SurfaceRaised, TextBrush, 10);
-            retry.Padding = new Thickness(8, 3, 8, 3);
-            retry.ToolTip = "Comprobar de nuevo la instalación de ARQ-IA.";
-            retry.Click += (_, _) => TryActivateProject();
-            DockPanel.SetDock(retry, Dock.Right);
-            topRow.Children.Add(retry);
-        }
+        var retry = CreateButton("Revisar", SurfaceRaised, TextBrush, 10);
+        retry.Padding = new Thickness(8, 3, 8, 3);
+        retry.ToolTip = "Comprobar de nuevo la instalación de ARQ-IA.";
+        retry.Click += (_, _) => TryActivateProject();
+        DockPanel.SetDock(retry, Dock.Right);
+        topRow.Children.Add(retry);
         topRow.Children.Add(title);
         stack.Children.Add(topRow);
         stack.Children.Add(new TextBlock
@@ -375,21 +380,20 @@ internal sealed class AssistantPane : UserControl, IDisposable
             Margin = new Thickness(0, 3, 0, 0),
             TextWrapping = TextWrapping.Wrap
         });
-        if (projectReady) stack.Children.Add(BuildModelRow());
         card.Child = stack;
         return card;
     }
 
     private FrameworkElement BuildModelRow()
     {
-        var row = new DockPanel { Margin = new Thickness(0, 6, 0, 0), LastChildFill = true };
+        var row = new DockPanel { Margin = new Thickness(5, 0, 8, 0), LastChildFill = false, VerticalAlignment = VerticalAlignment.Center };
         var label = new TextBlock
         {
-            Text = "Modelo:",
+            Text = "Codex · Revit MCP",
             Foreground = Muted,
             FontSize = 10,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0)
+            Margin = new Thickness(0, 0, 7, 0)
         };
         DockPanel.SetDock(label, Dock.Left);
         row.Children.Add(label);
@@ -397,35 +401,34 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _modelBox = new ComboBox
         {
             FontSize = 10,
-            MinWidth = 170,
+            Width = 112,
+            MaxDropDownHeight = 280,
+            Background = SurfaceRaised,
+            Foreground = TextBrush,
+            BorderBrush = PanelBorder,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(4, 2, 4, 2),
+            Template = CreateDarkComboBoxTemplate(),
             ToolTip = "Modelos reales que ofrece Codex en este equipo. Automático usa Luna para consultas breves y el modelo predeterminado para tareas generales."
         };
+        var itemStyle = new Style(typeof(ComboBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, SurfaceRaised));
+        itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, TextBrush));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 4, 6, 4)));
+        _modelBox.ItemContainerStyle = itemStyle;
         _modelBox.Items.Add(new ComboBoxItem { Content = "Automático", Tag = null });
         _modelBox.SelectedIndex = 0;
+        _modelBox.IsEnabled = _projectRoot is not null;
         _modelBox.SelectionChanged += (_, _) =>
         {
             if (_loadingModels || _modelBox?.SelectedItem is not ComboBoxItem selected) return;
             CodexModelSelection.Save(selected.Tag as string);
-            if (_modelHint is not null) _modelHint.Text = selected.Tag is string id
-                ? $"{id} · disponible según el catálogo de Codex; se confirma al enviar."
-                : "Luna para consultas breves; modelo predeterminado para tareas generales.";
             SetStatus($"Modelo {selected.Content} · se aplicará al próximo envío.");
         };
         DockPanel.SetDock(_modelBox, Dock.Right);
         row.Children.Add(_modelBox);
 
-        _modelHint = new TextBlock
-        {
-            Text = "Cargando modelos de Codex…",
-            Foreground = BrushFromRgb(125, 143, 164),
-            FontSize = 9,
-            Margin = new Thickness(0, 4, 0, 0),
-            TextWrapping = TextWrapping.Wrap
-        };
-        var container = new StackPanel();
-        container.Children.Add(row);
-        container.Children.Add(_modelHint);
-        return container;
+        return row;
     }
 
     private async Task LoadModelChoicesAsync()
@@ -437,7 +440,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
             await _client.EnsureInitializedAsync(_projectRoot);
             var models = await _client.ListModelsAsync();
             if (_disposed || _modelBox is null) return;
-            if (_connectionLabel is not null) _connectionLabel.Text = "Codex listo · MCP sin verificar";
+            if (_connectionLabel is not null) _connectionLabel.Text = "MCP sin verificar";
             _availableModels = models;
             _loadingModels = true;
             var saved = CodexModelSelection.Load();
@@ -448,9 +451,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
             _modelBox.SelectedItem = _modelBox.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(item => item.Tag is string id && id == saved) ?? _modelBox.Items[0];
             _loadingModels = false;
-            if (_modelHint is not null) _modelHint.Text = models.Count > 0
-                ? $"{models.Count} modelos listados por Codex. El acceso se confirma al enviar."
-                : "No se pudo listar modelos; Codex usará el predeterminado.";
+            SetStatus(models.Count > 0
+                ? $"{models.Count} modelos disponibles en el catálogo de Codex."
+                : "No se pudo listar modelos; Codex usará el predeterminado.");
         }
         catch (Exception ex)
         {
@@ -473,7 +476,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _prompt.IsEnabled = true;
         _attachButton.IsEnabled = true;
         _sendButton.IsEnabled = true;
-        _placeholder.Text = "Describe lo que necesitas…";
+        _placeholder.Text = "Pregunta sobre tu modelo, adjunta archivos o solicita una rutina Dynamo…";
+        if (_contextButton is not null) _contextButton.IsEnabled = true;
+        if (_modelBox is not null) _modelBox.IsEnabled = true;
         _status.Text = "Listo · Codex se conecta al enviar";
         _layout.Children.Remove(_contextCard);
         _contextCard = BuildContextCard(projectReady: true);
@@ -715,9 +720,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 _prompt.IsEnabled = true;
                 _attachButton.IsEnabled = true;
                 if (_contextButton is not null) _contextButton.IsEnabled = true;
-                _sendButton.Content = "Enviar  ↑";
-                _sendButton.Background = ButtonAccent;
-                _sendButton.Foreground = ButtonAccentText;
+                _sendButton.Content = "↑";
+                _sendButton.Background = BrushFromRgb(30, 30, 30);
+                _sendButton.Foreground = TextBrush;
                 _sendButton.IsEnabled = true;
                 _prompt.Focus();
             }
@@ -787,7 +792,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _toolCards.Clear();
         _messages.Children.Clear();
         AddMessage("ARQ-IA", "Nueva conversación. El modelo Revit permanece sin cambios.", isUser: false);
-        if (_connectionLabel is not null) _connectionLabel.Text = "Codex sin iniciar · MCP sin verificar";
+        if (_connectionLabel is not null)
+        {
+            _connectionLabel.Text = "MCP sin verificar";
+            _connectionLabel.Foreground = Muted;
+            if (_connectionBadge is not null) _connectionBadge.Background = BrushFromRgb(65, 65, 65);
+        }
         if (old is not null) await old.DisposeAsync();
         if (_projectRoot is not null) await LoadModelChoicesAsync();
     }
@@ -799,22 +809,33 @@ internal sealed class AssistantPane : UserControl, IDisposable
         {
             var card = new Border
             {
-                Background = SurfaceRaised,
+                Background = BrushFromRgb(49, 49, 49),
                 BorderBrush = PanelBorder,
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(9, 7, 9, 7),
-                Margin = new Thickness(0, 0, 0, 9)
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(11, 9, 11, 9),
+                Margin = new Thickness(0, 0, 0, 12)
             };
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock
+            var top = new DockPanel();
+            var badge = new Border
             {
-                Text = $"⚙  {activity.Server} · {activity.Tool}",
+                Background = BrushFromRgb(66, 66, 66),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(6, 1, 6, 1),
+                Child = new TextBlock { Text = "MCP", Foreground = TextBrush, FontSize = 9 }
+            };
+            DockPanel.SetDock(badge, Dock.Right);
+            top.Children.Add(badge);
+            top.Children.Add(new TextBlock
+            {
+                Text = "⚙  " + FriendlyToolLabel(activity),
                 Foreground = TextBrush,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 TextWrapping = TextWrapping.Wrap
             });
+            stack.Children.Add(top);
             var state = new TextBlock { Foreground = Muted, FontSize = 10, Margin = new Thickness(0, 4, 0, 0) };
             stack.Children.Add(state);
             var detail = new TextBlock { Foreground = Muted, FontSize = 10, TextWrapping = TextWrapping.Wrap };
@@ -847,30 +868,52 @@ internal sealed class AssistantPane : UserControl, IDisposable
             if (fields.Detail.Parent is Expander expander) expander.Visibility = Visibility.Visible;
         }
         if (activity.Status == "completed" && _connectionLabel is not null)
-            _connectionLabel.Text = "Codex listo · MCP respondió";
+        {
+            _connectionLabel.Text = "MCP conectado";
+            _connectionLabel.Foreground = BrushFromRgb(85, 219, 110);
+            if (_connectionBadge is not null) _connectionBadge.Background = BrushFromRgb(39, 65, 42);
+        }
         _conversationScroll.ScrollToEnd();
+    }
+
+    private static string FriendlyToolLabel(McpToolActivity activity)
+    {
+        if (activity.Server == "rvt_mcp")
+        {
+            var name = activity.Tool switch
+            {
+                "revit_get_selected_elements" => "Get Selection",
+                "revit_get_current_view_info" => "Get Active View",
+                "revit_list_materials" => "List Materials",
+                "revit_override_element_graphics" => "Override Graphics",
+                _ => activity.Tool.Replace("revit_", string.Empty, StringComparison.Ordinal).Replace('_', ' ')
+            };
+            return "Revit MCP · " + name;
+        }
+        if (activity.Server == "bim_ai_routines") return "Rutinas Dynamo · " + activity.Tool.Replace('_', ' ');
+        if (activity.Server == "bim_ai_dynamo_runner") return "Dynamo Runner · " + activity.Tool.Replace('_', ' ');
+        return activity.Server + " · " + activity.Tool;
     }
 
     private TextBlock AddMessage(string speaker, string message, bool isUser, IReadOnlyList<LocalAttachment>? attachments = null)
     {
-        var messageStack = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-        var heading = new TextBlock
+        var messageStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+        if (!isUser)
         {
-            Text = speaker,
-            Foreground = isUser ? BrushFromRgb(145, 184, 255) : BrushFromRgb(136, 220, 184),
-            FontSize = 10,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(3, 0, 3, 4)
-        };
-        messageStack.Children.Add(heading);
+            var heading = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(3, 0, 3, 6) };
+            heading.Children.Add(new TextBlock { Text = "◉", Foreground = TextBrush, FontSize = 11, Margin = new Thickness(0, 0, 7, 0) });
+            heading.Children.Add(new TextBlock { Text = speaker, Foreground = TextBrush, FontSize = 12, FontWeight = FontWeights.SemiBold });
+            heading.Children.Add(new TextBlock { Text = "Respuesta del asistente", Foreground = Muted, FontSize = 9, Margin = new Thickness(7, 2, 0, 0) });
+            messageStack.Children.Add(heading);
+        }
 
         var bubble = new Border
         {
-            Background = isUser ? BrushFromRgb(43, 63, 94) : Brushes.Transparent,
-            BorderBrush = isUser ? BrushFromRgb(61, 91, 133) : Brushes.Transparent,
-            BorderThickness = isUser ? new Thickness(1) : new Thickness(0),
-            CornerRadius = new CornerRadius(9),
-            Padding = new Thickness(9, 7, 9, 8),
+            Background = isUser ? BrushFromRgb(31, 31, 31) : Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(12),
+            Padding = isUser ? new Thickness(12, 9, 12, 9) : new Thickness(3, 3, 3, 4),
             HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
             MaxWidth = double.PositiveInfinity
         };
@@ -878,7 +921,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         var body = new TextBlock
         {
             Foreground = TextBrush,
-            FontSize = 12,
+            FontSize = 13,
             TextWrapping = TextWrapping.Wrap
         };
         if (isUser) body.Text = message;
@@ -889,7 +932,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
             var files = new TextBlock
             {
                 Text = string.Join("\n", attachments.Select(item => item.IsImage ? "▣ " : "▤ ").Zip(attachments, (symbol, item) => symbol + item.Name)),
-                Foreground = BrushFromRgb(190, 207, 231),
+                Foreground = Muted,
                 FontSize = 10,
                 Margin = new Thickness(0, 6, 0, 0),
                 TextWrapping = TextWrapping.Wrap
@@ -900,7 +943,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         messageStack.Children.Add(bubble);
         if (!isUser)
         {
-            var copy = CreateButton("Copiar", Brushes.Transparent, Muted, 10);
+            var copy = CreateButton("▢", Brushes.Transparent, Muted, 13);
             copy.Padding = new Thickness(3, 1, 3, 1);
             copy.Margin = new Thickness(5, 3, 0, 0);
             copy.HorizontalAlignment = HorizontalAlignment.Left;
@@ -1019,11 +1062,74 @@ internal sealed class AssistantPane : UserControl, IDisposable
         FocusVisualStyle = null
     };
 
-    private static ControlTemplate CreateButtonTemplate()
+    private static ControlTemplate CreateDarkComboBoxTemplate()
+    {
+        var toggleTemplate = new ControlTemplate(typeof(ToggleButton));
+        var toggleBorder = new FrameworkElementFactory(typeof(Border));
+        toggleBorder.SetValue(Border.BackgroundProperty, SurfaceRaised);
+        toggleBorder.SetValue(Border.BorderBrushProperty, PanelBorder);
+        toggleBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        toggleBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+        toggleBorder.SetValue(Border.PaddingProperty, new Thickness(6, 4, 6, 4));
+        var toggleContent = new FrameworkElementFactory(typeof(DockPanel));
+        var arrow = new FrameworkElementFactory(typeof(TextBlock));
+        arrow.SetValue(TextBlock.TextProperty, "⌄");
+        arrow.SetValue(TextBlock.ForegroundProperty, Muted);
+        arrow.SetValue(DockPanel.DockProperty, Dock.Right);
+        toggleContent.AppendChild(arrow);
+        var selected = new FrameworkElementFactory(typeof(TextBlock));
+        selected.SetBinding(TextBlock.TextProperty, new Binding("SelectedItem.Content")
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(ComboBox), 1)
+        });
+        selected.SetValue(TextBlock.ForegroundProperty, TextBrush);
+        selected.SetValue(TextBlock.FontSizeProperty, 10d);
+        selected.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        toggleContent.AppendChild(selected);
+        toggleBorder.AppendChild(toggleContent);
+        toggleTemplate.VisualTree = toggleBorder;
+
+        var template = new ControlTemplate(typeof(ComboBox));
+        var root = new FrameworkElementFactory(typeof(Grid));
+        var toggle = new FrameworkElementFactory(typeof(ToggleButton));
+        toggle.SetValue(ToggleButton.TemplateProperty, toggleTemplate);
+        toggle.SetValue(ToggleButton.FocusableProperty, false);
+        toggle.SetBinding(ToggleButton.IsCheckedProperty, new Binding("IsDropDownOpen")
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+            Mode = BindingMode.TwoWay
+        });
+        root.AppendChild(toggle);
+        var popup = new FrameworkElementFactory(typeof(Popup), "PART_Popup");
+        popup.SetValue(Popup.PlacementProperty, PlacementMode.Bottom);
+        popup.SetValue(Popup.AllowsTransparencyProperty, true);
+        popup.SetValue(Popup.FocusableProperty, false);
+        popup.SetBinding(Popup.IsOpenProperty, new Binding("IsDropDownOpen")
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        var popupBorder = new FrameworkElementFactory(typeof(Border));
+        popupBorder.SetValue(Border.BackgroundProperty, SurfaceRaised);
+        popupBorder.SetValue(Border.BorderBrushProperty, PanelBorder);
+        popupBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        popupBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+        popupBorder.SetValue(Border.MinWidthProperty, 180d);
+        var scroll = new FrameworkElementFactory(typeof(ScrollViewer));
+        scroll.SetValue(ScrollViewer.CanContentScrollProperty, true);
+        scroll.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
+        scroll.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
+        popupBorder.AppendChild(scroll);
+        popup.AppendChild(popupBorder);
+        root.AppendChild(popup);
+        template.VisualTree = root;
+        return template;
+    }
+
+    private static ControlTemplate CreateButtonTemplate(double cornerRadius = 6)
     {
         var template = new ControlTemplate(typeof(Button));
         var chrome = new FrameworkElementFactory(typeof(Border), "ButtonChrome");
-        chrome.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+        chrome.SetValue(Border.CornerRadiusProperty, new CornerRadius(cornerRadius));
         chrome.SetBinding(Border.BackgroundProperty, TemplateParentBinding(nameof(Control.Background)));
         chrome.SetBinding(Border.BorderBrushProperty, TemplateParentBinding(nameof(Control.BorderBrush)));
         chrome.SetBinding(Border.BorderThicknessProperty, TemplateParentBinding(nameof(Control.BorderThickness)));
