@@ -1,5 +1,7 @@
 # ARQ-IA
 
+**Repositorio público:** [Desoxi1/ARQ-IA](https://github.com/Desoxi1/ARQ-IA) · Clonar: `git clone https://github.com/Desoxi1/ARQ-IA.git`
+
 **Asistente para Revit 2027 y Dynamo 4.0.2.** Desarrollado por Branko Plaza. Abre un chat en Revit y en **Dynamo → Extensiones → Abrir ARQ-IA**, acepta texto e imágenes/archivos, conserva el historial local por carpeta de proyecto y usa Codex para interpretar solicitudes BIM.
 
 ## Cómo funciona
