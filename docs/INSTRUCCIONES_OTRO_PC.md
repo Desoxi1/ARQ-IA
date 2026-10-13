@@ -10,7 +10,7 @@ Revit 2027 con Dynamo for Revit, Windows x64 y Codex Desktop/CLI con sesión ini
 2. Guarda tu trabajo y cierra Revit antes de la primera instalación.
 3. Haz doble clic en `Instalar-ARQ-IA.cmd`. El programa comprueba Revit, Dynamo y Codex, instala el add-in y panel por usuario, y configura las rutas MCP locales para esa carpeta. No necesita .NET SDK.
 4. Abre la carpeta en Codex y acepta la confianza del proyecto cuando la solicite. No copies `.codex/config.toml` desde otro PC: el instalador lo genera con rutas del equipo.
-5. Abre Revit 2027. En la cinta aparece **ARQ-IA**; en Dynamo busca **Extensiones → Abrir ARQ-IA**. Si Windows avisa que el editor es desconocido, comprueba nombre y fabricante Branko Plaza. La metadata no equivale a una firma digital.
+5. Abre Revit 2027. En la cinta aparece **ARQ-IA**; en Dynamo busca **Extensiones → Abrir ARQ-IA**. Los manifiestos registran **Branko Plaza** como fabricante. Revit aún puede mostrar «Fabricante desconocido» en el aviso porque las DLL no están firmadas por un certificado de editor confiable; aceptar el aviso es una decisión de confianza en el código descargado, no algo que el nombre del manifiesto pueda sustituir.
 
 Alternativa PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 
@@ -26,6 +26,6 @@ La ejecución de rutinas **genéricas** de Dynamo y las escrituras complejas sig
 
 ## Qué copia Git
 
-Fuente de los paneles/bridge, DLL propios con hashes, instalador, MCP de rutinas, plantillas, documentos y rutinas de ejemplo. Git excluye RVT/RFA, credenciales, adjuntos, logs, caché de terceros, binarios temporales, `.codex/config.toml` local y ZIP generados. La instalación crea los archivos locales que faltan en cada PC.
+Fuente de los paneles/bridge, DLL propios con hashes, instalador, MCP de rutinas, plantillas, documentos, base compartida de materiales y rutinas de ejemplo. Git excluye RVT/RFA, credenciales, adjuntos, logs, caché de terceros, inventarios del modelo, datos personales de `.arq-ia/`, binarios temporales, `.codex/config.toml` local y ZIP generados. Cada PC crea su perfil y preferencias propias al usar ARQ-IA.
 
 Para el equipo de desarrollo: `package.ps1` genera un ZIP desde un **commit limpio**. `build.ps1` en cada componente recompila los DLL si cambia la fuente; los arquitectos no necesitan ejecutarlo.

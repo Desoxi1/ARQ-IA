@@ -47,6 +47,7 @@ node_modules/
 
 # Per-machine Codex wiring contains absolute executable paths
 .arq-ia/
+# Local model profile, conversation history, catalogs, and user-specific preferences stay on each PC.
 .codex/config.toml
 .codex/config.toml.*
 !.codex/config.toml.example

@@ -49,7 +49,8 @@ class BootstrapInstallerTests(unittest.TestCase):
         self.assertNotIn("Configura BIM-AI-POC", pane)
         self.assertIn("_prompt.IsEnabled = projectRoot is not null", pane)
         self.assertIn("_attachButton.IsEnabled = projectRoot is not null", pane)
-        self.assertIn("Gestor: Branko Plaza", pane)
+        self.assertIn('Text = "Asistente BIM · Revit 2027"', pane)
+        self.assertNotIn("Gestor: Branko Plaza", pane)
 
     def test_docs_and_portable_package_point_to_the_single_entrypoint(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

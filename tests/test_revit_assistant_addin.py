@@ -32,7 +32,8 @@ class RevitAssistantAddinTests(unittest.TestCase):
         self.assertIn('"ARQ-IA"', source)
         self.assertIn('"Abrir chat"', source)
         self.assertIn("GetDockablePane", source)
-        self.assertIn("Gestor: Branko Plaza", (SHARED / "AssistantPane.cs").read_text(encoding="utf-8"))
+        self.assertIn('Text = "Asistente BIM · Revit 2027"', (SHARED / "AssistantPane.cs").read_text(encoding="utf-8"))
+        self.assertNotIn("Gestor: Branko Plaza", (SHARED / "AssistantPane.cs").read_text(encoding="utf-8"))
 
     def test_installer_is_per_user_hash_checked_and_identifies_branko_plaza_as_vendor(self):
         installer = (ADDIN / "install.ps1").read_text(encoding="utf-8")

@@ -83,6 +83,15 @@ try {
 } finally {
     Remove-Item -LiteralPath $manifestTemp -Force -ErrorAction SilentlyContinue
 }
+[xml]$verifiedBridgeManifest = Get-Content -LiteralPath $manifestTarget -Raw
+if ($verifiedBridgeManifest.RevitAddIns.AddIn.FullClassName -ne 'BimAiDynamoBridge.BridgeApplication' -or
+    $verifiedBridgeManifest.RevitAddIns.AddIn.AddInId -ne '85279988-3BB1-4200-8DA5-E2FD521EA7A8' -or
+    $verifiedBridgeManifest.RevitAddIns.AddIn.VendorId -ne 'BMAI' -or
+    $verifiedBridgeManifest.RevitAddIns.AddIn.VendorDescription -ne 'Branko Plaza' -or
+    [IO.Path]::GetFullPath($verifiedBridgeManifest.RevitAddIns.AddIn.Assembly) -ne [IO.Path]::GetFullPath($assemblyTarget) -or
+    (Get-FileHash -LiteralPath $assemblyTarget -Algorithm SHA256).Hash.ToLowerInvariant() -ne $assemblyHash) {
+    throw 'La verificación del manifiesto y DLL de ARQ-IA Dynamo Bridge no pasó.'
+}
 $settings = [ordered]@{ routinesRoot = (Join-Path $repoRoot 'routines'); testModelsRoot = $testModelsRoot }
 [IO.File]::WriteAllText($settingsTarget, (ConvertTo-Json -InputObject $settings -Depth 4), $utf8NoBom)
 
@@ -94,3 +103,4 @@ if ($requiresRestart) {
     Write-Output 'Reinicia Revit y acepta la carga del add-in BIM-AI Dynamo Bridge para probarlo.'
 }
 Write-Output ("BRIDGE_ASSEMBLY_PATH=" + $assemblyTarget)
+Write-Output 'BRIDGE_VENDOR_DESCRIPTION=Branko Plaza'

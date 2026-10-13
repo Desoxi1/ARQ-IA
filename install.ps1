@@ -36,7 +36,9 @@ foreach ($path in @(
     (Join-Path $projectRoot 'setup.ps1'),
     (Join-Path $projectRoot 'revit\bridge\install.ps1'),
     (Join-Path $projectRoot 'revit\assistant\install.ps1'),
-    (Join-Path $projectRoot 'dynamo\extension\install.ps1')
+    (Join-Path $projectRoot 'dynamo\extension\install.ps1'),
+    (Join-Path $projectRoot 'materials\base.csv'),
+    (Join-Path $projectRoot 'materials\local-materials.template.csv')
 )) { Assert-RequiredFile $path 'un instalador del paquete' }
 
 function Resolve-CodexExecutable {
@@ -112,7 +114,18 @@ if ([IO.Path]::GetFullPath([string]$settings.routinesRoot) -ne [IO.Path]::GetFul
     throw 'La extensión quedó apuntando a otra carpeta de rutinas; revisa bridge.json antes de usarla.'
 }
 
+# Create a private, per-clone materials overlay once; preserve any existing user additions.
+$localMaterialsDirectory = Join-Path $projectRoot '.arq-ia\materials'
+$localMaterialsCatalog = Join-Path $localMaterialsDirectory 'local.csv'
+$localMaterialsTemplate = Join-Path $projectRoot 'materials\local-materials.template.csv'
+New-Item -ItemType Directory -Force -Path $localMaterialsDirectory | Out-Null
+if (-not (Test-Path -LiteralPath $localMaterialsCatalog -PathType Leaf)) {
+    Copy-Item -LiteralPath $localMaterialsTemplate -Destination $localMaterialsCatalog
+}
+
 Write-Output 'INSTALL=PASS'
+Write-Output 'MATERIALS_BASE=materials/base.csv'
+Write-Output 'MATERIALS_LOCAL=.arq-ia/materials/local.csv (privado; no se sobrescribe)'
 Write-Output 'CODEX_PROJECT=Abre esta carpeta en Codex y confirma Confiar si aparece el aviso para cargar los MCP locales.'
 Write-Output 'REVIT_DYNAMO=Abre Revit y Dynamo en una sesión nueva para cargar ARQ-IA.'
 Write-Output 'NEXT_TEST=En Dynamo, consulta la vista activa y la selección; no modifica el modelo.'

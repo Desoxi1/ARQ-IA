@@ -147,6 +147,7 @@ class BridgePackageIntegrityTests(unittest.TestCase):
     def test_installer_uses_hash_named_assemblies_for_open_revit_sessions(self):
         installer = BRIDGE_INSTALLER.read_text(encoding="utf-8")
         self.assertIn("BimAiDynamoBridge.' + $assemblyHash.Substring(0, 16) + '.dll", installer)
+        self.assertIn("VendorDescription -ne 'Branko Plaza'", installer)
         self.assertIn("$stagedHash -ne $assemblyHash", installer)
         self.assertIn("Move-Item -LiteralPath $manifestTemp -Destination $manifestTarget -Force", installer)
 

@@ -6,6 +6,12 @@ ARQ-IA consulta **el documento Revit activo**. `revit_list_materials` devuelve l
 
 Un material definido no demuestra que esté aplicado a un elemento. Las bibliotecas `.adsklib` instaladas en el PC son otra fuente distinta y no se importan automáticamente al proyecto. Tampoco existe un catálogo universal de materiales arquitectónicos válido para toda oficina o proyecto.
 
+## Base de referencia y extensión local
+
+`materials/base.csv` contiene 208 filas tomadas de la lista de materiales revisada para preparar ARQ-IA. Se conservaron solo nombre, clase, categoría, color y transparencia; se excluyeron IDs de Revit/asset, nombre del modelo, cantidades, recuentos de uso y takeoffs. Es una base común de búsqueda y lenguaje arquitectónico, no una norma de oficina ni una ficha técnica. Verifica siempre que el material exista en el documento activo y confirma sus propiedades antes de asignarlo.
+
+Cada PC puede guardar convenciones locales en `.arq-ia/materials/local.csv`, usando las columnas de `materials/local-materials.template.csv`. Añade solo una preferencia que el usuario haya definido o un resultado reutilizable ya verificado. No copies el inventario completo de un RVT a la base común; `.arq-ia/` está ignorada por Git, así cada equipo amplía su propia colección sin compartir el modelo.
+
 Según Autodesk, un material puede tener datos de **identidad**, **gráficos** para vistas no renderizadas, **apariencia** de render, **propiedades físicas** y **propiedades térmicas**. Estas facetas no son intercambiables. La clase/categoría escrita en el material es metadata del modelo, no una especificación técnica verificada. [Materiales en Revit 2027](https://help.autodesk.com/cloudhelp/2027/ENU/Revit-Customize/files/GUID-8E88F590-4864-4C60-9433-4A70AC066605.htm), [API de Material](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API-MainReference/files/html/2ec33007-7a2a-f86a-009b-d4c5d235a307.htm).
 
 ## Lectura comprobada en este PC
@@ -14,7 +20,7 @@ El 13-10-2026 se abrió **Snowdon Towers Sample Architectural.rvt**, copia local
 
 Distribución por clase declarada en el ejemplo: Generic 71, Unassigned 60, Metal 49, Wood 24, Plastic 20, Miscellaneous 16, Masonry 11, Paint 9, Glass 8, Concrete 7, System 6, Stone 6, Ceramic 3 y otras clases minoritarias. Los 300 registran un asset de apariencia; 124 tienen asset estructural y 128 asset térmico. Se consultaron detalladamente seis candidatos de hormigón, vidrio, ladrillo, madera, yeso y aislación; el conector devolvió gráficos, patrones, identidad, assets y parámetros. El ejemplo muestra que un nombre comercial o genérico puede coexistir con assets físicos/térmicos de nombres distintos. **No tomar sus valores como ficha técnica del proyecto.**
 
-El inventario íntegro y esas respuestas detalladas quedan solo en `logs/materials/` de este PC, excluido de Git y del ZIP. El escaneo no activó `includeUseCount`; no hay evidencia de cuáles de los 300 se usan en elementos ni de sus cantidades. Se identificaron 14 archivos `.adsklib` Autodesk instalados, sin afirmar que sus contenidos estén cargados en el RVT. El otro PC generará su propio catálogo al abrir su modelo.
+El inventario íntegro del ejemplo y esas respuestas detalladas quedan solo en `logs/materials/` de este PC, excluido de Git y del ZIP. El escaneo no activó `includeUseCount`; no hay evidencia de cuáles de los 300 se usan en elementos ni de sus cantidades. Se identificaron 14 archivos `.adsklib` Autodesk instalados, sin afirmar que sus contenidos estén cargados en el RVT. Cada PC generará su propio perfil al abrir su modelo; la base común de 208 nombres se usa solo como vocabulario de referencia.
 
 ## Cómo resolver una petición de un arquitecto
 

@@ -299,7 +299,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
             BorderBrush = BrushFromRgb(89, 200, 230),
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = "ARQ-IA · Asistente BIM · Branko Plaza",
+            ToolTip = "ARQ-IA · Asistente BIM",
             Child = markCanvas
         };
         DockPanel.SetDock(mark, Dock.Left);
@@ -314,7 +314,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         });
         title.Children.Add(new TextBlock
         {
-            Text = "Gestor: Branko Plaza · Asistente BIM · Revit 2027",
+            Text = "Asistente BIM · Revit 2027",
             FontSize = 10,
             Foreground = Muted
         });

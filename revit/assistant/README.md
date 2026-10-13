@@ -2,7 +2,7 @@
 
 Add-in de Revit 2027 que abre un chat acoplable en la pestaña **ARQ-IA**. Comparte el mismo panel WPF, cliente local de Codex, almacenamiento de adjuntos y configuración MCP que la extensión de Dynamo.
 
-El encabezado identifica a **Branko Plaza** como gestor. La integración usa la sesión local autenticada de Codex CLI y los MCP de la carpeta del proyecto; no contiene una API key. Ejecuta `install.ps1` desde la raíz del clon para configurar MCP, bridge, panel Revit y panel Dynamo en un solo paso.
+El encabezado muestra ARQ-IA y el producto, sin atribución personal. El manifiesto registra **Branko Plaza** como fabricante; el aviso de seguridad de Revit solo mostrará un editor verificado cuando la DLL esté firmada por un certificado confiable. La integración usa la sesión local autenticada de Codex CLI y los MCP de la carpeta del proyecto; no contiene una API key. Ejecuta `install.ps1` desde la raíz del clon para configurar MCP, bridge, panel Revit y panel Dynamo en un solo paso.
 
 ## Compilar
 

@@ -94,7 +94,7 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn('CreateButton("↑", BrushFromRgb(30, 30, 30), TextBrush', pane)
         self.assertIn('CreateButtonTemplate(16)', pane)
         self.assertIn('Geometry.Parse("M7.5,25.5 L16,6.8 L24.5,25.5")', pane)
-        self.assertIn('Text = "Gestor: Branko Plaza · Asistente BIM · Revit 2027"', pane)
+        self.assertIn('Text = "Asistente BIM · Revit 2027"', pane)
         self.assertIn('Content = "Automático", Tag = null', pane)
         self.assertIn("CodexModelSelection.Save(selected.Tag as string)", pane)
         self.assertIn("Width = 142", pane)
