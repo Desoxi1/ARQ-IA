@@ -7,6 +7,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Documents;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 namespace BimAiDynamoAssistant;
@@ -50,11 +52,15 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private Button? _contextButton;
     private ComboBox? _modelBox;
     private TextBlock? _modelHint;
-    private string? _activeModelKey;
+    private IReadOnlyList<CodexModelInfo> _availableModels = Array.Empty<CodexModelInfo>();
+    private bool _loadingModels;
     private readonly List<LocalAttachment> _pendingAttachments = new();
     private LocalAttachmentStore? _attachmentStore;
     private CodexAppServerClient? _client;
     private TextBlock? _streamingText;
+    private string _streamingRaw = string.Empty;
+    private TextBlock? _connectionLabel;
+    private readonly Dictionary<string, (TextBlock Status, TextBlock Detail)> _toolCards = new();
     private bool _disposed;
     private bool _turnInProgress;
     private bool _turnCancellationRequested;
@@ -240,11 +246,18 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _readinessTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _readinessTimer.Tick += (_, _) => TryActivateProject();
         if (projectRoot is null) _readinessTimer.Start();
+        else _ = LoadModelChoicesAsync();
     }
 
     private FrameworkElement BuildHeader()
     {
         var outer = new DockPanel { Margin = new Thickness(1, 1, 1, 8), LastChildFill = true };
+        var newChat = CreateButton("＋", Brushes.Transparent, Muted, 16);
+        newChat.ToolTip = "Nueva conversación de ARQ-IA";
+        newChat.Padding = new Thickness(7, 2, 7, 2);
+        newChat.Click += async (_, _) => await NewConversationAsync();
+        DockPanel.SetDock(newChat, Dock.Right);
+        outer.Children.Add(newChat);
         var markCanvas = new Canvas { Width = 32, Height = 32 };
         var markStroke = new SolidColorBrush(Color.FromRgb(248, 253, 255));
         var markCrossbar = new SolidColorBrush(Color.FromRgb(113, 229, 244));
@@ -289,11 +302,18 @@ internal sealed class AssistantPane : UserControl, IDisposable
         });
         title.Children.Add(new TextBlock
         {
-            Text = "Codex · Dynamo · Revit 2027",
+            Text = "Asistente BIM · Revit 2027",
+            FontSize = 10,
+            Foreground = Muted
+        });
+        _connectionLabel = new TextBlock
+        {
+            Text = "Codex sin iniciar · MCP sin verificar",
             FontSize = 10,
             Margin = new Thickness(0, 2, 0, 0),
             Foreground = Muted
-        });
+        };
+        title.Children.Add(_connectionLabel);
         title.Children.Add(new TextBlock
         {
             Text = "Gestor: Branko Plaza",
@@ -377,27 +397,26 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _modelBox = new ComboBox
         {
             FontSize = 10,
-            MinWidth = 150,
-            ToolTip = "Nivel de costo de Codex. Económico gasta menos cuota; Potente solo si Estándar no resolvió."
+            MinWidth = 170,
+            ToolTip = "Modelos reales que ofrece Codex en este equipo. Automático usa Luna para consultas breves y el modelo predeterminado para tareas generales."
         };
-        _modelBox.Items.Add(new ComboBoxItem { Content = "Económico", Tag = ModelTier.Economico });
-        _modelBox.Items.Add(new ComboBoxItem { Content = "Estándar", Tag = ModelTier.Estandar });
-        _modelBox.Items.Add(new ComboBoxItem { Content = "Potente", Tag = ModelTier.Potente });
-        var saved = CodexModelSelection.Load(_projectRoot);
-        _modelBox.SelectedIndex = saved switch { ModelTier.Economico => 0, ModelTier.Potente => 2, _ => 1 };
+        _modelBox.Items.Add(new ComboBoxItem { Content = "Automático", Tag = null });
+        _modelBox.SelectedIndex = 0;
         _modelBox.SelectionChanged += (_, _) =>
         {
-            if (_modelBox?.SelectedItem is not ComboBoxItem selected || selected.Tag is not ModelTier tier) return;
-            CodexModelSelection.Save(_projectRoot, tier);
-            if (_modelHint is not null) _modelHint.Text = CodexModelSelection.HintFor(tier);
-            SetStatus($"Modelo {selected.Content} · rige desde el próximo envío.");
+            if (_loadingModels || _modelBox?.SelectedItem is not ComboBoxItem selected) return;
+            CodexModelSelection.Save(selected.Tag as string);
+            if (_modelHint is not null) _modelHint.Text = selected.Tag is string id
+                ? $"{id} · disponible según el catálogo de Codex; se confirma al enviar."
+                : "Luna para consultas breves; modelo predeterminado para tareas generales.";
+            SetStatus($"Modelo {selected.Content} · se aplicará al próximo envío.");
         };
         DockPanel.SetDock(_modelBox, Dock.Right);
         row.Children.Add(_modelBox);
 
         _modelHint = new TextBlock
         {
-            Text = CodexModelSelection.HintFor(saved),
+            Text = "Cargando modelos de Codex…",
             Foreground = BrushFromRgb(125, 143, 164),
             FontSize = 9,
             Margin = new Thickness(0, 4, 0, 0),
@@ -407,6 +426,40 @@ internal sealed class AssistantPane : UserControl, IDisposable
         container.Children.Add(row);
         container.Children.Add(_modelHint);
         return container;
+    }
+
+    private async Task LoadModelChoicesAsync()
+    {
+        if (_disposed || _projectRoot is null || _modelBox is null) return;
+        try
+        {
+            _client ??= CreateClient();
+            await _client.EnsureInitializedAsync(_projectRoot);
+            var models = await _client.ListModelsAsync();
+            if (_disposed || _modelBox is null) return;
+            if (_connectionLabel is not null) _connectionLabel.Text = "Codex listo · MCP sin verificar";
+            _availableModels = models;
+            _loadingModels = true;
+            var saved = CodexModelSelection.Load();
+            _modelBox.Items.Clear();
+            _modelBox.Items.Add(new ComboBoxItem { Content = "Automático", Tag = null });
+            foreach (var model in models)
+                _modelBox.Items.Add(new ComboBoxItem { Content = model.DisplayName, Tag = model.Id });
+            _modelBox.SelectedItem = _modelBox.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => item.Tag is string id && id == saved) ?? _modelBox.Items[0];
+            _loadingModels = false;
+            if (_modelHint is not null) _modelHint.Text = models.Count > 0
+                ? $"{models.Count} modelos listados por Codex. El acceso se confirma al enviar."
+                : "No se pudo listar modelos; Codex usará el predeterminado.";
+        }
+        catch (Exception ex)
+        {
+            _loadingModels = false;
+            SetStatus($"Modelos no disponibles ({ex.GetType().Name}); se usará el predeterminado.");
+            var client = _client;
+            _client = null;
+            if (client is not null) await client.DisposeAsync();
+        }
     }
 
     private void TryActivateProject()
@@ -427,6 +480,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         Grid.SetRow(_contextCard, 1);
         _layout.Children.Add(_contextCard);
         AddMessage("ARQ-IA", "Instalación detectada. Ya puedes enviar mensajes y adjuntar archivos.", isUser: false);
+        _ = LoadModelChoicesAsync();
     }
 
     private async void OnPromptPreviewKeyDown(object sender, KeyEventArgs args)
@@ -593,7 +647,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         }
     }
 
-    private async Task SendPromptAsync(string? promptOverride = null, bool includeAttachments = true, bool clearComposer = true, ModelTier? forceTier = null)
+    private async Task SendPromptAsync(string? promptOverride = null, bool includeAttachments = true, bool clearComposer = true, bool preferLightweight = false)
     {
         if (_disposed || _projectRoot is null || _turnInProgress || !_sendButton.IsEnabled) return;
         var prompt = promptOverride ?? _prompt.Text.Trim();
@@ -601,22 +655,14 @@ internal sealed class AssistantPane : UserControl, IDisposable
             prompt = "Analiza los adjuntos y relaciónalos con el contexto actual de Revit.";
         if (prompt.Length == 0) return;
 
-        var tier = forceTier ?? SelectedTier();
-        var effort = CodexModelSelection.EffortFor(tier);
-        var pinnedModel = CodexModelSelection.PinnedModel(_projectRoot);
-        var modelKey = tier + "|" + effort + "|" + (pinnedModel ?? "-");
-        if (_client is not null && _activeModelKey != modelKey)
-        {
-            var previous = _client;
-            _client = null;
-            _activeModelKey = null;
-            await previous.DisposeAsync();
-        }
-
+        var selectedModel = ResolveModel(prompt, preferLightweight);
+        var modelInfo = _availableModels.FirstOrDefault(candidate => candidate.Id == selectedModel);
+        var effort = modelInfo?.DefaultEffort ?? "medium";
         var attachments = includeAttachments ? _pendingAttachments.ToArray() : Array.Empty<LocalAttachment>();
         var estimateTokens = (prompt.Length + attachments.Where(a => a.TextContent is not null).Sum(a => a.TextContent!.Length)) / 4;
         AddMessage("Tú", prompt, isUser: true, attachments);
         _streamingText = null;
+        _streamingRaw = string.Empty;
         _turnInProgress = true;
         _turnCancellationRequested = false;
         _prompt.IsEnabled = false;
@@ -631,10 +677,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         try
         {
             _client ??= CreateClient();
-            await _client.EnsureStartedAsync(_projectRoot, pinnedModel, effort);
-            _activeModelKey = modelKey;
-            SetStatus($"Consultando Codex ({TierName(tier)} · ≈{estimateTokens} tokens de entrada)…");
-            await _client.SendMessageWithAttachmentsAsync(prompt, attachments, pinnedModel, effort);
+            await _client.EnsureStartedAsync(_projectRoot, selectedModel, effort);
+            SetStatus($"Consultando Codex ({modelInfo?.DisplayName ?? "predeterminado"} · ≈{estimateTokens} tokens de entrada)…");
+            await _client.SendMessageWithAttachmentsAsync(prompt, attachments, selectedModel, effort);
             if (clearComposer)
             {
                 _prompt.Clear();
@@ -686,22 +731,22 @@ internal sealed class AssistantPane : UserControl, IDisposable
             "Consulta mediante MCP, en modo de solo lectura, la vista activa y la selección de Revit. Resume el nombre/tipo de vista y, para la selección, cantidad, categorías e IDs. Si no hay un documento activo, indícalo. No cambies el modelo.",
             includeAttachments: false,
             clearComposer: false,
-            forceTier: ModelTier.Economico);
+            preferLightweight: true);
     }
 
-    private ModelTier SelectedTier()
+    private string? ResolveModel(string prompt, bool preferLightweight)
     {
-        if (_modelBox?.SelectedItem is ComboBoxItem selected && selected.Tag is ModelTier tier)
-            return tier;
-        return CodexModelSelection.Load(_projectRoot);
+        if (_modelBox?.SelectedItem is ComboBoxItem { Tag: string chosen }) return chosen;
+        var briefRead = preferLightweight || (prompt.Length < 180 &&
+            (prompt.Contains("vista", StringComparison.OrdinalIgnoreCase) ||
+             prompt.Contains("selecci", StringComparison.OrdinalIgnoreCase) ||
+             prompt.Contains("lista", StringComparison.OrdinalIgnoreCase)) &&
+            !prompt.Contains("modifica", StringComparison.OrdinalIgnoreCase) &&
+            !prompt.Contains("crea", StringComparison.OrdinalIgnoreCase));
+        if (briefRead)
+            return _availableModels.FirstOrDefault(model => model.Id.EndsWith("-luna", StringComparison.OrdinalIgnoreCase))?.Id;
+        return _availableModels.FirstOrDefault(model => model.IsDefault)?.Id;
     }
-
-    private static string TierName(ModelTier tier) => tier switch
-    {
-        ModelTier.Economico => "Económico",
-        ModelTier.Potente => "Potente",
-        _ => "Estándar",
-    };
 
     private async Task StopCurrentTurnAsync()
     {
@@ -722,12 +767,88 @@ internal sealed class AssistantPane : UserControl, IDisposable
         {
             if (_streamingText is null)
                 _streamingText = AddMessage("ARQ-IA", string.Empty, isUser: false);
-            _streamingText.Text += value;
+            _streamingRaw += value;
+            RenderMarkdown(_streamingText, _streamingRaw);
             _conversationScroll.ScrollToEnd();
         });
+        client.ToolActivity += activity => Dispatcher.Invoke(() => UpdateToolCard(activity));
         client.TurnFailed += value => Dispatcher.Invoke(() => AddMessage("Codex", value, isUser: false));
         client.ApprovalRequested = request => Dispatcher.InvokeAsync(() => ConfirmRequest(request)).Task;
         return client;
+    }
+
+    private async Task NewConversationAsync()
+    {
+        if (_disposed || _turnInProgress) return;
+        var old = _client;
+        _client = null;
+        _streamingText = null;
+        _streamingRaw = string.Empty;
+        _toolCards.Clear();
+        _messages.Children.Clear();
+        AddMessage("ARQ-IA", "Nueva conversación. El modelo Revit permanece sin cambios.", isUser: false);
+        if (_connectionLabel is not null) _connectionLabel.Text = "Codex sin iniciar · MCP sin verificar";
+        if (old is not null) await old.DisposeAsync();
+        if (_projectRoot is not null) await LoadModelChoicesAsync();
+    }
+
+    private void UpdateToolCard(McpToolActivity activity)
+    {
+        var key = string.IsNullOrWhiteSpace(activity.Id) ? activity.Server + "." + activity.Tool : activity.Id;
+        if (!_toolCards.TryGetValue(key, out var fields))
+        {
+            var card = new Border
+            {
+                Background = SurfaceRaised,
+                BorderBrush = PanelBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(9, 7, 9, 7),
+                Margin = new Thickness(0, 0, 0, 9)
+            };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock
+            {
+                Text = $"⚙  {activity.Server} · {activity.Tool}",
+                Foreground = TextBrush,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            });
+            var state = new TextBlock { Foreground = Muted, FontSize = 10, Margin = new Thickness(0, 4, 0, 0) };
+            stack.Children.Add(state);
+            var detail = new TextBlock { Foreground = Muted, FontSize = 10, TextWrapping = TextWrapping.Wrap };
+            stack.Children.Add(new Expander
+            {
+                Header = "Detalles técnicos",
+                Content = detail,
+                FontSize = 10,
+                Foreground = Muted,
+                Margin = new Thickness(0, 4, 0, 0),
+                Visibility = Visibility.Collapsed
+            });
+            card.Child = stack;
+            _messages.Children.Add(card);
+            fields = (state, detail);
+            _toolCards[key] = fields;
+        }
+        fields.Status.Text = activity.Status switch
+        {
+            "inProgress" => "Consultando herramienta…",
+            "completed" => "Completada · respuesta recibida",
+            "failed" => "Error de herramienta",
+            _ => activity.Status
+        };
+        fields.Status.Foreground = activity.Status == "completed" ? BrushFromRgb(136, 220, 184) :
+            activity.Status == "failed" ? BrushFromRgb(255, 153, 153) : Muted;
+        if (!string.IsNullOrWhiteSpace(activity.Detail))
+        {
+            fields.Detail.Text = activity.Detail.Length > 3000 ? activity.Detail[..3000] + "…" : activity.Detail;
+            if (fields.Detail.Parent is Expander expander) expander.Visibility = Visibility.Visible;
+        }
+        if (activity.Status == "completed" && _connectionLabel is not null)
+            _connectionLabel.Text = "Codex listo · MCP respondió";
+        _conversationScroll.ScrollToEnd();
     }
 
     private TextBlock AddMessage(string speaker, string message, bool isUser, IReadOnlyList<LocalAttachment>? attachments = null)
@@ -745,9 +866,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
 
         var bubble = new Border
         {
-            Background = isUser ? BrushFromRgb(43, 63, 94) : SurfaceRaised,
-            BorderBrush = isUser ? BrushFromRgb(61, 91, 133) : PanelBorder,
-            BorderThickness = new Thickness(1),
+            Background = isUser ? BrushFromRgb(43, 63, 94) : Brushes.Transparent,
+            BorderBrush = isUser ? BrushFromRgb(61, 91, 133) : Brushes.Transparent,
+            BorderThickness = isUser ? new Thickness(1) : new Thickness(0),
             CornerRadius = new CornerRadius(9),
             Padding = new Thickness(9, 7, 9, 8),
             HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
@@ -756,11 +877,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
         var contents = new StackPanel();
         var body = new TextBlock
         {
-            Text = message,
             Foreground = TextBrush,
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap
         };
+        if (isUser) body.Text = message;
+        else RenderMarkdown(body, message);
         contents.Children.Add(body);
         if (attachments is { Count: > 0 })
         {
@@ -776,9 +898,87 @@ internal sealed class AssistantPane : UserControl, IDisposable
         }
         bubble.Child = contents;
         messageStack.Children.Add(bubble);
+        if (!isUser)
+        {
+            var copy = CreateButton("Copiar", Brushes.Transparent, Muted, 10);
+            copy.Padding = new Thickness(3, 1, 3, 1);
+            copy.Margin = new Thickness(5, 3, 0, 0);
+            copy.HorizontalAlignment = HorizontalAlignment.Left;
+            copy.ToolTip = "Copiar esta respuesta";
+            copy.Click += (_, _) =>
+            {
+                if (body.Tag is string content && content.Length > 0)
+                    Clipboard.SetText(content);
+            };
+            messageStack.Children.Add(copy);
+        }
         _messages.Children.Add(messageStack);
         _conversationScroll.ScrollToEnd();
         return body;
+    }
+
+    private static void RenderMarkdown(TextBlock target, string raw)
+    {
+        target.Tag = raw;
+        target.Inlines.Clear();
+        var lines = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var inCode = false;
+        var fence = new string((char)96, 3);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index];
+            if (line.TrimStart().StartsWith(fence, StringComparison.Ordinal))
+            {
+                inCode = !inCode;
+                continue;
+            }
+            if (index > 0) target.Inlines.Add(new LineBreak());
+            if (inCode)
+            {
+                target.Inlines.Add(new Run(line)
+                {
+                    FontFamily = new FontFamily("Consolas"),
+                    Foreground = BrushFromRgb(184, 213, 231)
+                });
+                continue;
+            }
+            var heading = line.StartsWith("### ", StringComparison.Ordinal) ? 3 :
+                line.StartsWith("## ", StringComparison.Ordinal) ? 2 :
+                line.StartsWith("# ", StringComparison.Ordinal) ? 1 : 0;
+            if (heading > 0)
+            {
+                target.Inlines.Add(new Run(line[(heading + 1)..])
+                {
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = heading == 1 ? 15 : heading == 2 ? 14 : 13
+                });
+                continue;
+            }
+            if (line.StartsWith("- ", StringComparison.Ordinal))
+            {
+                target.Inlines.Add(new Run("• "));
+                line = line[2..];
+            }
+            AppendInlineFormatting(target, line);
+        }
+    }
+
+    private static void AppendInlineFormatting(TextBlock target, string line)
+    {
+        // Render only a small, safe subset. Tool output stays plain text and never becomes active markup.
+        var marker = new string((char)96, 1);
+        var parts = Regex.Split(line, "(\\*\\*[^*]+\\*\\*|\\*[^*]+\\*|" + marker + "[^" + marker + "]+" + marker + ")");
+        foreach (var part in parts)
+        {
+            if (part.Length == 0) continue;
+            if (part.StartsWith("**", StringComparison.Ordinal) && part.EndsWith("**", StringComparison.Ordinal) && part.Length > 4)
+                target.Inlines.Add(new Run(part[2..^2]) { FontWeight = FontWeights.SemiBold });
+            else if (part.StartsWith("*", StringComparison.Ordinal) && part.EndsWith("*", StringComparison.Ordinal) && part.Length > 2)
+                target.Inlines.Add(new Run(part[1..^1]) { FontStyle = FontStyles.Italic });
+            else if (part.StartsWith(marker, StringComparison.Ordinal) && part.EndsWith(marker, StringComparison.Ordinal) && part.Length > 2)
+                target.Inlines.Add(new Run(part[1..^1]) { FontFamily = new FontFamily("Consolas"), Foreground = BrushFromRgb(154, 220, 234) });
+            else target.Inlines.Add(new Run(part));
+        }
     }
 
     private bool ConfirmRequest(AgentApprovalRequest request)

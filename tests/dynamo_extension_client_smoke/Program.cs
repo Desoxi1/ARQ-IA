@@ -78,7 +78,7 @@ try
     if (routinePaths.Any(File.Exists))
         throw new IOException("Generated smoke-test routine path unexpectedly already exists.");
 
-    var ensureStarted = (Task)clientType.GetMethod("EnsureStartedAsync")!.Invoke(client, new object[] { projectRoot, CancellationToken.None })!;
+    var ensureStarted = (Task)clientType.GetMethod("EnsureStartedAsync")!.Invoke(client, new object?[] { projectRoot, null, null, CancellationToken.None })!;
     await ensureStarted;
     Console.WriteLine("CODEX_APP_SERVER_CSHARP_THREAD=PASS");
 
@@ -169,10 +169,12 @@ try
 
     text.Clear();
     var sendWithAttachments = clientType.GetMethod("SendMessageWithAttachmentsAsync")!;
-    var attachmentTurn = (Task)sendWithAttachments.Invoke(client, new object[]
+    var attachmentTurn = (Task)sendWithAttachments.Invoke(client, new object?[]
     {
         $"Inspect the attached image and text file. Reply with the square's color and the exact reference code. Do not call MCP tools or inspect other files.",
         stagedAttachments,
+        null,
+        null,
         CancellationToken.None
     })!;
     await attachmentTurn;

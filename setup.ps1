@@ -74,10 +74,11 @@ if ($needsInstall) {
     }
 }
 
-$serverPath = if (Test-Path -LiteralPath $currentServerPath -PathType Leaf) { $currentServerPath } elseif (Test-Path -LiteralPath $legacyServerPath -PathType Leaf) { $legacyServerPath } else { $null }
-if (-not $serverPath) { throw 'No se encontró el servidor rvt-mcp instalado.' }
 if (-not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) { throw 'No se encontró el add-in de Revit 2027 después de instalar.' }
 }
+
+$serverPath = if (Test-Path -LiteralPath $currentServerPath -PathType Leaf) { $currentServerPath } elseif (Test-Path -LiteralPath $legacyServerPath -PathType Leaf) { $legacyServerPath } else { $null }
+if (-not $serverPath) { throw 'No se encontró el servidor rvt-mcp instalado.' }
 
 New-Item -ItemType Directory -Force -Path $codexDir | Out-Null
 if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {

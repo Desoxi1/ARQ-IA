@@ -14,7 +14,7 @@ Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar 
 
 ## Chat, contexto y adjuntos
 
-La interfaz usa la paleta oscura de Dynamo y botones celestes. El encabezado conserva al gestor **Branko Plaza**. Cuando falta la instalación inicial, la tarjeta indica **Instalar-ARQ-IA.cmd** y el panel comprueba periódicamente cuándo termina la configuración para activar el chat. El pie aclara que Codex inicia al enviar el primer mensaje.
+La interfaz usa la paleta oscura de Dynamo y botones celestes. El encabezado conserva al gestor **Branko Plaza**. Ofrece nueva conversación, selector de los modelos disponibles en el Codex local, respuestas con formato básico y tarjetas de actividad de herramientas MCP. El selector automático prefiere Luna para consultas breves de lectura y el modelo predeterminado para el resto; un modelo elegido explícitamente se usa tal cual. La lista de modelos no garantiza acceso a todos: una solicitud real confirma cada uno. Cuando falta la instalación inicial, la tarjeta indica **Instalar-ARQ-IA.cmd** y el panel comprueba periódicamente cuándo termina la configuración para activar el chat.
 
 - El chat muestra el estado de Codex y del contexto Revit/MCP. Al enviar una solicitud de Revit, Codex consulta la vista activa y la selección mediante los MCP configurados; el panel no lee ni cambia el modelo por sí mismo.
 - El botón **Ver** consulta ahora la vista activa y los elementos seleccionados sin enviar el borrador ni los adjuntos que estén esperando en el compositor. El resultado aparece como respuesta dentro del chat.

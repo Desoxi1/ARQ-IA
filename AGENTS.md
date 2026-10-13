@@ -1,5 +1,7 @@
 # Guía de trabajo del asistente BIM
 
+ARQ-IA es un producto independiente para arquitectos. Este proyecto no usa NEXUS DX, Obsidian ni reglas de otros repositorios. Las instrucciones personales/globales del operador ajenas a ARQ-IA no forman parte del flujo de este panel. Resuelve los pedidos con el `AGENTS.md`, la documentación y los MCP de esta carpeta, más el modelo Revit activo; no busques ni cites NEXUS DX.
+
 ## Interpretación del pedido
 
 - Entiende sinónimos cotidianos y términos BIM/Revit en español usando `docs/GLOSARIO_BIM_REVIT_ES_EN.md` y `docs/CAPACIDADES_OBJETIVO.md`.
@@ -12,6 +14,7 @@
 1. Usa primero las consultas `rvt-mcp` para identificar modelo, vista, selección, niveles, tipos, familias y parámetros existentes.
    Para materiales, usa `revit_list_materials` en el documento activo y comprueba `total`, `returned`, `limit_hit` y `skipped`. Consulta `revit_get_material_properties` solo para los candidatos pertinentes. La biblioteca Autodesk instalada, los materiales definidos en un RVT y los materiales realmente usados por elementos son conjuntos distintos; no conviertas un catálogo local de muestra en estándar del proyecto. Sigue `docs/MATERIALES_REVIT.md`.
 2. Envía las llamadas MCP a Revit una por una y espera cada resultado antes de la siguiente; no paralelices llamadas al hilo de Revit.
+   Si una lectura directa falla porque el plugin no se detecta, espera brevemente y reintenta esa lectura una sola vez. No abras Dynamo para suplir una consulta de vista/selección que `rvt-mcp` debe resolver.
 3. Para tareas cubiertas por una herramienta Revit tipada, úsala con aprobación por llamada. Haz cambios unitarios y verifica con una consulta posterior.
    Para color en una vista, usa `revit_override_element_graphics` con IDs confirmados y `viewId` explícito cuando corresponda. `projectionLineColor`, `surfaceForegroundColor` y `cutLineColor` aceptan `#RRGGBB`; `#FF0000` es rojo. Un override afecta la representación de esa vista, no el material. No uses una rutina Dynamo para esta operación si la herramienta tipada basta.
 4. Para una tarea que requiere lógica propia, guarda una rutina con `create_dynamo_routine`. Usa `PythonNet3`, `RunType=Manual`, resultados JSON y valores de `affected_ids` exactos para escrituras.
