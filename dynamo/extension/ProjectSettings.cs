@@ -26,7 +26,7 @@ internal static class ProjectSettings
             var projectRoot = Directory.GetParent(fullRoutinesRoot)?.FullName;
             return projectRoot is not null &&
                 File.Exists(Path.Combine(projectRoot, "AGENTS.md")) &&
-                File.Exists(Path.Combine(projectRoot, ".codex", "config.toml.example")) &&
+                File.Exists(Path.Combine(projectRoot, ".codex", "config.toml")) &&
                 File.Exists(Path.Combine(projectRoot, "dynamo", "extension", "README.md")) &&
                 Directory.Exists(Path.Combine(projectRoot, "mcp"))
                 ? projectRoot

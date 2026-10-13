@@ -13,6 +13,11 @@ EXTENSION = ROOT / "dynamo" / "extension"
 
 
 class DynamoExtensionPackageTests(unittest.TestCase):
+    def test_project_readiness_uses_the_generated_codex_configuration(self):
+        settings = (EXTENSION / "ProjectSettings.cs").read_text(encoding="utf-8")
+        self.assertIn('".codex", "config.toml"', settings)
+        self.assertNotIn('".codex", "config.toml.example"', settings)
+
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")
