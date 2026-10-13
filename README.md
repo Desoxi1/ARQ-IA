@@ -51,6 +51,7 @@ El chat ofrece **Acceso controlado** y **Acceso completo** por sesión. Completo
 | `install.ps1` | Orquesta la instalación de Revit, Dynamo, bridge y MCP. |
 | `setup.ps1` | Obtiene/verifica `rvt-mcp` y genera la configuración Codex local para este clon. |
 | `doctor.ps1` | Comprueba componentes, rutas y conexión sin instalar ni modificar el modelo. |
+| `AGENTS.md` | Instrucciones de Codex para lenguaje BIM, alcance, aprobaciones y verificación. |
 | `revit/assistant/`, `dynamo/extension/` | Paneles y binarios precompilados con hashes. |
 | `revit/bridge/`, `mcp/` | Ejecución y herramientas MCP locales. |
 | `routines/`, `dynamo/` | Rutinas guardadas, plantilla y wrapper PythonNet3. |

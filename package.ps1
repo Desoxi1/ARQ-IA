@@ -37,7 +37,6 @@ try {
             'ARQ-IA/install.ps1',
             'ARQ-IA/setup.ps1',
             'ARQ-IA/doctor.ps1',
-            'ARQ-IA/.codex/config.toml.example',
             'ARQ-IA/docs/COLOR_MUROS_PRIMER_PISO.md',
             'ARQ-IA/materials/base.csv',
             'ARQ-IA/materials/local-materials.template.csv',
@@ -116,7 +115,8 @@ try {
             $name = $entry.FullName
             $extension = [IO.Path]::GetExtension($name).ToLowerInvariant()
             if ($extension -in @('.rvt', '.rfa', '.rte') -or
-                $name -eq 'ARQ-IA/.codex/config.toml' -or
+                $name -match '(?i)(^|/)\.codex/' -or
+                $name -match '(?i)(^|/)\.arq-ia/' -or
                 $name -match '(?i)(^|/)\.env(\.(?!example$)[^/]+)?$' -or
                 $name -match '(?i)(^|/)logs/(runner-results|attachments)/') {
                 throw "El paquete incluye un artefacto local no permitido: $name"
