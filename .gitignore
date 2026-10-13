@@ -11,6 +11,12 @@
 *.nwc
 *.nwd
 
+# Generated routines stay local until reviewed and explicitly promoted.
+# Already tracked examples remain tracked; use git add -f only after validation.
+routines/*.py
+routines/*.dyn
+routines/*.manifest.json
+
 # Local logs
 logs/*.log
 logs/*.jsonl

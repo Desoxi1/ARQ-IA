@@ -35,6 +35,7 @@ ARQ-IA es un producto independiente para arquitectos. Este proyecto no usa NEXUS
 ## Límites de ejecución
 
 - Nunca ejecutes rutinas generadas sobre modelos productivos. El bridge genérico debe rechazarlos.
+- Las rutinas generadas deben ser portables: no incluyas rutas absolutas del usuario ni nombres privados del modelo en código o manifiesto. Los borradores quedan locales e ignorados por Git hasta su revisión y validación explícita.
 - No asumas que la aprobación de guardar una rutina también aprueba ejecutarla; la ejecución requiere otra aprobación.
 - Revisa el `.py` antes de ejecutarlo. PythonNet3 se ejecuta con los permisos del proceso Revit; la protección del documento no sandboxea archivos, red ni el resto del sistema.
 - No habilites `revit_send_code_to_revit`, ToolBaker, borrado ni ejecución libre como atajos.

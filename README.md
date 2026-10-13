@@ -54,6 +54,8 @@ Las herramientas que escriben requieren aprobación por llamada. Los scripts Pyt
 
 Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y `.codex/config.toml` local quedan fuera de Git. El nombre de fabricante **Branko Plaza** figura en la metadata, pero un aviso de Windows de “fabricante desconocido” solo se elimina con firma de código confiable.
 
+Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por Git. Revisa su código, elimina rutas específicas del PC y valida su comportamiento en un RVT descartable antes de compartirlas; una rutina aprobada puede añadirse explícitamente al repositorio.
+
 ## Más información
 
 - [Arquitectura y evaluación de repositorios](docs/ARCHITECTURE_DECISION.md)
