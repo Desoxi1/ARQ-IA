@@ -9,7 +9,7 @@ Revit 2027 con Dynamo for Revit, Windows x64 y Codex Desktop/CLI con sesión ini
 1. Clona el repositorio con Git en una carpeta a elección y abre esa carpeta. También sirve un ZIP del repositorio extraído.
 2. Guarda tu trabajo y cierra Revit antes de la primera instalación.
 3. Haz doble clic en `Instalar-ARQ-IA.cmd`. El programa comprueba Revit, Dynamo y Codex, instala el add-in y panel por usuario, y configura las rutas MCP locales para esa carpeta. No necesita .NET SDK.
-4. Abre la carpeta en Codex y acepta la confianza del proyecto cuando la solicite. No copies `.codex/config.toml` desde otro PC: el instalador lo genera con rutas del equipo.
+4. Abre la carpeta en Codex. `setup.ps1` genera `.codex/config.toml` con rutas de este PC y registra en la configuración del usuario solo la ruta de este clon como proyecto confiable, para habilitar sus MCP. Si Codex muestra un aviso, confirma que corresponde exactamente a esta carpeta. No copies `.codex/` desde otro PC.
 5. Abre Revit 2027. En la cinta aparece **ARQ-IA**; en Dynamo busca **Extensiones → Abrir ARQ-IA**. Los manifiestos registran **Branko Plaza** como fabricante. Revit aún puede mostrar «Fabricante desconocido» en el aviso porque las DLL no están firmadas por un certificado de editor confiable; aceptar el aviso es una decisión de confianza en el código descargado, no algo que el nombre del manifiesto pueda sustituir.
 
 Alternativa PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.

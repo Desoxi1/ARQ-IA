@@ -3,6 +3,8 @@
 **Actualizado:** 26 de septiembre de 2026
 **Alcance:** versiones y compatibilidad usadas para este POC. Se omiten rutas del usuario, nombres de equipo y datos identificables del modelo.
 
+> **Línea base histórica del PC de desarrollo.** Este registro describe la instalación local observada el 26-09-2026, incluido `rvt-mcp` v0.6.2; no describe lo que instala un clon nuevo. El instalador actual fija `rvt-mcp` v1.1.0 y verifica su SHA-256. Para requisitos e instalación vigentes, consulta [INSTRUCCIONES_OTRO_PC.md](INSTRUCCIONES_OTRO_PC.md) y [PROTOTYPE_STATUS.md](PROTOTYPE_STATUS.md).
+
 | Componente | Referencia validada | Implicación |
 |---|---|---|
 | Revit | Revit 2027, build 27.0.20.10 | Host objetivo del paquete. |

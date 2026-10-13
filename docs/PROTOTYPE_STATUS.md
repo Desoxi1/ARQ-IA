@@ -5,9 +5,9 @@
 ### Publicación, limpieza y catálogo — actualización final
 
 - Se creó y publicó el repositorio público [Desoxi1/ARQ-IA](https://github.com/Desoxi1/ARQ-IA). La rama `main` y el remoto `origin` usan la cuenta autenticada `Desoxi1`; el push se ejecutó con Git local, sin navegador ni credencial guardada en el repositorio.
-- Se retiraron los ZIP/builds/vistas previas antiguos de `artifacts/` y las salidas temporales de `logs/materials/` y `logs/runner-results/`. Se preservaron `.arq-ia/` y `.codex/` locales; no forman parte del commit ni del paquete.
+- Se retiraron los ZIP/builds/vistas previas antiguos de `artifacts/` y las salidas temporales de `logs/materials/` y `logs/runner-results/`. `.arq-ia/` y la configuración generada en `.codex/` son datos locales ignorados. Se quitó del repositorio `config.toml.example`, porque `setup.ps1` genera la configuración real para cada ruta y equipo.
 - `materials/base.csv` conserva 208 nombres únicos, ordenados, con clase, categoría, color y transparencia. La consulta local confirmó `total=208`, `returned=208`, `limit_hit=false`, `skipped=0`. IDs, assets, usos, cantidades, takeoff y datos del RVT quedan fuera del repositorio; cada equipo puede añadir preferencias en su catálogo ignorado local.
-- La revisión de publicación del paquete pasó para 95 archivos: sin secretos, rutas personales ni modelos/artefactos locales. No se agregaron pruebas nuevas en esta limpieza.
+- Tras retirar el ejemplo redundante de `.codex/`, el paquete limpio se verifica con los controles de secretos, rutas privadas, modelos y hashes de binarios. No se agregaron pruebas de producto.
 - El diseño del panel está compilado y preparado en los binarios del proyecto, pero falta cargarlo y comprobarlo visualmente en una sesión nueva de Revit/Dynamo. La ejecución genérica y las escrituras complejas de Dynamo siguen sin aceptación en vivo.
 - Los manifiestos muestran `VendorDescription=Branko Plaza`; las DLL siguen sin firma confiable, por lo que el diálogo de Revit puede seguir indicando fabricante desconocido. Cambiar ese aviso requiere un certificado de firma confiable.
 - Los apartados siguientes conservan el registro histórico del desarrollo y pueden describir estados ya superados; para el estado vigente manda esta actualización.

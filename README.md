@@ -47,14 +47,16 @@ El chat ofrece **Acceso controlado** y **Acceso completo** por sesión. Completo
 
 | Ruta | Función |
 |---|---|
-| `Instalar-ARQ-IA.cmd`, `install.ps1`, `setup.ps1` | Instalación de un clon y configuración local. |
-| `doctor.ps1` | Diagnóstico sin cambiar Revit. |
+| `Instalar-ARQ-IA.cmd` | Punto de entrada: ejecuta la instalación y el diagnóstico. |
+| `install.ps1` | Orquesta la instalación de Revit, Dynamo, bridge y MCP. |
+| `setup.ps1` | Obtiene/verifica `rvt-mcp` y genera la configuración Codex local para este clon. |
+| `doctor.ps1` | Comprueba componentes, rutas y conexión sin instalar ni modificar el modelo. |
 | `revit/assistant/`, `dynamo/extension/` | Paneles y binarios precompilados con hashes. |
 | `revit/bridge/`, `mcp/` | Ejecución y herramientas MCP locales. |
 | `routines/`, `dynamo/` | Rutinas guardadas, plantilla y wrapper PythonNet3. |
 | `docs/`, `tests/` | Diseño, estado y verificaciones de desarrollo. |
 
-Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y `.codex/config.toml` local quedan fuera de Git. Los manifiestos ya identifican a **Branko Plaza** como fabricante; el logo y encabezado del chat no muestran tu nombre. Revit puede seguir indicando «Fabricante desconocido» en su aviso de seguridad porque las DLL no tienen firma digital de un certificado de editor confiable. Para que el aviso identifique a un editor verificado se necesita firmar la publicación con ese certificado. [Seguridad de complementos de Revit](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm) · [Firma digital de complementos](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Digitally_Signing_Your_Revit_Add_in/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Digitally_Signing_Your_App_html.html).
+Los scripts `build.ps1` sirven al desarrollador; no son necesarios para instalar en otro PC. `package.ps1` crea un ZIP desde un commit Git limpio. `logs/`, `artifacts/`, modelos RVT, adjuntos, cachés y la carpeta `.codex/` generada localmente quedan fuera de Git. `setup.ps1` crea ahí las rutas MCP específicas de ese PC; no copies esa carpeta entre equipos. Los manifiestos ya identifican a **Branko Plaza** como fabricante; el logo y encabezado del chat no muestran tu nombre. Revit puede seguir indicando «Fabricante desconocido» en su aviso de seguridad porque las DLL no tienen firma digital de un certificado de editor confiable. Para que el aviso identifique a un editor verificado se necesita firmar la publicación con ese certificado. [Seguridad de complementos de Revit](https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Troubleshooting/files/GUID-36D29367-A540-4CFD-9773-4995BF1DF08A.htm) · [Firma digital de complementos](https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Digitally_Signing_Your_Revit_Add_in/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Digitally_Signing_Your_App_html.html).
 
 `materials/base.csv` contiene la base de referencia inicial con 208 nombres y atributos visuales, saneada sin IDs, archivos, cantidades ni takeoffs. Sirve para encontrar vocabulario y candidatos; Revit activo sigue siendo la fuente de verdad y la base no es una especificación técnica. Cada PC puede mantener preferencias propias en `.arq-ia/materials/local.csv`; todo `.arq-ia/`, perfil, inventario del modelo e historial quedan ignorados y no se incluyen en Git ni en el paquete. La base común no se modifica automáticamente.
 
