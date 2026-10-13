@@ -487,7 +487,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         footer.Children.Add(_status);
 
         _accessButton = CreateButton("Acceso controlado", SurfaceRaised, Muted, 10);
-        _accessButton.ToolTip = "Alterna los permisos de Codex para este chat. Acceso completo habilita comandos, archivos y red sin aprobaciones repetidas.";
+        _accessButton.ToolTip = "Acceso completo habilita archivos, comandos y red sin aprobaciones repetidas. Se confirma una vez y vuelve a Acceso controlado al abrir otra conversación.";
         _accessButton.Padding = new Thickness(9, 4, 9, 4);
         _accessButton.MinHeight = 25;
         _accessButton.Template = CreateButtonTemplate(12);
@@ -975,10 +975,33 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private void ToggleAccessMode()
     {
         if (_turnInProgress || _accessButton is null) return;
-        _fullAccessEnabled = !_fullAccessEnabled;
-        _accessButton.Content = _fullAccessEnabled ? "● Acceso completo" : "Acceso controlado";
-        _accessButton.Background = _fullAccessEnabled ? BrushFromRgb(76, 50, 28) : SurfaceRaised;
-        _accessButton.Foreground = _fullAccessEnabled ? BrushFromRgb(255, 175, 91) : Muted;
+        var enable = !_fullAccessEnabled;
+        if (enable)
+        {
+            var answer = MessageBox.Show(
+                "Acceso completo permite a Codex usar archivos, comandos y red sin pedir aprobación por cada acción en esta conversación. Las rutinas PythonNet3 se ejecutan dentro de Revit con los permisos de Windows del usuario; la restricción del RVT de prueba no aísla el resto del equipo. Actívalo solo para una tarea y un código que hayas revisado.\n\n¿Activar Acceso completo para esta conversación?",
+                "Acceso completo · ARQ-IA",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+            if (answer != MessageBoxResult.Yes)
+            {
+                SetStatus("Acceso controlado activo.");
+                return;
+            }
+        }
+        SetAccessMode(enable);
+    }
+
+    private void SetAccessMode(bool enabled)
+    {
+        _fullAccessEnabled = enabled;
+        if (_accessButton is not null)
+        {
+            _accessButton.Content = _fullAccessEnabled ? "● Acceso completo" : "Acceso controlado";
+            _accessButton.Background = _fullAccessEnabled ? BrushFromRgb(76, 50, 28) : SurfaceRaised;
+            _accessButton.Foreground = _fullAccessEnabled ? BrushFromRgb(255, 175, 91) : Muted;
+        }
         if (_client is not null) _client.FullAccessEnabled = _fullAccessEnabled;
         SetStatus(_fullAccessEnabled
             ? "Acceso completo activo en este chat: Codex ejecutará acciones sin pedir aprobación por llamada."
@@ -988,6 +1011,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private async Task NewConversationAsync()
     {
         if (_disposed || _turnInProgress) return;
+        SetAccessMode(false);
         var old = _client;
         _client = null;
         _activeConversation = null;
@@ -1020,6 +1044,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
             return;
         }
 
+        SetAccessMode(false);
         var old = _client;
         _client = null;
         _activeConversation = record;

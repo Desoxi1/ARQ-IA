@@ -9,7 +9,7 @@ Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar 
 1. Dynamo agrega el comando **Extensiones → Abrir ARQ-IA** y la pestaña lateral **ARQ-IA**. El comando vuelve a abrir el panel si cierras la pestaña.
 2. El panel inicia `codex app-server` desde la carpeta del POC y mantiene la conversación mientras Dynamo permanece abierto.
 3. Codex consulta el modelo mediante los MCP disponibles y sigue el flujo definido en `AGENTS.md`.
-4. El botón de permisos queda al pie del panel para que **Acceso completo** esté siempre visible junto al estado del chat. Controlado mantiene las aprobaciones de Codex. Completo aplica `approvalPolicy=never` y `dangerFullAccess` solo al chat ARQ-IA actual, y acepta las solicitudes MCP sin formularios que antes abrían una ventana repetida. El modo vuelve a controlado al cerrar la sesión de Dynamo.
+4. El botón de permisos queda al pie del panel para que **Acceso completo** esté siempre visible junto al estado del chat. Controlado mantiene las aprobaciones de Codex. Completo pide una confirmación única, aplica `approvalPolicy=never` y `dangerFullAccess` solo a la conversación actual, y acepta las solicitudes MCP sin formularios que antes abrían una ventana repetida. Al crear o abrir otra conversación vuelve a controlado.
 5. En Acceso completo, la petición explícita del usuario permite ejecutar acciones sin aprobación repetida. Se mantienen las restricciones de las herramientas BIM: los scripts genéricos usan RVT local de prueba, hashes y el parámetro de escritura requerido. Revisa el estado del modelo y los resultados en el chat.
 
 ## Chat, contexto y adjuntos
@@ -28,7 +28,7 @@ El acceso **controlado** puede pedir permiso para guardar el perfil local; **Acc
 - La carpeta `logs/attachments/` está ignorada por Git y excluida del ZIP portable. Al cerrar correctamente el panel, se elimina su carpeta de sesión; un cierre abrupto puede dejar archivos que deben borrarse manualmente.
 - Codex trabaja con la sesión local autenticada y los MCP configurados. No se requiere una clave API aparte. El modo elegido define si se piden aprobaciones de Codex.
 
-**Acceso completo da a Codex permisos amplios en el equipo para sus herramientas de archivos, comandos y red durante esta sesión.** Actívalo solo cuando quieras que el chat ejecute esas acciones sin confirmación individual. No se aplica a otros proyectos ni cambia la configuración global de Codex.
+**Acceso completo da a Codex permisos amplios en el equipo para sus herramientas de archivos, comandos y red durante esta conversación.** Actívalo solo cuando quieras que el chat ejecute esas acciones sin confirmación individual. Al cambiar de conversación vuelve a controlado; no se aplica a otros proyectos ni cambia la configuración global de Codex. PythonNet3 corre dentro de Revit con los permisos de Windows del usuario; la ruta del RVT de prueba no limita el acceso del script a otros archivos o a la red.
 
 El panel no contiene una credencial de API. Usa la sesión local autenticada de Codex CLI; busca el ejecutable en `PATH` y en la instalación de Codex Desktop. El protocolo local [`app-server`](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server) está marcado como experimental por Codex. La extensión sigue siendo un prototipo hasta pasar pruebas visuales y de Revit en una sesión limpia. Dynamo la carga con su API oficial de [View Extensions](https://github.com/DynamoDS/Dynamo/wiki/Dynamo-View-Extensions).
 

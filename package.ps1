@@ -109,23 +109,37 @@ try {
             throw 'El DLL del bridge Revit-Dynamo no coincide con su manifiesto SHA-256.'
         }
 
-        $tokenPattern = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})\b'
-        $privatePathPattern = '(?i)[A-Z]:[\\/]+Users[\\/]+Branko(?:[\\/]|$)'
+        $tokenPatterns = @(
+            '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,})\b',
+            '(?i)\b(?:AKIA|ASIA)[0-9A-Z]{16}\b',
+            '(?i)\bxox[baprs]-[A-Za-z0-9-]{10,}\b',
+            '(?i)\bAIza[0-9A-Za-z_-]{35}\b',
+            '(?im)-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'
+        )
+        $privatePathPattern = '(?i)\b[A-Z]:[\\/]+Users[\\/]+[^\\/:\s"'']+'
         foreach ($entry in $entries) {
             $name = $entry.FullName
             $extension = [IO.Path]::GetExtension($name).ToLowerInvariant()
-            if ($extension -in @('.rvt', '.rfa', '.rte') -or
+            if ($extension -in @('.rvt', '.rfa', '.rte', '.ifc', '.nwc', '.nwd', '.dwg', '.dxf', '.pfx', '.p12', '.pem', '.key') -or
+                $name -match '(?i)(^|/)(?:id_rsa|id_ed25519|credentials(?:\.[^/]*)?|secrets(?:\.[^/]*)?)$' -or
+                $name -match '(?i)(^|/)revit/test-models/(?!README\.md$|prepare-test-model\.ps1$)' -or
                 $name -match '(?i)(^|/)\.codex/' -or
                 $name -match '(?i)(^|/)\.arq-ia/' -or
                 $name -match '(?i)(^|/)\.env(\.(?!example$)[^/]+)?$' -or
-                $name -match '(?i)(^|/)logs/(runner-results|attachments)/') {
+                $name -match '(?i)(^|/)logs/(?!README\.md$)' -or
+                $name -match '(?i)(^|/)artifacts/' -or
+                $name -match '(?i)(^|/)vendor/[^/]+\.zip$') {
                 throw "El paquete incluye un artefacto local no permitido: $name"
             }
 
             $stream = $entry.Open()
             $reader = New-Object System.IO.StreamReader($stream, [Text.Encoding]::UTF8, $true)
             try { $content = $reader.ReadToEnd() } finally { $reader.Dispose() }
-            if ($content -match $tokenPattern) { throw "Se detecto un patron de token en: $name" }
+            $matchedSecretPattern = $false
+            foreach ($tokenPattern in $tokenPatterns) {
+                if ($content -match $tokenPattern) { $matchedSecretPattern = $true; break }
+            }
+            if ($matchedSecretPattern) { throw "Se detecto un patron conocido de secreto en: $name" }
             if ($content -match $privatePathPattern) { throw "Se detecto una ruta privada local en: $name" }
         }
 
@@ -138,7 +152,7 @@ try {
     Write-Output 'PACKAGE=PASS'
     Write-Output ("REVISION=" + $revision)
     Write-Output ("FILES=" + $entries.Count)
-    Write-Output 'SECRETS_AND_LOCAL_ARTIFACTS=PASS'
+    Write-Output 'TARGETED_SECRET_PATTERNS_AND_LOCAL_ARTIFACTS=PASS'
     Write-Output ("ARCHIVE=" + $archivePath)
     Write-Output ("SHA256=" + $hash)
 } finally {

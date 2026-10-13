@@ -61,7 +61,7 @@ Copy-Item -LiteralPath $assemblyPath -Destination $distributionDll -Force
 $dllHash = (Get-FileHash -LiteralPath $distributionDll -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText(
     (Join-Path $distributionDirectory 'BimAiRevitAssistant.sha256'),
-    $dllHash + [Environment]::NewLine,
+    $dllHash,
     (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Output 'REVIT_ASSISTANT_BUILD=PASS'

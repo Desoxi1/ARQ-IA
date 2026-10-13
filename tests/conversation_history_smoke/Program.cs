@@ -13,8 +13,9 @@ internal static class Program
         {
             var store = new ConversationHistoryStore(root);
             var record = store.Create("gpt-test-model");
+            var attachmentPath = Path.Combine(Path.GetTempPath(), "Private", "Plano A.png");
             store.AddMessage(record, "Tú", "Resume los niveles y materiales del modelo.", true,
-                new[] { @"C:\Users\Example\Private\Plano A.png" });
+                new[] { attachmentPath });
             store.AddMessage(record, "ARQ-IA", "La ficha se consultó en modo de solo lectura.", false);
             store.UpsertTool(record, new McpToolActivity("tool-1", "rvt_mcp", "revit_get_model_statistics", "completed", "{\"categories\":4}"));
 
@@ -29,7 +30,7 @@ internal static class Program
             var jsonPath = Path.Combine(root, ".arq-ia", "conversations", record.Id + ".json");
             var json = File.ReadAllText(jsonPath);
             using var parsed = JsonDocument.Parse(json);
-            if (json.Contains("C:\\Users\\Example", StringComparison.Ordinal) ||
+            if (json.Contains(attachmentPath, StringComparison.Ordinal) ||
                 json.Contains("Private\\Plano A.png", StringComparison.Ordinal))
                 throw new InvalidOperationException("History stored an attachment path instead of its file name.");
             if (!json.Contains("Plano A.png", StringComparison.Ordinal))

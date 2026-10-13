@@ -51,7 +51,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'pkg.json') `
 $dllHash = (Get-FileHash -LiteralPath (Join-Path $distributionDirectory 'BimAiDynamoAssistant.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText(
     (Join-Path $distributionDirectory 'BimAiDynamoAssistant.dll.sha256'),
-    $dllHash + [Environment]::NewLine,
+    $dllHash,
     (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "DYNAMO_EXTENSION_BUILD=PASS"
 Write-Host "OUTPUT=$OutputDirectory"

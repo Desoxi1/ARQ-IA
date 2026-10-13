@@ -41,7 +41,7 @@ El instalador detecta rutas del equipo, instala los dos paneles y el bridge por 
 - **Corregido en el código:** se quitó el bloqueo local de frases como “pinta el piso”, se expuso la herramienta gráfica tipada y se actualizó la descarga para clones nuevos.
 - **Pendiente de validar en Revit:** la solicitud de muros rojos desde el panel, la ejecución de rutinas genéricas al cambiar de grafo y cualquier escritura compleja. No se promete “cualquier pedido” ni edición autónoma de modelos productivos.
 
-El chat ofrece **Acceso controlado** y **Acceso completo** por sesión. Completo elimina las aprobaciones repetidas de Codex y permite sus herramientas de archivos, comandos y red con permisos amplios en el PC. Los scripts PythonNet3 se ejecutan con los permisos de Revit y el runner los limita a modelos locales bajo `revit/test-models/`; esa restricción **no** es un sandbox del sistema. [Estado y evidencia](docs/PROTOTYPE_STATUS.md).
+El chat ofrece **Acceso controlado** y **Acceso completo** por conversación. Acceso completo pide una confirmación al activarlo y evita las aprobaciones repetidas de Codex para esa conversación; al abrir o crear otra, vuelve a Acceso controlado. Codex puede usar archivos, comandos y red con permisos amplios en el PC. Los scripts PythonNet3 se ejecutan con los permisos de Revit y el runner limita qué RVT activo acepta, pero esa restricción **no** aísla el código del resto del sistema. Revisa la rutina antes de ejecutarla y usa solo un RVT descartable. [Estado y evidencia](docs/PROTOTYPE_STATUS.md).
 
 ## Carpetas y archivos necesarios
 
@@ -65,7 +65,7 @@ El botón de historial `◷` abre las conversaciones guardadas en `.arq-ia/conve
 
 En el primer envío de cada copia local sin perfil, ARQ-IA pide a Codex una ficha concisa del proyecto abierto mediante MCP de solo lectura: documento, niveles, fases, cantidades por categoría y un resumen acotado de materiales. La ficha queda en `.arq-ia/model-profile.md`, no se sube a Git. También puede existir `.arq-ia/project-memory.md` con convenciones y correcciones locales verificadas y `.arq-ia/materials/local.csv` con preferencias de materiales explícitas y verificadas; esto conserva contexto local, pero no entrena el modelo ni comparte información entre PCs.
 
-La carpeta `.arq-ia` contiene texto local sin cifrar; no guardes secretos allí. En **Acceso controlado**, Codex puede pedir permiso para crear o actualizar el perfil y las notas; **Acceso completo** aplica los permisos elegidos para esa sesión.
+La carpeta `.arq-ia` contiene texto local sin cifrar; no guardes secretos allí. Los adjuntos se copian temporalmente en `logs/attachments/` y el historial conserva texto de la conversación; ambos quedan excluidos de Git. Considera lo que adjuntes como contenido que Codex puede procesar. En **Acceso controlado**, Codex puede pedir permiso para crear o actualizar el perfil y las notas; **Acceso completo** aplica los permisos elegidos solo a la conversación actual.
 
 Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por Git. Revisa su código, elimina rutas específicas del PC y valida su comportamiento en un RVT descartable antes de compartirlas; una rutina aprobada puede añadirse explícitamente al repositorio.
 
@@ -76,3 +76,7 @@ Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por G
 - [Instalar y diagnosticar en otro PC](docs/INSTRUCCIONES_OTRO_PC.md)
 - [Estado actual del prototipo](docs/PROTOTYPE_STATUS.md)
 - [Materiales: catálogo, lectura e interpretación](docs/MATERIALES_REVIT.md)
+
+## Licencia
+
+El repositorio es público, pero aún no tiene un archivo `LICENSE`. La visibilidad pública de GitHub no concede por sí sola permisos de reutilización o redistribución. Define la licencia antes de invitar a terceros a basarse en el código.
