@@ -4,6 +4,8 @@
 
 **Asistente para Revit 2027 y Dynamo 4.0.2.** Desarrollado por Branko Plaza. Abre un chat en Revit y en **Dynamo → Extensiones → Abrir ARQ-IA**, acepta texto e imágenes/archivos, conserva el historial local por carpeta de proyecto y usa Codex para interpretar solicitudes BIM.
 
+Para ubicar rápidamente las reglas, guías, catálogo, scripts y archivos locales, consulta el [mapa de la carpeta](docs/ESTRUCTURA_DEL_REPOSITORIO.md). Para BIM, empieza por el [índice de guías](knowledge/playbooks/INDEX.md) o el [catálogo y taxonomía de materiales](materials/README.md).
+
 ## Cómo funciona
 
 ```text
