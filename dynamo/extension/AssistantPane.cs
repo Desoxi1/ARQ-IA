@@ -67,6 +67,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private ConversationHistoryRecord? _activeConversation;
     private bool _continueLocalConversation;
     private RichTextBox? _streamingText;
+    private StackPanel? _streamingMessageContainer;
     private string _streamingRaw = string.Empty;
     private readonly Dictionary<string, (TextBlock Status, RichTextBox Detail)> _toolCards = new();
     private bool _disposed;
@@ -979,7 +980,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         AddMessage("Tú", prompt, isUser: true, attachments);
         PersistMessage("Tú", prompt, isUser: true, attachments.Select(item => item.Name));
         _streamingText = null;
+        _streamingMessageContainer = null;
         _streamingRaw = string.Empty;
+        _toolCards.Clear();
         _turnInProgress = true;
         _turnCancellationRequested = false;
         _prompt.IsEnabled = false;
@@ -1021,7 +1024,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
                     RefreshAttachmentChips();
                 }
             }
-            _messages.Children.Add(new Border { Height = 7, Opacity = 0 });
+            _conversationScroll.ScrollToEnd();
             SetStatus(initializeProjectProfile && NeedsProjectProfile()
                 ? "Respuesta lista · la ficha local de Revit sigue pendiente."
                 : "Respuesta lista · el modelo sigue bajo tu control.");
@@ -1114,9 +1117,12 @@ internal sealed class AssistantPane : UserControl, IDisposable
         client.TextReceived += value => Dispatcher.Invoke(() =>
         {
             if (_streamingText is null)
+            {
                 _streamingText = AddMessage("ARQ-IA", string.Empty, isUser: false,
                     modelDisplayName: _activeTurnModelName,
                     reasoningEffort: _activeTurnEffort);
+                _streamingMessageContainer = _messages.Children[_messages.Children.Count - 1] as StackPanel;
+            }
             _streamingRaw += value;
             RenderMarkdown(_streamingText, _streamingRaw);
             _conversationScroll.ScrollToEnd();
@@ -1180,6 +1186,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _activeConversation = null;
         _continueLocalConversation = false;
         _streamingText = null;
+        _streamingMessageContainer = null;
         _streamingRaw = string.Empty;
         _toolCards.Clear();
         _messages.Children.Clear();
@@ -1213,6 +1220,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _activeConversation = record;
         _continueLocalConversation = true;
         _streamingText = null;
+        _streamingMessageContainer = null;
         _streamingRaw = string.Empty;
         _toolCards.Clear();
         _messages.Children.Clear();
@@ -1220,7 +1228,8 @@ internal sealed class AssistantPane : UserControl, IDisposable
         _pendingAttachments.Clear();
         RefreshAttachmentChips();
 
-        foreach (var entry in record.Entries)
+        var turnEntries = new List<ConversationHistoryEntry>();
+        void RenderEntry(ConversationHistoryEntry entry)
         {
             if (entry.Kind == "message")
                 AddMessage(entry.Speaker, entry.Text, entry.IsUser,
@@ -1230,8 +1239,24 @@ internal sealed class AssistantPane : UserControl, IDisposable
             else if (entry.Kind == "tool")
                 UpdateToolCard(new McpToolActivity(entry.Id, entry.Server, entry.Tool, entry.Status, entry.Detail), persistHistory: false, updateStatus: false);
         }
-        AddMessage("ARQ-IA", "Historial local abierto. Si continúas, Codex recibirá los mensajes recientes como contexto; vuelve a adjuntar los archivos que necesites.", isUser: false);
-        SetStatus($"Historial local · {record.UpdatedUtc.ToLocalTime():dd MMM yyyy HH:mm}");
+        void RenderTurn()
+        {
+            foreach (var entry in turnEntries.Where(entry => entry.Kind == "tool")) RenderEntry(entry);
+            foreach (var entry in turnEntries.Where(entry => entry.Kind == "message")) RenderEntry(entry);
+            turnEntries.Clear();
+        }
+        foreach (var entry in record.Entries)
+        {
+            if (entry.Kind == "message" && entry.IsUser)
+            {
+                RenderTurn();
+                _toolCards.Clear();
+                RenderEntry(entry);
+            }
+            else turnEntries.Add(entry);
+        }
+        RenderTurn();
+        SetStatus($"Historial local · {record.UpdatedUtc.ToLocalTime():dd MMM yyyy HH:mm} · vuelve a adjuntar archivos si hacen falta.");
         if (old is not null) await old.DisposeAsync();
         _prompt.Focus();
     }
@@ -1296,7 +1321,11 @@ internal sealed class AssistantPane : UserControl, IDisposable
                 Visibility = Visibility.Collapsed
             });
             card.Child = stack;
-            _messages.Children.Add(card);
+            var responseIndex = _streamingMessageContainer is null
+                ? -1
+                : _messages.Children.IndexOf(_streamingMessageContainer);
+            if (responseIndex >= 0) _messages.Children.Insert(responseIndex, card);
+            else _messages.Children.Add(card);
             fields = (state, detail);
             _toolCards[key] = fields;
         }

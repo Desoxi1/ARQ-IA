@@ -35,6 +35,19 @@ AssemblyLoadContext.Default.Resolving += (context, name) =>
 
 var extensionAssembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(extensionPath);
 var clientType = extensionAssembly.GetType("BimAiDynamoAssistant.CodexAppServerClient", throwOnError: true)!;
+var classifyMcpResult = clientType.GetMethod("IsMcpErrorResult", BindingFlags.Static | BindingFlags.NonPublic)!;
+foreach (var (payload, expected) in new[]
+{
+    ("{\"isError\":true}", true),
+    ("{\"content\":[{\"type\":\"text\",\"text\":\"Error: Category 'Walls' not found.\"}]}", true),
+    ("{\"content\":[{\"type\":\"text\",\"text\":\"Consulta correcta\"}]}", false)
+})
+{
+    using var resultDocument = JsonDocument.Parse(payload);
+    if ((bool)classifyMcpResult.Invoke(null, new object[] { resultDocument.RootElement })! != expected)
+        throw new InvalidOperationException("MCP result error classification failed.");
+}
+Console.WriteLine("CODEX_APP_SERVER_MCP_RESULT_CLASSIFICATION=PASS");
 var client = Activator.CreateInstance(clientType, nonPublic: true)!;
 var text = new StringBuilder();
 var statuses = new StringBuilder();

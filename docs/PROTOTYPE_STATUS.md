@@ -1,6 +1,6 @@
 # Estado de ARQ-IA
 
-- **Actualizado:** 13 de octubre de 2026
+- **Actualizado:** 14 de octubre de 2026
 - **Versión declarada del paquete Dynamo:** 0.5.1
 - **Estado:** prototipo funcional con capacidades que aún requieren validación en Revit/Dynamo; no es una herramienta aprobada para producción.
 
@@ -23,6 +23,7 @@ Este archivo es la fuente canónica del estado. Las pruebas antiguas se interpre
 - **Materiales:** el 13 de octubre una consulta en un modelo de muestra devolvió 300 de 300 materiales definidos. La base compartida contiene 208 nombres curados; no guarda el inventario completo de ese modelo ni sus IDs, cantidades o assets.
 - **Escrituras:** el cambio de color de muros y las escrituras complejas no tienen una ejecución viva verificada desde ARQ-IA. Una compilación, un hash válido o una respuesta de plan no prueban que el modelo haya cambiado correctamente.
 - **Verificación del panel (13 de octubre de 2026):** smoke del historial local `PASS` (incluye persistencia de modelo/esfuerzo); 10 comprobaciones dirigidas del paquete Dynamo `PASS`; builds Release de Revit y Dynamo `PASS`, ambos con 0 errores y 0 advertencias. Se corrigió un bloqueo de preparación: el panel buscaba `.codex/config.toml.example`, pero el instalador genera `.codex/config.toml`. El código ahora valida el archivo real. Las DLL corregidas de Revit y Dynamo quedaron instaladas para la próxima sesión; Dynamo confirmó el SHA-256 `cdcc92ce45cb66e78bcaf64f44af13e9745cd6c83d496e9f6c46d679c52d442f`. Esta sesión aún requiere confirmación visual del panel y una respuesta real; no ejecutó rutinas ni modificó el RVT.
+- **Orden del chat e interpretación de imágenes (14 de octubre de 2026):** el panel inserta las tarjetas MCP antes de la respuesta en curso, incluso cuando llegan después de su primer texto; al abrir historial, presenta herramientas antes de la respuesta de cada turno. El cliente marca como fallo un resultado MCP con `isError` o texto que comienza por `Error:`. La guía del agente exige alinear una foto de ciclos con geometría y referencias distinguibles del RVT, comprobar IDs, vistas y niveles y excluir correspondencias ambiguas. Compilaron Revit y Dynamo con 0 errores/advertencias; el smoke del cliente confirmó clasificación de errores, creación/listado de rutina de lectura y adjuntos de imagen y texto. Esto valida el código y la conexión del cliente, no demuestra la precisión espacial de una foto concreta ni una aplicación correcta de colores en Revit. Falta comprobar visualmente el panel tras reiniciar Revit y ensayar una alineación sobre el modelo activo sin escrituras.
 
 ## Seguridad y datos locales
 
