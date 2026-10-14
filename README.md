@@ -15,7 +15,7 @@ Un **MCP** ofrece herramientas concretas a Codex; no es otro modelo entrenado. `
 
 Para ahorrar tokens, ARQ-IA consulta solo la vista, los elementos y parámetros necesarios. Prefiere una herramienta Revit existente antes de generar un grafo. Mantiene rutinas revisadas en disco y responde con resúmenes e IDs, sin enviar el modelo entero en cada solicitud.
 
-La [base de trabajo BIM](docs/playbooks/INDEX.md) añade guías breves para interpretar ciclos desde imágenes, crear o revisar muros y cotas, reproducir elementos estructurales, leer fichas técnicas y diagnosticar el modelo. El chat carga como máximo una guía por pedido y comprueba los datos contra el RVT activo. Cada clon puede conservar observaciones **verificadas** en `.arq-ia/project-memory.md`; esto no entrena automáticamente a Codex ni promete operaciones sin errores. Las capacidades reales dependen de las herramientas disponibles en la versión instalada y de su comprobación en Revit.
+La [base de trabajo BIM](knowledge/playbooks/INDEX.md) añade guías breves para interpretar ciclos desde imágenes, crear o revisar muros y cotas, reproducir elementos estructurales, leer fichas técnicas y diagnosticar el modelo. El chat carga como máximo una guía por pedido y comprueba los datos contra el RVT activo. Cada clon puede conservar observaciones **verificadas** en `.arq-ia/project-memory.md`; esto no entrena automáticamente a Codex ni promete operaciones sin errores. Las capacidades reales dependen de las herramientas disponibles en la versión instalada y de su comprobación en Revit.
 
 ### Ejemplo: “pinta de rojo los muros del primer piso”
 
@@ -56,11 +56,13 @@ El chat ofrece **Acceso controlado** y **Acceso completo** por conversación. Ac
 | `setup.ps1` | Obtiene/verifica `rvt-mcp` y genera la configuración Codex local para este clon. |
 | `doctor.ps1` | Comprueba componentes, rutas y conexión sin instalar ni modificar el modelo. |
 | `package.ps1` | Crea un ZIP portable desde un commit Git limpio y verifica los archivos/binarios requeridos. |
-| `AGENTS.md` | Instrucciones de Codex para lenguaje BIM, alcance, aprobaciones y verificación. |
+| `AGENTS.md`, `governance/` | Entrada de instrucciones y política completa de BIM, seguridad y alcance. |
+| `config/` | Catálogo versionado de herramientas permitidas y opciones por defecto. |
+| `knowledge/` | Guías por tarea y reglas de aprendizaje local progresivo. |
 | `revit/assistant/`, `dynamo/extension/` | Paneles y binarios precompilados con hashes. |
 | `revit/bridge/`, `mcp/` | Ejecución y herramientas MCP locales. |
 | `routines/`, `dynamo/` | Rutinas guardadas, plantilla y wrapper PythonNet3. |
-| `materials/` | Base común curada y plantilla para preferencias locales. |
+| `materials/` | Catálogo común categorizado, taxonomía y plantilla para preferencias locales. |
 | `docs/`, `tests/` | Arquitectura, límites, instalación y evidencia de desarrollo. |
 
 Los scripts `build.ps1` sirven al desarrollador; no hacen falta para instalar en otro PC. `install.ps1` coordina `setup.ps1` y los instaladores de cada complemento; `doctor.ps1` diagnostica y no instala. `Instalar-ARQ-IA.cmd` es la entrada recomendada para arquitectos. `.codex/` guarda la configuración MCP específica de este clon; `.arq-ia/` guarda perfiles, preferencias e historial locales. Ambas se excluyen de Git y no deben copiarse entre PCs. Los archivos de runtime bajo `logs/`, las cachés bajo `vendor/` y los resultados bajo `artifacts/` son locales. Git conserva los README de orientación de `logs/` y `vendor/`; `artifacts/` no forma parte del clon. Modelos RVT y adjuntos no se incluyen en el repo.
@@ -84,6 +86,7 @@ Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por G
 - [Instalar y diagnosticar en otro PC](docs/INSTRUCCIONES_OTRO_PC.md)
 - [Estado actual del prototipo](docs/PROTOTYPE_STATUS.md)
 - [Materiales: catálogo, lectura e interpretación](docs/MATERIALES_REVIT.md)
+- [Política y restricciones](governance/README.md) · [Configuración de MCP](config/README.md) · [Conocimiento progresivo](knowledge/README.md)
 
 ## Uso previsto y permisos
 

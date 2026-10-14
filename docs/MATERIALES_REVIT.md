@@ -8,7 +8,7 @@ Un material definido no demuestra que esté aplicado a un elemento. Las bibliote
 
 ## Base de referencia y extensión local
 
-`materials/base.csv` contiene 208 entradas curadas para búsqueda y lenguaje arquitectónico. Se conservaron solo nombre, clase, categoría, color y transparencia; se excluyeron IDs de Revit/asset, nombre del modelo, cantidades, recuentos de uso y takeoffs. Es una base común, no una norma de oficina ni una ficha técnica. Su cantidad no representa el inventario de un RVT. Verifica siempre que el material exista en el documento activo y confirma sus propiedades antes de asignarlo.
+`materials/base.csv` contiene 208 entradas curadas para búsqueda y lenguaje arquitectónico. Conserva nombre, clase/categoría Revit, color y transparencia, y añade `catalog_group` para navegar por familias. Los campos de origen no se normalizan; por eso pueden estar en español/inglés, ser genéricos o estar vacíos. Consulta [la taxonomía](../materials/TAXONOMIA.md) para interpretar la columna nueva. Se excluyeron IDs de Revit/asset, nombre del modelo, cantidades, recuentos de uso y takeoffs. Es una base común, no una norma de oficina ni una ficha técnica. Su cantidad no representa el inventario de un RVT. Verifica siempre que el material exista en el documento activo y confirma sus propiedades antes de asignarlo.
 
 Cada PC puede guardar convenciones locales en `.arq-ia/materials/local.csv`, usando las columnas de `materials/local-materials.template.csv`. Añade solo una preferencia que el usuario haya definido o un resultado reutilizable ya verificado. No copies el inventario completo de un RVT a la base común; `.arq-ia/` está ignorada por Git, así cada equipo amplía su propia colección sin compartir el modelo.
 

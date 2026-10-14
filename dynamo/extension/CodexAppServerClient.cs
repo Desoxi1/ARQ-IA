@@ -202,7 +202,7 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
             var playbook = SelectPlaybook(message, attachments);
             if (playbook is not null)
             {
-                var playbookPath = Path.Combine(root, "docs", "playbooks", playbook);
+                var playbookPath = Path.Combine(root, "knowledge", "playbooks", playbook);
                 if (File.Exists(playbookPath))
                 {
                     try

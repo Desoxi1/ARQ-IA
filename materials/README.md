@@ -1,9 +1,15 @@
-# Catálogo de materiales ARQ-IA
+# Materiales ARQ-IA
 
-`base.csv` contiene **208 entradas de referencia**, ordenadas por nombre y con cinco campos: nombre, clase Revit, categoría, color RGB y transparencia. Este conteo describe únicamente el catálogo curado; no es un conteo del modelo abierto ni una biblioteca completa de Revit.
+## Archivos
 
-Una consulta distinta, documentada en [MATERIALES_REVIT.md](../docs/MATERIALES_REVIT.md), devolvió 300/300 materiales definidos en un modelo de muestra. Las cifras corresponden a alcances distintos y no se deben comparar como inventarios equivalentes. El catálogo compartido no se usa para afirmar que un material exista o esté aplicado en el RVT actual.
+- `base.csv`: vocabulario compartido de **208 entradas curadas**, conservando los nombres y campos de origen de Revit y añadiendo `catalog_group` para navegar por familias.
+- `TAXONOMIA.md`: definición de grupos, límites y notas para revisar clasificaciones dudosas.
+- `local-materials.template.csv`: esquema para preferencias que cada PC guarda en `.arq-ia/materials/local.csv`.
 
-Se omitieron IDs, assets, nombre del modelo, usos y cantidades/takeoff. El catálogo sirve como vocabulario y para encontrar candidatos; no certifica especificaciones ni garantiza que un material exista en el RVT abierto. Antes de asignarlo, consulta el documento activo y valida sus propiedades y alcance.
+La base mezcla materiales de construcción, elementos nombrados como materiales, registros analíticos, colores, estados de fase y valores predeterminados. Por eso la nueva columna clasifica **el tipo de registro**, no afirma que cada fila sea material físico. Se conservaron sin normalizar nombres y valores originales; la categoría Revit y la clase Revit pueden venir vacías, en otro idioma o con valores genéricos.
 
-Cada instalación puede agregar preferencias propias en `.arq-ia/materials/local.csv`, siguiendo `local-materials.template.csv`. Esos datos quedan locales y fuera de Git. ARQ-IA los agrega solo cuando el usuario define la convención o el resultado ya quedó verificado. La base compartida se actualiza mediante una revisión intencional del repositorio.
+La base es referencial y no es una especificación. No es un inventario completo de Revit ni demuestra que esos materiales estén disponibles o usados en el modelo activo. Consulta el RVT con `revit_list_materials` y revisa propiedades antes de proponer una asignación. Véase [Materiales en Revit](../docs/MATERIALES_REVIT.md).
+
+## Preferencias por PC
+
+Las convenciones propias se guardan localmente bajo `.arq-ia/materials/local.csv`. Registra solo una preferencia explícita del usuario o un uso previamente comprobado. No copies IDs, cantidades, assets privados, nombres de proyecto o fichas no autorizadas a `base.csv`.
