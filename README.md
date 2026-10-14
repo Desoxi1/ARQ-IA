@@ -15,6 +15,8 @@ Un **MCP** ofrece herramientas concretas a Codex; no es otro modelo entrenado. `
 
 Para ahorrar tokens, ARQ-IA consulta solo la vista, los elementos y parámetros necesarios. Prefiere una herramienta Revit existente antes de generar un grafo. Mantiene rutinas revisadas en disco y responde con resúmenes e IDs, sin enviar el modelo entero en cada solicitud.
 
+La [base de trabajo BIM](docs/playbooks/INDEX.md) añade guías breves para interpretar ciclos desde imágenes, crear o revisar muros y cotas, reproducir elementos estructurales, leer fichas técnicas y diagnosticar el modelo. El chat carga como máximo una guía por pedido y comprueba los datos contra el RVT activo. Cada clon puede conservar observaciones **verificadas** en `.arq-ia/project-memory.md`; esto no entrena automáticamente a Codex ni promete operaciones sin errores. Las capacidades reales dependen de las herramientas disponibles en la versión instalada y de su comprobación en Revit.
+
 ### Ejemplo: “pinta de rojo los muros del primer piso”
 
 En Revit puede significar **sobrescritura gráfica en una vista**, **pintura de caras** o **cambio de material del elemento/tipo**. El asistente debe consultar el nivel real y los muros, y preguntar cuál de esos efectos se busca si sigue ambiguo. Para color de presentación usa `revit_override_element_graphics` con los IDs encontrados y `#FF0000`; comprueba la vista y los elementos después. No hace falta Dynamo para esa operación. [Detalle técnico](docs/COLOR_MUROS_PRIMER_PISO.md).
