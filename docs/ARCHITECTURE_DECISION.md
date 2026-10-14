@@ -6,7 +6,7 @@
 
 ARQ-IA combina tres piezas locales:
 
-1. `bimwright/rvt-mcp` ofrece consultas y acciones tipadas sobre Revit 2027. Un clon descarga la versión 1.1.0 fijada por hash. El perfil ARQ-IA habilita `revit_override_element_graphics` y las consultas necesarias para contexto, geometría, salas, documentación, estructura, MEP, familias y vínculos. No se ha probado cada herramienta de escritura ni la versión 1.1.0 integrada con ARQ-IA.
+1. `bimwright/rvt-mcp` ofrece consultas y acciones tipadas sobre Revit 2027. Un clon descarga la versión 1.1.0 fijada por hash. El perfil ARQ-IA expone 105 herramientas (58 lectura, 47 escritura tipada) de creación/edición arquitectónica, estructural y MEP, parámetros, materiales, vistas y documentación. El inventario se contrastó con el código del tag 1.1.0; no se ha probado cada escritura en vivo.
 2. Un MCP propio crea/lista rutinas versionables (`.py`, `.dyn`, manifiesto con hashes); otro puede pedir que un borrador se cargue en la sesión Dynamo del documento activo en Manual para que el usuario lo revise. Una operación separada pide la ejecución al add-in Revit y conserva la puerta de `revit/test-models/`.
 3. El chat en el panel Revit y la extensión lateral de Dynamo usan Codex app-server con los MCP configurados para la carpeta clonada. Aceptan texto, imágenes y archivos. El contenido adjunto se trata como referencia, no como código ejecutable por sí mismo.
 
@@ -16,7 +16,7 @@ Se reutiliza `rvt-mcp` porque ya aporta una superficie de Revit tipada para la v
 
 | Fuente oficial del proyecto | Hallazgo aplicable | Decisión |
 |---|---|---|
-| [bimwright/rvt-mcp](https://github.com/bimwright/rvt-mcp) | El release fijado 1.1.0 publica un ZIP de instalación para Revit 2022–2027 y ofrece toolsets por dominio; su instalador puede migrar datos previos y escribir configuraciones de clientes. | Fijar 1.1.0 por SHA-256. Seleccionar toolsets por dominio y una allowlist de herramientas tipadas; excluir `meta`, `delete`, `export`, `workflows`, ToolBaker y `send_code`. |
+| [bimwright/rvt-mcp](https://github.com/bimwright/rvt-mcp) | El release fijado 1.1.0 publica un ZIP de instalación para Revit 2022–2027 y ofrece toolsets por dominio; su instalador puede migrar datos previos y escribir configuraciones de clientes. | Fijar 1.1.0 por SHA-256. Seleccionar toolsets por dominio y una allowlist amplia de herramientas tipadas; excluir `meta`, `delete`, `export`, `workflows`, ToolBaker y `send_code`. |
 | [KenLP/RevitMCPServer](https://github.com/KenLP/RevitMCPServer) | Documenta `dry-run`, diffs y transacciones agrupadas para Revit 2025–2027. | Tomar el patrón de vista previa y recibo como referencia. No instalar un segundo puente que pueda escribir en el mismo modelo. |
 | [HorizunGroup/horizun-revit-mcp](https://github.com/HorizunGroup/horizun-revit-mcp) | Documenta una superficie BIM amplia y perfiles de operación. | Referencia de cobertura; no fusionar repositorios ni asumir compatibilidad por su README. |
 | [BhaveshY/revit-mcp-next](https://github.com/BhaveshY/revit-mcp-next) | Su documentación lista herramientas tipadas adicionales, como `set_element_pinned`, y advierte que debe usarse un solo servidor Revit MCP por cliente; no se hizo auditoría estática de su código ni de sus flujos salientes. | No agregarlo junto a `rvt-mcp`: implicaría dos integraciones sobre la misma sesión. Mantenerlo como candidato para una migración evaluada si se necesita desanclar/dividir elementos con herramienta tipada. |

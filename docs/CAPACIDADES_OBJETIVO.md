@@ -14,12 +14,12 @@ El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualq
 |---|---|---|
 | Chat y adjuntos en Revit y Dynamo | Paneles propios con Codex app-server; paquete Dynamo 0.5.1 | El cliente procesó texto e imagen en un smoke; hay registro de carga de una versión anterior del panel. La instalación limpia de 0.5.1 no está validada en otro PC. |
 | Vista activa y selección | `rvt-mcp` de bimwright | Consulta de solo lectura pasada en Revit. |
-| Operaciones tipadas de creación/edición | Lista acotada de `rvt-mcp`; control de Codex según modo del chat | Inventario de herramientas; cada escritura requiere prueba individual. |
+| Herramientas tipadas Revit | 105 herramientas expuestas: 58 de lectura y 47 de escritura para creación/edición arquitectónica, estructura, MEP, parámetros, materiales, vistas, láminas y tablas | Catálogo estático contrastado con `rvt-mcp` v1.1.0; las escrituras no se han probado todas en vivo. No equivale a toda la API Revit. |
 | Color de presentación por elemento | `revit_override_element_graphics` de `rvt-mcp` | Esquema disponible en el binario local; habilitado en el perfil ARQ-IA, sin prueba viva de color. |
 | Guardar `.py` + `.dyn` + manifiesto | MCP propio de rutinas | Creación/listado y hashes comprobados fuera de Revit. |
 | Dejar un borrador visible en Dynamo sobre el documento activo | `prepare_saved_routine_in_dynamo` + bridge | Bridge compilado, empaquetado y preparado para la próxima sesión Revit: solicita apertura en Manual, no llama al ejecutor y se detiene si el workspace tiene nodos/notas. Pendiente validar la apertura sin ejecución con Dynamo 4.0.2 instalado. |
 | Ejecutar rutina fija PythonNet3 de lectura | MCP runner + bridge Revit/Dynamo | Pasó en RVT descartable el 05-10-2026. |
-| Ejecutar una rutina genérica | Runner restringido a `revit/test-models/` | Pendiente: el cambio de grafo agotó tiempo en la última prueba viva. |
+| Ejecutar una rutina genérica | Runner de prueba y operación separada para el RVT activo | La rutina fija de lectura pasó históricamente en un modelo descartable. La ejecución genérica y las escrituras PythonNet3 aún requieren verificación viva por flujo. |
 
 ## Reglas de ingeniería
 
@@ -29,6 +29,10 @@ El asistente no “absorbe” automáticamente todos los MCP ni aprende de cualq
 4. Para cambios masivos, mostrar cantidad y alcance antes de ejecutar. Si una consulta está truncada, no afirmar que cubre todos los elementos.
 5. PythonNet3 corre con los permisos de Revit; la restricción de RVT no aísla archivos/red. Revisar scripts completos, usar copia descartable y comprobar deltas tras ejecutar.
 6. Reducir tokens con consultas acotadas, respuestas resumidas y reutilización de rutinas; no volver a generar el mismo grafo ni adjuntar el modelo entero sin motivo.
+
+### Límites de cobertura
+
+El perfil tipado actual permite crear y editar las familias de operaciones enumeradas en `config/rvt-mcp-tools.json`; no habilita borrado de elementos, C# arbitrario ni toda la API de Revit. Si falta una operación concreta —por ejemplo dividir un muro o mover geometría sin una herramienta tipada adecuada— ARQ-IA debe reconocer las herramientas Revit que ya respondieron y resolver el cambio con una rutina Dynamo revisada sobre el modelo abierto cuando el runner lo permita. La capacidad queda pendiente si el runner o sus precondiciones no están disponibles.
 
 ## Evolución
 

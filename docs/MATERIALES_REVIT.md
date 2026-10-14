@@ -2,7 +2,7 @@
 
 ## Qué se consulta
 
-ARQ-IA consulta **el documento Revit activo**. `revit_list_materials` devuelve los materiales definidos en ese RVT; `revit_get_material_properties` obtiene detalles de uno por ID o nombre. El instalador habilita estas dos herramientas de lectura en Codex. No habilita las herramientas MCP que crean, asignan o editan materiales.
+ARQ-IA consulta **el documento Revit activo**. `revit_list_materials` devuelve los materiales definidos en ese RVT; `revit_get_material_properties` obtiene detalles de uno por ID o nombre. El catálogo actual también expone herramientas tipadas para crear/duplicar materiales, cambiar apariencia, identidad y propiedades físicas/térmicas, y asignar materiales a elementos o tipos. Cada modificación debe partir de elementos/materiales consultados en el RVT activo y revisar si la asignación alcanzará una instancia o un tipo compartido.
 
 Un material definido no demuestra que esté aplicado a un elemento. Las bibliotecas `.adsklib` instaladas en el PC son otra fuente distinta y no se importan automáticamente al proyecto. Tampoco existe un catálogo universal de materiales arquitectónicos válido para toda oficina o proyecto.
 
