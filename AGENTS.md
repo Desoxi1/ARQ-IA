@@ -12,4 +12,4 @@ ARQ-IA es independiente de NEXUS DX. Antes de cambiar código, configuración, m
 - `revit/`, `dynamo/`, `mcp/`: add-ins, bridge y servidores MCP.
 - `routines/`: rutinas compartidas revisadas; borradores personales se guardan fuera de Git.
 
-Usa una guía de `knowledge/playbooks/` por solicitud cuando corresponda. Consulta el modelo activo antes de inferir niveles, tipos, materiales o IDs. No declares éxito hasta leer el resultado en Revit. La memoria de cada clon vive bajo `.arq-ia/` y nunca se copia automáticamente al repositorio.
+Usa la guía pertinente de `knowledge/playbooks/` por solicitud; para diseño contextual, consulta `arquitectura-chile.md`. Aplica el resumen de `knowledge/standards/operacion-y-validacion.md`: consulta el modelo activo, delimita alcance y verifica el resultado antes de declarar éxito. No infieras niveles, tipos, materiales o IDs. La memoria de cada clon vive bajo `.arq-ia/` y nunca se copia automáticamente al repositorio. Las fuentes externas de `knowledge/references/` son referencias, no código para ejecutar o dependencias adoptadas.

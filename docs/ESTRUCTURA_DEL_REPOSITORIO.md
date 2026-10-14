@@ -9,7 +9,7 @@ ARQ-IA/
 ├── AGENTS.md              entrada breve de instrucciones
 ├── governance/            reglas completas del asistente y seguridad
 ├── config/                lista versionada de herramientas MCP permitidas
-├── knowledge/             guías BIM y aprendizaje local progresivo
+├── knowledge/             marcos BIM, referencias y aprendizaje local progresivo
 ├── materials/             catálogo común y taxonomía
 ├── docs/                  manuales, arquitectura y evidencia
 ├── revit/                 panel Revit, bridge y espacio de modelos descartables
@@ -26,7 +26,9 @@ ARQ-IA/
 |---|---|---|
 | `governance/` | Política de contexto BIM, datos, aprobaciones, escritura y verificación | Codex y quienes mantienen el producto |
 | `config/` | `rvt-mcp-tools.json`, fuente revisable de las herramientas habilitadas | Instalador y mantenedores; `.codex/config.toml` se genera localmente |
-| `knowledge/playbooks/` | Cinco guías breves por intención; consulta `INDEX.md` | ARQ-IA recupera una guía pertinente por solicitud |
+| `knowledge/playbooks/` | Seis guías breves por intención; consulta `INDEX.md` | ARQ-IA recupera una guía pertinente por solicitud |
+| `knowledge/standards/` | Estándar transversal de operación, ejecución y control | ARQ-IA y mantenedores |
+| `knowledge/references/` | Fuentes externas evaluadas para BIM y arquitectura chilena | Mantenedores; estado y límites de uso documentados |
 | `knowledge/progressive-learning.md` | Qué puede recordar localmente, cómo verificarlo y qué no promover | Cada clon/equipo |
 | `knowledge/templates/` | Plantilla para notas de aprendizaje, no memoria de un proyecto real | Cada clon/equipo al crear su memoria local |
 | `materials/` | `base.csv`, `TAXONOMIA.md`, instrucciones y plantilla de preferencias | Arquitectos y consultas del asistente |
@@ -80,3 +82,5 @@ Que una ruta esté ignorada significa que Git no la publica. No significa que se
 | Revisar seguridad | `SECURITY_AUDIT.md` y `ENV_AUDIT.md` |
 
 El punto de partida para las guías operativas es [`knowledge/playbooks/INDEX.md`](../knowledge/playbooks/INDEX.md). El catálogo de materiales se navega con la columna `catalog_group` de [`materials/base.csv`](../materials/base.csv); el significado y cantidad de cada grupo está en [`materials/TAXONOMIA.md`](../materials/TAXONOMIA.md).
+
+La investigación de fuentes externas vive en `knowledge/references/`; no se guarda código, videos, transcripciones ni modelos externos dentro del producto. La documentación chilena debe comprobarse vigente y aplicable para cada proyecto.

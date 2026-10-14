@@ -4,11 +4,14 @@ ARQ-IA carga **una guía breve por solicitud**, además del contexto mínimo del
 
 | Área | Intención principal | Guía | Resultado comprobable |
 |---|---|---|
+| Diseño arquitectónico | Concepto, distribución, implantación, contexto y alternativas | `arquitectura-chile.md` | Datos confirmados/supuestos separados, opciones con compromisos y criterios verificables |
 | Análisis espacial | Ciclos, zonas o colores desde una imagen | `ciclos-imagen.md` | Correspondencia imagen ↔ vista/nivel ↔ IDs confirmados; ambiguos excluidos |
 | Modelado arquitectónico | Crear o editar muros y cotas | `muros-cotas.md` | Tipo, restricciones, geometría y referencias de cotas comprobadas |
 | Coordinación y estructura | Estructura o traslado de elementos | `estructura-copia.md` | Dependencias, sistema de coordenadas y conjunto copiado comprobados |
 | Materiales y familias | Ficha técnica, material o familia | `fichas-materiales.md` | Datos con fuente/unidad/vigencia y parámetros realmente disponibles |
 | Diagnóstico | Errores, interferencias o auditoría | `diagnostico-modelo.md` | Hallazgo, alcance, causa probable y verificación posterior |
+
+El estándar transversal de escritura, prueba, ejecución y verificación está en [`../standards/operacion-y-validacion.md`](../standards/operacion-y-validacion.md). El panel añade al turno un resumen compacto de esas reglas y carga como máximo una ficha específica.
 
 ## Ruta de herramientas y consumo de contexto
 
@@ -20,6 +23,8 @@ ARQ-IA carga **una guía breve por solicitud**, además del contexto mínimo del
 ## Compatibilidad y evidencia
 
 El paquete actual usa `rvt-mcp` y un bridge propio de Dynamo 4.0.2. El [MCP oficial de Autodesk para Revit](https://help.autodesk.com/view/ADSKMCP/ENU/?guid=ADSKMCP_RevitMcp_revit_mcp_server_html) y [DynamoMCP](https://help.autodesk.com/cloudhelp/2027/ENU/Revit-WhatsNew/files/GUID-ECD5B134-5A8A-4223-9DBA-565D708A4F47.htm) se evalúan cuando las versiones del equipo sean compatibles; no se añaden automáticamente. [rvt-mcp](https://github.com/bimwright/rvt-mcp) ya es la integración de terceros adoptada, con herramientas expuestas de forma acotada. Consultar `docs/PROTOTYPE_STATUS.md` antes de declarar una capacidad verificada.
+
+La investigación de repositorios, normativa chilena y referencias audiovisuales está resumida en [`../references/REPOSITORIOS_Y_CONTENIDO.md`](../references/REPOSITORIOS_Y_CONTENIDO.md). Los ejemplos externos son referencias: no se clonan, instalan ni ejecutan automáticamente.
 
 ## Memoria local de cada PC
 

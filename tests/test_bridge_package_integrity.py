@@ -118,7 +118,7 @@ class BridgePackageIntegrityTests(unittest.TestCase):
         preparation = source.split("private BridgeResponse PrepareSavedRoutineInDynamo", 1)[1].split("private string InRoutinesRoot", 1)[0]
         self.assertIn('request.Operation == "run_saved_routine_in_active_model"', source)
         self.assertIn('TryGetDynamoWorkspaceContentState(GetDynamoModel()', handler)
-        self.assertIn('if (workspaceHasContent)', handler)
+        self.assertIn('if (workspaceHasContent && !IsCurrentSavedRoutineWorkspace(graphPath, validatedGraphBytes))', handler)
         self.assertIn('TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No', handler)
         self.assertIn('if (confirmation.Show() != TaskDialogResult.Yes)', handler)
         self.assertIn('if (!request.TryCommitExecution())', handler)

@@ -1,11 +1,12 @@
 param(
-    [string]$DynamoRoot = 'C:\Program Files\Autodesk\Revit 2027\AddIns\DynamoForRevit'
+    [string]$DynamoRoot = 'C:\Program Files\Autodesk\Revit 2027\AddIns\DynamoForRevit',
+    [switch]$RoutingOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $DynamoRoot = [IO.Path]::GetFullPath($DynamoRoot)
-$extensionDll = Join-Path $repoRoot 'artifacts\dynamo-extension\BimAiDynamoAssistant.dll'
+$extensionDll = Join-Path $repoRoot 'dynamo\extension\dist\BimAiDynamoAssistant.dll'
 $smokeProject = Join-Path $PSScriptRoot 'dynamo_extension_client_smoke\DynamoExtensionClientSmoke.csproj'
 $localSdkDirectory = Join-Path $env:LOCALAPPDATA 'BIM-AI-POC\dotnet-sdk'
 $localDotnet = Join-Path $localSdkDirectory 'dotnet.exe'
@@ -26,5 +27,10 @@ else {
     $dotnet = (Get-Command dotnet.exe -ErrorAction Stop).Source
 }
 
-& $dotnet run --project $smokeProject --configuration Release -- $extensionDll $DynamoRoot $repoRoot
+if ($RoutingOnly) {
+    & $dotnet run --project $smokeProject --configuration Release -- $extensionDll $DynamoRoot $repoRoot --routing-only
+}
+else {
+    & $dotnet run --project $smokeProject --configuration Release -- $extensionDll $DynamoRoot $repoRoot
+}
 if ($LASTEXITCODE -ne 0) { throw 'Dynamo extension Codex client smoke failed.' }

@@ -195,7 +195,7 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
         string? continuationContext)
     {
         var text = new StringBuilder();
-        text.AppendLine("Contexto BIM: sigue AGENTS.md; consulta el RVT activo con herramientas tipadas y datos acotados. Comprueba cada escritura antes de declarar éxito.");
+        text.AppendLine("Contexto BIM: sigue AGENTS.md; traduce el pedido cotidiano a elementos y parámetros Revit; consulta el modelo activo y usa datos acotados. Antes de escribir, delimita elementos, efecto y comprobación; ejecuta solo con autorización aplicable y verifica el resultado en Revit. No inventes ni declares éxito por crear un grafo o recibir 'completed'.");
         if (!string.IsNullOrWhiteSpace(projectRoot))
         {
             var root = Path.GetFullPath(projectRoot);
@@ -258,7 +258,8 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
         {
             new { type = "text", text = text.ToString(), text_elements = Array.Empty<object>() }
         };
-        var imageDetail = SelectPlaybook(message, attachments) is "ciclos-imagen.md" or "fichas-materiales.md" ? "high" : "low";
+        var selectedPlaybook = SelectPlaybook(message, attachments);
+        var imageDetail = selectedPlaybook is "ciclos-imagen.md" or "fichas-materiales.md" or "arquitectura-chile.md" ? "high" : "low";
         foreach (var attachment in attachments.Where(attachment => attachment.IsImage))
             input.Add(new { type = "localImage", path = attachment.LocalPath, detail = imageDetail });
 
@@ -281,6 +282,8 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
             return "muros-cotas.md";
         if (Has(message, "error", "problema", "interferencia", "advertencia", "diagnóstico", "diagnostico", "revisar modelo", "auditar modelo"))
             return "diagnostico-modelo.md";
+        if (Has(message, "propuesta arquitectónica", "propuesta arquitectonica", "concepto arquitectónico", "concepto arquitectonico", "diseño arquitectónico", "diseno arquitectonico", "diseña", "diseñar", "diseño", "diseno", "distribución", "distribucion", "emplazamiento", "asoleamiento", "orientación", "orientacion", "contexto chileno", "clima", "paisaje", "vivienda", "programa arquitectónico", "programa arquitectonico"))
+            return "arquitectura-chile.md";
         return null;
     }
 

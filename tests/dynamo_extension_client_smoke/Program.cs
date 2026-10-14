@@ -8,9 +8,9 @@ using System.Text.Json;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-if (args.Length != 3)
+if (args.Length != 3 && !(args.Length == 4 && args[3] == "--routing-only"))
 {
-    Console.WriteLine("Usage: DynamoExtensionClientSmoke <extension.dll> <dynamo-root> <project-root>");
+    Console.WriteLine("Usage: DynamoExtensionClientSmoke <extension.dll> <dynamo-root> <project-root> [--routing-only]");
     return 2;
 }
 
@@ -35,6 +35,22 @@ AssemblyLoadContext.Default.Resolving += (context, name) =>
 
 var extensionAssembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(extensionPath);
 var clientType = extensionAssembly.GetType("BimAiDynamoAssistant.CodexAppServerClient", throwOnError: true)!;
+var attachmentTypeForRouting = extensionAssembly.GetType("BimAiDynamoAssistant.LocalAttachment", throwOnError: true)!;
+var emptyAttachments = Array.CreateInstance(attachmentTypeForRouting, 0);
+var selectPlaybook = clientType.GetMethod("SelectPlaybook", BindingFlags.Static | BindingFlags.NonPublic)!;
+foreach (var (prompt, expectedPlaybook) in new[]
+{
+    ("Diseña una propuesta para una vivienda considerando clima y paisaje de Chile", "arquitectura-chile.md"),
+    ("Diseña los muros y cotas del primer piso", "muros-cotas.md"),
+    ("Identifica los ciclos y zonas de color de esta planta", "ciclos-imagen.md")
+})
+{
+    var actualPlaybook = (string?)selectPlaybook.Invoke(null, new object[] { prompt, emptyAttachments });
+    if (!string.Equals(actualPlaybook, expectedPlaybook, StringComparison.Ordinal))
+        throw new InvalidOperationException($"Playbook routing failed for '{prompt}': expected {expectedPlaybook}, got {actualPlaybook ?? "none"}.");
+}
+Console.WriteLine("CODEX_APP_SERVER_PLAYBOOK_ROUTING=PASS architecture=localized specific_modeling=preserved cycles=preserved");
+if (args.Length == 4) return 0;
 var classifyMcpResult = clientType.GetMethod("IsMcpErrorResult", BindingFlags.Static | BindingFlags.NonPublic)!;
 foreach (var (payload, expected) in new[]
 {

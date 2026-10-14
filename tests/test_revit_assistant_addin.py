@@ -42,7 +42,8 @@ class RevitAssistantAddinTests(unittest.TestCase):
         self.assertIn("VendorDescription>Branko Plaza", installer)
         self.assertIn("StageWhileRevitOpen", installer)
         self.assertIn("BimAiRevitAssistant.RevitAssistantApplication", installer)
-        self.assertIn(".codex\\config.toml.example", installer)
+        self.assertIn(".codex\\config.toml", installer)
+        self.assertNotIn(".codex\\config.toml.example", installer)
         self.assertIn("$verified.RevitAddIns.AddIn.VendorDescription -ne 'Branko Plaza'", installer)
         self.assertNotIn("Remove-Item -Recurse", installer)
 
