@@ -63,7 +63,6 @@ ARQ-IA/
 | `artifacts/` | ZIP, DLL intermedias y archivos de build/diagnóstico | Ignorada; se puede regenerar |
 | `vendor/` | Caché del instalador de terceros verificado por hash | Ignorada salvo su README; descargable otra vez |
 | `revit/test-models/*.rvt` | Modelos descartables de integración | Ignorados; no incluir modelos de trabajo |
-| `.desoxi/` | Scripts y diseños para mostrar la marca DESOXI en terminales | Excluida; no pertenece al producto ARQ-IA ni a su instalador |
 
 Que una ruta esté ignorada significa que Git no la publica. No significa que sea necesaria para instalar ni que deba borrarse automáticamente: revisa su origen y si contiene datos locales antes de limpiar el equipo.
 
