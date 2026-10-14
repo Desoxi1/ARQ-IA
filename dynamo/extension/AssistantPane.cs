@@ -1478,56 +1478,75 @@ internal sealed class AssistantPane : UserControl, IDisposable
     {
         target.Tag = raw;
         target.Document.Blocks.Clear();
-        var paragraph = new Paragraph { Margin = new Thickness(0), LineHeight = 19 };
         var lines = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var inCode = false;
         var fence = new string((char)96, 3);
-        for (var index = 0; index < lines.Length; index++)
+        var index = 0;
+        while (index < lines.Length)
         {
             var line = lines[index];
             var trimmed = line.TrimStart();
             if (trimmed.StartsWith(fence, StringComparison.Ordinal))
             {
-                if (!inCode && index > 0) paragraph.Inlines.Add(new LineBreak());
-                inCode = !inCode;
+                var codeLines = new List<string>();
+                index++;
+                while (index < lines.Length && !lines[index].TrimStart().StartsWith(fence, StringComparison.Ordinal))
+                    codeLines.Add(lines[index++]);
+                if (index < lines.Length) index++;
+                AddCodeBlock(target, codeLines);
                 continue;
             }
-            if (index > 0) paragraph.Inlines.Add(new LineBreak());
-            if (inCode)
+            if (string.IsNullOrWhiteSpace(line))
             {
-                paragraph.Inlines.Add(new Run(string.IsNullOrEmpty(line) ? " " : line)
-                {
-                    FontFamily = new FontFamily("Consolas"),
-                    Foreground = BrushFromRgb(190, 222, 235),
-                    Background = BrushFromRgb(43, 51, 60)
-                });
+                index++;
                 continue;
             }
-            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            if (index + 1 < lines.Length && TryParseMarkdownTableRow(line, out var headerCells) &&
+                TryParseMarkdownTableRow(lines[index + 1], out var separatorCells) &&
+                IsMarkdownTableSeparator(separatorCells) && separatorCells.Count == headerCells.Count)
+            {
+                var tableRows = new List<IReadOnlyList<string>> { headerCells };
+                index += 2;
+                while (index < lines.Length && TryParseMarkdownTableRow(lines[index], out var rowCells) && rowCells.Count == headerCells.Count)
+                {
+                    tableRows.Add(rowCells);
+                    index++;
+                }
+                AddMarkdownTable(target, tableRows);
+                continue;
+            }
+
             var heading = trimmed.StartsWith("### ", StringComparison.Ordinal) ? 3 :
                 trimmed.StartsWith("## ", StringComparison.Ordinal) ? 2 :
                 trimmed.StartsWith("# ", StringComparison.Ordinal) ? 1 : 0;
             if (heading > 0)
             {
+                var paragraph = new Paragraph { Margin = new Thickness(0, heading == 1 ? 10 : 8, 0, 5), LineHeight = 22 };
                 paragraph.Inlines.Add(new Run(trimmed[(heading + 1)..])
                 {
                     FontWeight = FontWeights.SemiBold,
-                    FontSize = heading == 1 ? 15 : heading == 2 ? 14 : 13,
+                    FontSize = heading == 1 ? 16 : heading == 2 ? 14 : 13,
                     Foreground = BrushFromRgb(202, 232, 241)
                 });
+                target.Document.Blocks.Add(paragraph);
+                index++;
                 continue;
             }
             if (trimmed.StartsWith("> ", StringComparison.Ordinal))
             {
+                var paragraph = new Paragraph { Margin = new Thickness(4, 2, 0, 7), Padding = new Thickness(7, 3, 4, 3), Background = SurfaceRaised, LineHeight = 19 };
                 paragraph.Inlines.Add(new Run("│ ") { Foreground = ButtonAccent, FontWeight = FontWeights.Bold });
                 paragraph.Inlines.Add(new Run(trimmed[2..]) { FontStyle = FontStyles.Italic, Foreground = BrushFromRgb(205, 211, 220) });
+                target.Document.Blocks.Add(paragraph);
+                index++;
                 continue;
             }
+
             var listItem = Regex.Match(line, @"^(\s*)([-*+]|\d+[.)])\s+(.+)$");
             if (listItem.Success)
             {
-                var indentation = listItem.Groups[1].Value.Length;
-                if (indentation > 0) paragraph.Inlines.Add(new Run(new string(' ', Math.Min(indentation, 8))));
+                var indentation = Math.Min(listItem.Groups[1].Value.Length, 4);
+                var paragraph = new Paragraph { Margin = new Thickness(8 + indentation * 8, 1, 0, 3), LineHeight = 19 };
                 var marker = listItem.Groups[2].Value;
                 paragraph.Inlines.Add(new Run(char.IsDigit(marker[0]) ? marker + "  " : "•  ")
                 {
@@ -1535,9 +1554,141 @@ internal sealed class AssistantPane : UserControl, IDisposable
                     FontWeight = FontWeights.SemiBold
                 });
                 AppendInlineFormatting(paragraph, listItem.Groups[3].Value);
+                target.Document.Blocks.Add(paragraph);
+                index++;
                 continue;
             }
-            AppendInlineFormatting(paragraph, line);
+
+            var body = new Paragraph { Margin = new Thickness(0, 0, 0, 7), LineHeight = 19 };
+            AppendInlineFormatting(body, line);
+            index++;
+            while (index < lines.Length && !string.IsNullOrWhiteSpace(lines[index]) && !IsMarkdownBlockStart(lines, index, fence))
+            {
+                body.Inlines.Add(new Run(" "));
+                AppendInlineFormatting(body, lines[index].Trim());
+                index++;
+            }
+            target.Document.Blocks.Add(body);
+        }
+    }
+
+    private static bool IsMarkdownBlockStart(string[] lines, int index, string fence)
+    {
+        var trimmed = lines[index].TrimStart();
+        if (trimmed.StartsWith(fence, StringComparison.Ordinal) || trimmed.StartsWith("# ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("## ", StringComparison.Ordinal) || trimmed.StartsWith("### ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("> ", StringComparison.Ordinal) || Regex.IsMatch(lines[index], @"^\s*([-*+]|\d+[.)])\s+.+")) return true;
+        return index + 1 < lines.Length && TryParseMarkdownTableRow(lines[index], out _) &&
+               TryParseMarkdownTableRow(lines[index + 1], out var separator) && IsMarkdownTableSeparator(separator);
+    }
+
+    private static bool TryParseMarkdownTableRow(string line, out List<string> cells)
+    {
+        cells = new List<string>();
+        var trimmed = line.Trim();
+        if (!trimmed.Contains('|')) return false;
+        var start = trimmed.StartsWith('|') ? 1 : 0;
+        var end = trimmed.EndsWith('|') ? trimmed.Length - 1 : trimmed.Length;
+        var cell = new System.Text.StringBuilder();
+        var escaped = false;
+        var inCode = false;
+        for (var position = start; position < end; position++)
+        {
+            var character = trimmed[position];
+            if (escaped)
+            {
+                cell.Append(character);
+                escaped = false;
+                continue;
+            }
+            if (character == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+            if (character == '`') inCode = !inCode;
+            if (character == '|' && !inCode)
+            {
+                cells.Add(cell.ToString().Trim());
+                cell.Clear();
+            }
+            else cell.Append(character);
+        }
+        if (escaped) cell.Append('\\');
+        cells.Add(cell.ToString().Trim());
+        return cells.Count >= 2;
+    }
+
+    private static bool IsMarkdownTableSeparator(IReadOnlyList<string> cells) =>
+        cells.Count >= 2 && cells.All(cell => Regex.IsMatch(cell.Replace(":", string.Empty, StringComparison.Ordinal), @"^-{3,}$"));
+
+    private static void AddMarkdownTable(RichTextBox target, IReadOnlyList<IReadOnlyList<string>> rows)
+    {
+        if (rows.Count == 0 || rows[0].Count == 0) return;
+        var table = new Table
+        {
+            CellSpacing = 0,
+            BorderBrush = PanelBorder,
+            BorderThickness = new Thickness(1),
+            Background = Surface,
+            Margin = new Thickness(0, 2, 0, 10)
+        };
+        var columnCount = rows[0].Count;
+        var weights = Enumerable.Range(0, columnCount)
+            .Select(column => Math.Clamp(rows.Max(row => row[column].Length), 5, 28))
+            .ToArray();
+        foreach (var weight in weights) table.Columns.Add(new TableColumn { Width = new GridLength(weight, GridUnitType.Star) });
+
+        var group = new TableRowGroup();
+        for (var rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+        {
+            var row = new TableRow();
+            for (var column = 0; column < columnCount; column++)
+            {
+                var cell = new TableCell
+                {
+                    BorderBrush = PanelBorder,
+                    BorderThickness = new Thickness(0, 0, 1, 1),
+                    Padding = new Thickness(6, 4, 6, 4),
+                    Background = rowIndex == 0 ? SurfaceRaised : (rowIndex % 2 == 0 ? SurfaceRaised : Surface)
+                };
+                var paragraph = new Paragraph { Margin = new Thickness(0), LineHeight = 17, FontSize = 11, Foreground = TextBrush };
+                AppendInlineFormatting(paragraph, rows[rowIndex][column]);
+                if (rowIndex == 0)
+                {
+                    foreach (var inline in paragraph.Inlines)
+                    {
+                        inline.FontWeight = FontWeights.SemiBold;
+                        inline.Foreground = BrushFromRgb(202, 232, 241);
+                    }
+                }
+                cell.Blocks.Add(paragraph);
+                row.Cells.Add(cell);
+            }
+            group.Rows.Add(row);
+        }
+        table.RowGroups.Add(group);
+        target.Document.Blocks.Add(table);
+    }
+
+    private static void AddCodeBlock(RichTextBox target, IReadOnlyList<string> lines)
+    {
+        var paragraph = new Paragraph
+        {
+            Margin = new Thickness(0, 2, 0, 9),
+            Padding = new Thickness(8, 6, 8, 6),
+            Background = BrushFromRgb(38, 45, 53),
+            LineHeight = 18
+        };
+        for (var index = 0; index < lines.Count; index++)
+        {
+            if (index > 0) paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new Run(string.IsNullOrEmpty(lines[index]) ? " " : lines[index])
+            {
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 11,
+                Foreground = BrushFromRgb(190, 222, 235)
+            });
         }
         target.Document.Blocks.Add(paragraph);
     }
