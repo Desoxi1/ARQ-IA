@@ -14,7 +14,7 @@ Revit 2027 con Dynamo for Revit, Windows x64 y Codex Desktop/CLI con sesión ini
 
 Alternativa PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 
-Si la descarga falla, la instalación termina con un error explícito. También puedes poner el ZIP oficial `RvtMcp.Setup-v1.1.0-win-x64.zip` en `vendor/`; debe coincidir con el SHA-256 fijado en `setup.ps1`. Una instalación anterior v0.6.2 detectada en el PC se conserva y se configura; no se migra automáticamente a 1.1.0.
+Si la descarga falla, la instalación termina con un error explícito. También puedes poner el ZIP oficial `RvtMcp.Setup-v1.1.0-win-x64.zip` en `vendor/`; debe coincidir con el SHA-256 fijado en `setup.ps1`. Una instalación anterior v0.6.2 no se acepta como compatible con el catálogo 1.1.0: el instalador completo actualiza el servidor antes de generar `.codex/config.toml`. `setup.ps1 -ConfigureOnly` solo funciona después de que el servidor 1.1.0 y el add-in correspondiente estén instalados.
 
 ## Primera comprobación
 

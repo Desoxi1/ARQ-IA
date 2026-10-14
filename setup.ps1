@@ -27,17 +27,17 @@ function Get-Sha256Hex([string]$Path) {
 }
 
 if ($ConfigureOnly) {
-    if (-not ((Test-Path -LiteralPath $currentServerPath -PathType Leaf) -or (Test-Path -LiteralPath $legacyServerPath -PathType Leaf)) -or
+    if (-not (Test-Path -LiteralPath $currentServerPath -PathType Leaf) -or
         -not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or
         -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) {
-        throw 'ConfigureOnly requiere rvt-mcp instalado para Revit 2027.'
+        throw 'ConfigureOnly requiere rvt-mcp v1.1.0 instalado para Revit 2027. Ejecuta el instalador completo para actualizar.'
     }
     Write-Host 'Se actualizará solamente la configuración local MCP del proyecto.'
 } else {
     $runningRevit = Get-Process -Name Revit -ErrorAction SilentlyContinue
     if ($runningRevit) { throw 'Cierra todas las ventanas de Revit 2027 antes de instalar o actualizar add-ins.' }
 
-$alreadyInstalled = ((Test-Path -LiteralPath $currentServerPath -PathType Leaf) -or (Test-Path -LiteralPath $legacyServerPath -PathType Leaf)) -and
+$alreadyInstalled = (Test-Path -LiteralPath $currentServerPath -PathType Leaf) -and
     (Test-Path -LiteralPath $addinManifest -PathType Leaf) -and (Test-Path -LiteralPath $pluginDll -PathType Leaf)
 if (-not $alreadyInstalled -and -not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     $vendorDir = Split-Path -Parent $packagePath
@@ -77,8 +77,8 @@ if ($needsInstall) {
 if (-not (Test-Path -LiteralPath $addinManifest -PathType Leaf) -or -not (Test-Path -LiteralPath $pluginDll -PathType Leaf)) { throw 'No se encontró el add-in de Revit 2027 después de instalar.' }
 }
 
-$serverPath = if (Test-Path -LiteralPath $currentServerPath -PathType Leaf) { $currentServerPath } elseif (Test-Path -LiteralPath $legacyServerPath -PathType Leaf) { $legacyServerPath } else { $null }
-if (-not $serverPath) { throw 'No se encontró el servidor rvt-mcp instalado.' }
+$serverPath = if (Test-Path -LiteralPath $currentServerPath -PathType Leaf) { $currentServerPath } else { $null }
+if (-not $serverPath) { throw 'No se encontró rvt-mcp v1.1.0. La configuración nueva no es compatible con 0.6.2; ejecuta la instalación completa.' }
 
 New-Item -ItemType Directory -Force -Path $codexDir | Out-Null
 if (Test-Path -LiteralPath $codexConfig -PathType Leaf) {
