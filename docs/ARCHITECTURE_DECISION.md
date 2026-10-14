@@ -1,12 +1,12 @@
 # Decisión de arquitectura — ARQ-IA
 
-**Actualizada:** 13 de octubre de 2026.
+**Actualizada:** 14 de octubre de 2026.
 
 ## Decisión
 
 ARQ-IA combina tres piezas locales:
 
-1. `bimwright/rvt-mcp` ofrece consultas y acciones tipadas sobre Revit 2027. La instalación local 0.6.2 pasó consultas de vista activa/selección y expone `revit_override_element_graphics`, que no estaba habilitada en ARQ-IA. Un clon nuevo descarga la versión 1.1.0 fijada por hash. No se ha probado cada herramienta de escritura ni la versión 1.1.0 integrada con ARQ-IA.
+1. `bimwright/rvt-mcp` ofrece consultas y acciones tipadas sobre Revit 2027. Un clon descarga la versión 1.1.0 fijada por hash. El perfil ARQ-IA habilita `revit_override_element_graphics` y las consultas necesarias para contexto, geometría, salas, documentación, estructura, MEP, familias y vínculos. No se ha probado cada herramienta de escritura ni la versión 1.1.0 integrada con ARQ-IA.
 2. Un MCP propio crea/lista rutinas versionables (`.py`, `.dyn`, manifiesto con hashes); otro puede pedir que un borrador se cargue en la sesión Dynamo del documento activo en Manual para que el usuario lo revise. Una operación separada pide la ejecución al add-in Revit y conserva la puerta de `revit/test-models/`.
 3. El chat en el panel Revit y la extensión lateral de Dynamo usan Codex app-server con los MCP configurados para la carpeta clonada. Aceptan texto, imágenes y archivos. El contenido adjunto se trata como referencia, no como código ejecutable por sí mismo.
 
@@ -16,7 +16,7 @@ Se reutiliza `rvt-mcp` porque ya aporta una superficie de Revit tipada para la v
 
 | Fuente oficial del proyecto | Hallazgo aplicable | Decisión |
 |---|---|---|
-| [bimwright/rvt-mcp](https://github.com/bimwright/rvt-mcp) | Incluye herramientas gráficas y materiales; el release 0.6.2 quedó archivado y 1.1.0 publica un ZIP de instalación para Revit 2022–2027. Su instalador puede mover datos de una instalación antigua y escribir configuraciones de clientes. | Usar la herramienta gráfica existente para el caso de muros rojos. Fijar 1.1.0 para equipos nuevos con `-Client none` y SHA-256; conservar 0.6.2 instalada en este PC hasta validar una migración separada. No habilitar `send_code` ni ToolBaker. |
+| [bimwright/rvt-mcp](https://github.com/bimwright/rvt-mcp) | El release fijado 1.1.0 publica un ZIP de instalación para Revit 2022–2027 y ofrece toolsets por dominio; su instalador puede migrar datos previos y escribir configuraciones de clientes. | Fijar 1.1.0 por SHA-256. Seleccionar toolsets por dominio y una allowlist de herramientas tipadas; excluir `meta`, `delete`, `export`, `workflows`, ToolBaker y `send_code`. |
 | [KenLP/RevitMCPServer](https://github.com/KenLP/RevitMCPServer) | Documenta `dry-run`, diffs y transacciones agrupadas para Revit 2025–2027. | Tomar el patrón de vista previa y recibo como referencia. No instalar un segundo puente que pueda escribir en el mismo modelo. |
 | [HorizunGroup/horizun-revit-mcp](https://github.com/HorizunGroup/horizun-revit-mcp) | Documenta una superficie BIM amplia y perfiles de operación. | Referencia de cobertura; no fusionar repositorios ni asumir compatibilidad por su README. |
 | [Autodesk Dynamo / Revit MCP](https://help.autodesk.com/view/ADSKMCP/ENU/?guid=ADSKMCP_RevitMcp_revit_mcp_server_html) | La opción oficial depende de la actualización y el host instalados. | Evaluar cuando Revit/Dynamo del equipo soporten la versión requerida; no duplicar un servidor por anticipado. |
@@ -44,7 +44,7 @@ El fallo de “pinta los muros del primer piso de rojo” tuvo dos causas de pro
 
 PythonNet3 ya cubre el motor Python de Dynamo. pyRevit aporta un entorno para comandos, pestañas y paneles directamente en Revit; añadirlo no arregla el runner Dynamo ni es requisito del chat actual. Sus [releases oficiales](https://github.com/pyrevitlabs/pyRevit/releases) declaran soporte para Revit 2027 y su [documentación](https://docs.pyrevitlabs.io/reference/pyrevit/extensions/) explica las extensiones. Se evaluará para tareas que necesiten una herramienta Revit independiente de un grafo Dynamo.
 
-Autodesk publicó Dynamo Core 4.2 con DynamoMCP, pero la versión instalada con este Revit es Dynamo 4.0.2. Las [notas oficiales](https://dynamobim.org/dynamo-core-4-2-release/) no prueban que el MCP de 4.2 esté disponible en este host ni conectado a Codex. Tampoco se instalará el Revit Public MCP Server en esta fase: su [guía](https://help.autodesk.com/view/ADSKMCP/ENU/?guid=ADSKMCP_RevitMcp_setting_up_revit_mcp_server_html) requiere Revit 2027.2, mientras este PC tiene 2027.0.
+La documentación de DynamoMCP y Revit Public MCP depende de la actualización instalada de Autodesk. No se considera disponible en ARQ-IA hasta confirmar la versión compatible del host y su conexión real con Codex; consulta las páginas oficiales actuales antes de reevaluarlo.
 
 ## Distribución
 

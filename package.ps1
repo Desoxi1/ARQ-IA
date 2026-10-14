@@ -38,6 +38,7 @@ try {
             'ARQ-IA/setup.ps1',
             'ARQ-IA/doctor.ps1',
             'ARQ-IA/docs/COLOR_MUROS_PRIMER_PISO.md',
+            'ARQ-IA/docs/README.md',
             'ARQ-IA/docs/ESTRUCTURA_DEL_REPOSITORIO.md',
             'ARQ-IA/governance/assistant-policy.md',
             'ARQ-IA/governance/README.md',

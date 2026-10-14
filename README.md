@@ -4,7 +4,7 @@
 
 **Asistente para Revit 2027 y Dynamo 4.0.2.** Desarrollado por Branko Plaza. Abre un chat en Revit y en **Dynamo → Extensiones → Abrir ARQ-IA**, acepta texto e imágenes/archivos, conserva el historial local por carpeta de proyecto y usa Codex para interpretar solicitudes BIM.
 
-Para ubicar rápidamente las reglas, guías, catálogo, scripts y archivos locales, consulta el [mapa de la carpeta](docs/ESTRUCTURA_DEL_REPOSITORIO.md). Para BIM, empieza por el [índice de guías](knowledge/playbooks/INDEX.md) o el [catálogo y taxonomía de materiales](materials/README.md).
+Para ubicar rápidamente reglas, manuales, guías, configuración y archivos locales, consulta el [índice de documentación](docs/README.md) y el [mapa de la carpeta](docs/ESTRUCTURA_DEL_REPOSITORIO.md). Para BIM, empieza por el [índice de guías](knowledge/playbooks/INDEX.md) o el [catálogo y taxonomía de materiales](materials/README.md).
 
 ## Cómo funciona
 
@@ -35,13 +35,13 @@ Requiere Windows x64, Revit **2027**, Dynamo incluido con Revit, Codex Desktop/C
 
 Alternativa PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 
-El instalador detecta rutas del equipo, instala los dos paneles y el bridge por usuario, registra los MCP y comprueba los componentes. Descarga el release **v1.1.0** de `bimwright/rvt-mcp` con SHA-256 fijo solo si no existe una instalación compatible. En este PC de desarrollo conserva la instalación anterior v0.6.2; el perfil habilita la misma herramienta gráfica ya presente. El instalador no actualiza un `rvt-mcp` existente automáticamente. [Pasos y diagnóstico](docs/INSTRUCCIONES_OTRO_PC.md).
+El instalador detecta rutas del equipo, instala los dos paneles y el bridge por usuario, registra los MCP y comprueba los componentes. Descarga el release **v1.1.0** de `bimwright/rvt-mcp` con SHA-256 fijado solo si no existe una instalación compatible. El instalador no actualiza un `rvt-mcp` existente automáticamente. [Pasos y diagnóstico](docs/INSTRUCCIONES_OTRO_PC.md).
 
 ## Estado real
 
 La versión declarada por el paquete Dynamo es **0.5.1**. El producto incluye paneles para Revit y Dynamo, adjuntos, historial local, selección de modelo Codex y MCP para contexto Revit, rutinas y bridge.
 
-- **Evidencia histórica:** consultas de vista y selección por `rvt-mcp` v0.6.2; carga de una versión anterior de la extensión Dynamo; intercambio Codex app-server con texto/imagen; y una rutina fija de lectura ejecutada en un RVT descartable. El listado de materiales de un modelo de muestra devolvió 300/300; `materials/base.csv` conserva 208 nombres curados, no el inventario del RVT.
+- **Evidencia histórica:** hay consultas de vista/selección, procesamiento de texto e imagen y ejecución de una rutina fija de solo lectura documentadas para versiones y sesiones anteriores. Esa evidencia no prueba una instalación limpia de la versión actual ni todas las escrituras. `materials/base.csv` contiene nombres comunes curados; no es inventario de ningún RVT.
 - **Pendiente:** validar una instalación limpia en otro PC, `rvt-mcp` v1.1.0 integrado, ejecución genérica de rutinas después de cambiar de grafo, escritura y el caso de muros rojos. Compilar o instalar un archivo no sustituye esas comprobaciones.
 - **Límite del producto:** ARQ-IA interpreta solicitudes y usa las herramientas disponibles; no garantiza cualquier operación ni modifica proyectos productivos mediante el runner genérico.
 
@@ -82,6 +82,8 @@ La carpeta `.arq-ia` contiene texto local sin cifrar; no guardes secretos allí.
 Las rutinas nuevas de `routines/` quedan como borradores locales ignorados por Git. Revisa su código, elimina rutas específicas del PC y valida su comportamiento en un RVT descartable antes de compartirlas; una rutina aprobada puede añadirse explícitamente al repositorio.
 
 ## Más información
+
+- [Índice de documentación](docs/README.md)
 
 - [Arquitectura y evaluación de repositorios](docs/ARCHITECTURE_DECISION.md)
 - [Glosario español ↔ Revit](docs/GLOSARIO_BIM_REVIT_ES_EN.md)

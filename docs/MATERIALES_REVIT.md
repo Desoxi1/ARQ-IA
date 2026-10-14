@@ -14,13 +14,9 @@ Cada PC puede guardar convenciones locales en `.arq-ia/materials/local.csv`, usa
 
 Según Autodesk, un material puede tener datos de **identidad**, **gráficos** para vistas no renderizadas, **apariencia** de render, **propiedades físicas** y **propiedades térmicas**. Estas facetas no son intercambiables. La clase/categoría escrita en el material es metadata del modelo, no una especificación técnica verificada. [Materiales en Revit 2027](https://help.autodesk.com/cloudhelp/2027/ENU/Revit-Customize/files/GUID-8E88F590-4864-4C60-9433-4A70AC066605.htm), [API de Material](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API-MainReference/files/html/2ec33007-7a2a-f86a-009b-d4c5d235a307.htm).
 
-## Lectura comprobada en este PC
+## Alcance y control de resultados
 
-El 13-10-2026 se abrió **Snowdon Towers Sample Architectural.rvt**, copia local del ejemplo Autodesk, en Revit 2027. El conector local `rvt-mcp` v0.6.2 devolvió `total=300`, `returned=300`, `limit_hit=false`, `skipped=0` con `limit=1000`. Por tanto, el listado de **materiales definidos en ese modelo** quedó completo. Esta lectura de 300 es independiente del catálogo curado de 208 entradas de `materials/base.csv`; no se espera que las cantidades coincidan. La respuesta avisó que el resultado era grande (77.924 bytes); en trabajo normal conviene filtrar por nombre o clase y pedir propiedades solo de los candidatos.
-
-Distribución por clase declarada en el ejemplo: Generic 71, Unassigned 60, Metal 49, Wood 24, Plastic 20, Miscellaneous 16, Masonry 11, Paint 9, Glass 8, Concrete 7, System 6, Stone 6, Ceramic 3 y otras clases minoritarias. Los 300 registran un asset de apariencia; 124 tienen asset estructural y 128 asset térmico. Se consultaron detalladamente seis candidatos de hormigón, vidrio, ladrillo, madera, yeso y aislación; el conector devolvió gráficos, patrones, identidad, assets y parámetros. El ejemplo muestra que un nombre comercial o genérico puede coexistir con assets físicos/térmicos de nombres distintos. **No tomar sus valores como ficha técnica del proyecto.**
-
-Los resultados completos de esa consulta se conservan solo en almacenamiento local, fuera de Git y del ZIP. El repositorio mantiene únicamente la base común saneada de 208 entradas. El escaneo no activó `includeUseCount`; no hay evidencia de cuáles de los 300 se usan en elementos ni de sus cantidades. Se identificaron 14 archivos `.adsklib` Autodesk instalados, sin afirmar que sus contenidos estén cargados en el RVT. Cada PC generará su propio perfil al abrir su modelo; la base común se usa solo como vocabulario de referencia.
+El catálogo común de `materials/base.csv` contiene 208 nombres curados para vocabulario y búsqueda; no representa un inventario de proyecto. Las pruebas históricas de conectividad y límites por tamaño se registran en [el estado del prototipo](PROTOTYPE_STATUS.md), no en esta guía de uso. Los resultados completos extraídos de un RVT, nombres de modelos, IDs, cantidades, assets, rutas de bibliotecas y perfiles de equipos no se incluyen en Git. Cada instalación crea su perfil local y consulta el modelo activo.
 
 ## Cómo resolver una petición de un arquitecto
 

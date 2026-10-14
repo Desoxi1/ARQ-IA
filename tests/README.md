@@ -2,6 +2,8 @@
 
 Este directorio contiene validaciones de desarrollo. El [estado vigente del producto](../docs/PROTOTYPE_STATUS.md) es la fuente de verdad; [MCP_SMOKE_TEST.md](MCP_SMOKE_TEST.md) conserva el último resumen de evidencias históricas y sus límites. Las pruebas offline comprueban generación MCP, guardado/reutilización de rutinas, hashes, autorización de ejecución, wrapper JSON y named pipe con un bridge simulado. No cargan Revit ni Dynamo.
 
+`test_mcp_tool_catalog.py` valida que cada herramienta publicada en el catálogo versionado esté clasificada, use nombres conocidos y respete los bloqueos de seguridad. No comprueba que cada operación funcione en una sesión real de Revit.
+
 El historial local se verifica de forma aislada, sin iniciar Revit, Dynamo ni Codex:
 
 ```powershell

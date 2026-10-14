@@ -72,6 +72,7 @@ Que una ruta esté ignorada significa que Git no la publica. No significa que se
 
 | Necesitas… | Lee… |
 |---|---|
+| Encontrar la guía apropiada sin revisar todos los documentos | `docs/README.md` |
 | Clonar e instalar en un PC nuevo | `README.md` y `INSTRUCCIONES_OTRO_PC.md` |
 | Ver qué está probado y qué falta | `PROTOTYPE_STATUS.md` y `MCP_SMOKE_TEST.md` |
 | Entender el diseño técnico | `ARCHITECTURE_DECISION.md` y `ASSISTANT_EXECUTION_LOOP.md` |

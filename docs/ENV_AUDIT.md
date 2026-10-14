@@ -1,6 +1,6 @@
 # Plataforma objetivo y compatibilidad de ARQ-IA
 
-**Actualizado:** 13 de octubre de 2026. Esta es la plataforma objetivo y la referencia de compatibilidad del prototipo; no garantiza que cada PC tenga los mismos componentes o parches.
+**Actualizado:** 14 de octubre de 2026. Esta es la plataforma objetivo y la referencia de compatibilidad del prototipo; no garantiza que cada PC tenga los mismos componentes o parches.
 
 | Componente | Objetivo | Nota |
 |---|---|---|
@@ -14,6 +14,6 @@
 
 ## Evidencia disponible
 
-Esta tabla define la plataforma objetivo; no es un inventario automático de cada PC. El paquete Dynamo del repositorio declara versión 0.5.1. Las consultas de vista/selección y la lectura de materiales se comprobaron históricamente con Revit 2027 en una instalación de desarrollo; la rutina fija de solo lectura también pasó en un modelo descartable. El desarrollador conserva `rvt-mcp` v0.6.2; un clon nuevo usa v1.1.0 fijado por hash. Esa integración nueva, las escrituras y las rutinas Dynamo genéricas no se consideran verificadas. Revisa [el estado vigente](PROTOTYPE_STATUS.md) y sigue [las instrucciones de instalación](INSTRUCCIONES_OTRO_PC.md).
+Esta tabla define la plataforma objetivo; no es un inventario automático de cada PC. El paquete Dynamo del repositorio declara versión 0.5.1. Las consultas de vista/selección y la rutina fija de solo lectura cuentan con evidencia histórica en Revit 2027 y un modelo descartable. Los clones nuevos fijan `rvt-mcp` v1.1.0 por hash; esa integración, las escrituras y las rutinas Dynamo genéricas todavía requieren validación según el estado vigente. Revisa [el estado del prototipo](PROTOTYPE_STATUS.md) y sigue [las instrucciones de instalación](INSTRUCCIONES_OTRO_PC.md).
 
 Esta documentación evita rutas personales, nombres de equipo y nombres de archivos de modelos usados durante el desarrollo.
