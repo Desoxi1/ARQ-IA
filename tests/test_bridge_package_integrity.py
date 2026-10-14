@@ -75,7 +75,7 @@ class BridgePackageIntegrityTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");',
+            'if (!activeModelExecution && document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");',
             source,
         )
 
@@ -92,7 +92,7 @@ class BridgePackageIntegrityTests(unittest.TestCase):
 
     def test_bridge_requires_open_dynamo_bound_to_active_document_without_silent_initialization(self):
         source = BRIDGE_SOURCE.read_text(encoding="utf-8")
-        self.assertEqual(source.count('[JournalKeys.AutomationModeKey] = "false"'), 2)
+        self.assertGreaterEqual(source.count('[JournalKeys.AutomationModeKey] = "false"'), 2)
         self.assertNotIn("Thread.Sleep(50)", source)
         self.assertIn("ExecuteDynamoWorkspace(application, journal, runtimeGraphPath, resultPath, disableTransactions: true)", source)
         self.assertIn("disableTransactions: !writesModel", source)
@@ -111,6 +111,21 @@ class BridgePackageIntegrityTests(unittest.TestCase):
         self.assertIn('post_run_document_changed_" + changedIds.Count', source)
         self.assertIn("beforeModified != document.IsModified", source)
         self.assertIn('if (document.IsModifiable) return BridgeResponse.Fail("document_must_be_idle");', source)
+
+    def test_active_model_execution_has_separate_revit_confirmation(self):
+        source = BRIDGE_SOURCE.read_text(encoding="utf-8")
+        handler = source.split("private BridgeResponse HandleSavedRoutine", 1)[1].split("private string CreateRuntimeGraphCopy", 1)[0]
+        preparation = source.split("private BridgeResponse PrepareSavedRoutineInDynamo", 1)[1].split("private string InRoutinesRoot", 1)[0]
+        self.assertIn('request.Operation == "run_saved_routine_in_active_model"', source)
+        self.assertIn('TryGetDynamoWorkspaceContentState(GetDynamoModel()', handler)
+        self.assertIn('if (workspaceHasContent)', handler)
+        self.assertIn('TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No', handler)
+        self.assertIn('if (confirmation.Show() != TaskDialogResult.Yes)', handler)
+        self.assertIn('if (!request.TryCommitExecution())', handler)
+        self.assertIn('if (!IsApplicationActiveDocument(application, document)', handler)
+        self.assertIn('TryCancelBeforeExecution()', source)
+        self.assertIn('if (!IsTestModel(document, _testModelsRoot))', preparation)
+        self.assertIn('if (confirmation.Show() != TaskDialogResult.Yes)', preparation)
 
     def test_open_dynamo_ui_posts_official_command_only_for_clean_disposable_model(self):
         source = BRIDGE_SOURCE.read_text(encoding="utf-8")

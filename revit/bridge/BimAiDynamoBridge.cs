@@ -117,11 +117,15 @@ namespace BimAiDynamoBridge
                             BridgeResponse response;
                             try
                             {
-                                response = await pending.Completion.Task.WaitAsync(TimeSpan.FromSeconds(90), cancellationToken).ConfigureAwait(false);
+                                response = await pending.Completion.Task.WaitAsync(
+                                    TimeSpan.FromSeconds(request.Operation == "run_saved_routine_in_active_model" ? 300 : 90),
+                                    cancellationToken).ConfigureAwait(false);
                             }
                             catch (TimeoutException)
                             {
-                                var cancelledBeforeStart = pending.TryCancelBeforeStart();
+                                var cancelledBeforeStart = request.Operation == "run_saved_routine_in_active_model"
+                                    ? pending.TryCancelBeforeExecution()
+                                    : pending.TryCancelBeforeStart();
                                 response = BridgeResponse.Fail(cancelledBeforeStart ? "revit_dispatch_timeout_before_execution" : "revit_execution_timeout_unknown");
                             }
                             await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions)).ConfigureAwait(false);
@@ -165,14 +169,15 @@ namespace BimAiDynamoBridge
                     var op = operation.GetString();
                     var routineId = root.TryGetProperty("routineId", out var id) ? id.GetString() : null;
                     var confirmModelWrite = false;
-                    if (op == "run_saved_routine")
+                    if (op == "run_saved_routine" || op == "run_saved_routine_in_active_model")
                     {
                         if (!root.TryGetProperty("confirmModelWrite", out var confirmation) ||
                             (confirmation.ValueKind != JsonValueKind.True && confirmation.ValueKind != JsonValueKind.False)) return null;
                         confirmModelWrite = confirmation.GetBoolean();
                     }
                     if (op != "ping" && op != "open_dynamo_ui" && op != "prepare_saved_routine_in_dynamo" &&
-                        op != "run_saved_readonly_routine" && op != "run_saved_routine") return null;
+                        op != "run_saved_readonly_routine" && op != "run_saved_routine" &&
+                        op != "run_saved_routine_in_active_model") return null;
                     return new BridgeRequest(op, routineId, confirmModelWrite);
                 }
             }
@@ -206,7 +211,13 @@ namespace BimAiDynamoBridge
 
         internal bool TryStart() => Interlocked.CompareExchange(ref _state, 1, 0) == 0;
         internal bool TryCancelBeforeStart() => Interlocked.CompareExchange(ref _state, 2, 0) == 0;
-        internal void MarkComplete() => Interlocked.CompareExchange(ref _state, 3, 1);
+        internal bool TryCancelBeforeExecution() => TryCancelBeforeStart() || Interlocked.CompareExchange(ref _state, 2, 1) == 1;
+        internal bool TryCommitExecution() => Interlocked.CompareExchange(ref _state, 3, 1) == 1;
+        internal void MarkComplete()
+        {
+            if (Interlocked.CompareExchange(ref _state, 4, 1) != 1)
+                Interlocked.CompareExchange(ref _state, 4, 3);
+        }
     }
 
     internal sealed class DeferredRun
@@ -347,7 +358,8 @@ namespace BimAiDynamoBridge
 
             if (request.Operation == "prepare_saved_routine_in_dynamo") return PrepareSavedRoutineInDynamo(application, request.RoutineId);
 
-            if (request.Operation == "run_saved_routine") return HandleSavedRoutine(application, request);
+            if (request.Operation == "run_saved_routine") return HandleSavedRoutine(application, request, false);
+            if (request.Operation == "run_saved_routine_in_active_model") return HandleSavedRoutine(application, request, true);
 
             if (request.Operation != "run_saved_readonly_routine" || request.RoutineId != BridgeApplication.RoutineId)
                 return BridgeResponse.Fail("routine_not_allowed");
@@ -544,6 +556,7 @@ namespace BimAiDynamoBridge
             string pythonPath;
             string graphPath;
             string manifestPath;
+            byte[] validatedGraphBytes;
             try
             {
                 pythonPath = InRoutinesRoot(routineId + ".py");
@@ -551,7 +564,7 @@ namespace BimAiDynamoBridge
                 manifestPath = InRoutinesRoot(routineId + ".manifest.json");
                 if (ContainsReparsePoint(pythonPath) || ContainsReparsePoint(graphPath) || ContainsReparsePoint(manifestPath))
                     return BridgeResponse.Fail("routine_path_invalid");
-                ValidateGeneratedRoutine(routineId, pythonPath, graphPath, manifestPath, out _);
+                ValidateGeneratedRoutine(routineId, pythonPath, graphPath, manifestPath, out validatedGraphBytes);
             }
             catch
             {
@@ -582,6 +595,25 @@ namespace BimAiDynamoBridge
                     return BridgeResponse.Fail("dynamo_workspace_state_unavailable");
                 if (workspaceHasContent)
                     return BridgeResponse.Fail("dynamo_workspace_not_empty");
+            }
+
+            if (!IsTestModel(document, _testModelsRoot))
+            {
+                var confirmation = new TaskDialog("ARQ-IA · abrir rutina")
+                {
+                    MainInstruction = "¿Permitir abrir código PythonNet3 en este modelo?",
+                    MainContent = "Modelo: " + document.Title + "\nRutina: " + routineId +
+                        "\nDynamo solicita abrir el grafo en modo Manual, pero aún no se ha comprobado en vivo que esta versión nunca lo ejecute durante la apertura. " +
+                        "Pulsa No si solo quieres leer el script; puedes revisarlo en la carpeta routines sin cargarlo en Revit.",
+                    ExpandedContent = "RVT: " + document.PathName + "\nScript: " + pythonPath +
+                        "\nSHA-256 del grafo: " + ToHex(SHA256.HashData(validatedGraphBytes)),
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                    DefaultButton = TaskDialogResult.No
+                };
+                if (confirmation.Show() != TaskDialogResult.Yes)
+                    return BridgeResponse.Fail("user_declined_graph_load_in_active_model");
+                if (!IsApplicationActiveDocument(application, document) || document.IsModifiable)
+                    return BridgeResponse.Fail("active_document_changed_before_open");
             }
 
             if (!IsApplicationActiveDocument(application, document)) return BridgeResponse.Fail("active_document_changed_before_open");
@@ -636,7 +668,7 @@ namespace BimAiDynamoBridge
             return path;
         }
 
-        private BridgeResponse HandleSavedRoutine(UIApplication application, PendingRequest request)
+        private BridgeResponse HandleSavedRoutine(UIApplication application, PendingRequest request, bool activeModelExecution)
         {
             if (String.IsNullOrWhiteSpace(request.RoutineId) || !Regex.IsMatch(request.RoutineId, "^[a-z][a-z0-9_-]{1,47}$", RegexOptions.CultureInvariant))
                 return BridgeResponse.Fail("routine_id_invalid");
@@ -648,7 +680,14 @@ namespace BimAiDynamoBridge
             // already marked that in-memory copy modified during UI startup; routines
             // still require an idle document and verify their own DocumentChanged delta.
             if (document.IsModifiable) return BridgeResponse.Fail("document_must_be_idle");
-            if (!IsTestModel(document, _testModelsRoot)) return BridgeResponse.Fail("test_model_required");
+            if (activeModelExecution)
+            {
+                if (String.IsNullOrWhiteSpace(document.PathName) ||
+                    !String.Equals(Path.GetExtension(document.PathName), ".rvt", StringComparison.OrdinalIgnoreCase) ||
+                    ContainsReparsePoint(document.PathName))
+                    return BridgeResponse.Fail("saved_local_rvt_required");
+            }
+            else if (!IsTestModel(document, _testModelsRoot)) return BridgeResponse.Fail("test_model_required");
             if (!IsDynamoReadyForDocument(application, document)) return BridgeResponse.Fail("dynamo_ui_required_for_active_document");
 
             string pythonPath;
@@ -661,6 +700,8 @@ namespace BimAiDynamoBridge
                 pythonPath = InRoutinesRoot(request.RoutineId + ".py");
                 graphPath = InRoutinesRoot(request.RoutineId + ".dyn");
                 manifestPath = InRoutinesRoot(request.RoutineId + ".manifest.json");
+                if (ContainsReparsePoint(pythonPath) || ContainsReparsePoint(graphPath) || ContainsReparsePoint(manifestPath))
+                    return BridgeResponse.Fail("routine_path_invalid");
                 writesModel = ValidateGeneratedRoutine(request.RoutineId, pythonPath, graphPath, manifestPath, out validatedGraphBytes);
             }
             catch
@@ -669,7 +710,40 @@ namespace BimAiDynamoBridge
             }
             // PythonNet3 is full trust; manifest metadata cannot prove that a script is read-only.
             if (!request.ConfirmModelWrite) return BridgeResponse.Fail("generic_execution_confirmation_required");
-            if (document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");
+            if (!activeModelExecution && document.IsWorkshared) return BridgeResponse.Fail("model_must_be_local_non_workshared");
+            if (activeModelExecution)
+            {
+                if (!TryGetDynamoWorkspaceContentState(GetDynamoModel(), out var workspaceHasContent))
+                    return BridgeResponse.Fail("dynamo_workspace_state_unavailable");
+                if (workspaceHasContent)
+                    return BridgeResponse.Fail("dynamo_workspace_not_empty");
+
+                var targetPath = Path.GetFullPath(document.PathName);
+                var graphHash = ToHex(SHA256.HashData(validatedGraphBytes));
+                var confirmation = new TaskDialog("ARQ-IA · confirmar ejecución")
+                {
+                    MainInstruction = "¿Ejecutar esta rutina en el modelo abierto?",
+                    MainContent = "Modelo: " + document.Title + "\nRutina: " + request.RoutineId +
+                        "\nAcción: ejecutar PythonNet3 en Dynamo; puede modificar el modelo.\n" +
+                        "El grafo se cargará y ejecutará solo después de Sí. El RVT no se guardará automáticamente. " +
+                        "Revisa el archivo .py antes de continuar.",
+                    ExpandedContent = "RVT: " + targetPath + "\nGrafo: " + graphPath +
+                        "\nScript: " + pythonPath +
+                        "\nSHA-256 del grafo: " + graphHash +
+                        "\nPythonNet3 se ejecuta con tus permisos de Revit y Windows.",
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                    DefaultButton = TaskDialogResult.No
+                };
+                if (confirmation.Show() != TaskDialogResult.Yes)
+                    return BridgeResponse.Fail("user_declined_active_model_execution");
+                if (!request.TryCommitExecution())
+                    return BridgeResponse.Fail("execution_approval_expired");
+                if (!IsApplicationActiveDocument(application, document) ||
+                    !String.Equals(Path.GetFullPath(document.PathName), targetPath, StringComparison.OrdinalIgnoreCase) ||
+                    document.IsModifiable || !IsDynamoReadyForDocument(application, document) ||
+                    !TryGetDynamoWorkspaceContentState(GetDynamoModel(), out var stillHasContent) || stillHasContent)
+                    return BridgeResponse.Fail("active_document_changed_before_execution");
+            }
 
             var beforeModified = document.IsModified;
             var beforeViewId = uiDocument.ActiveView.Id.Value;

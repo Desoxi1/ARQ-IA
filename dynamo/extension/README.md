@@ -10,7 +10,7 @@ Extensión lateral para Dynamo for Revit 2027 / Dynamo 4.0.2. Permite conversar 
 2. El panel inicia `codex app-server` desde la carpeta del POC y mantiene la conversación mientras Dynamo permanece abierto.
 3. Codex consulta el modelo mediante los MCP disponibles y sigue el flujo definido en `AGENTS.md`.
 4. El botón de permisos queda al pie del panel para que **Acceso completo** esté siempre visible junto al estado del chat. Controlado mantiene las aprobaciones de Codex. Completo pide una confirmación única, aplica `approvalPolicy=never` y `dangerFullAccess` solo a la conversación actual, y acepta las solicitudes MCP sin formularios que antes abrían una ventana repetida. Al crear o abrir otra conversación vuelve a controlado.
-5. En Acceso completo, la petición explícita del usuario permite ejecutar acciones sin aprobación repetida. Se mantienen las restricciones de las herramientas BIM: los scripts genéricos usan RVT local de prueba, hashes y el parámetro de escritura requerido. Revisa el estado del modelo y los resultados en el chat.
+5. En Acceso completo, la petición explícita del usuario permite usar las herramientas tipadas sin aprobación repetida. Para ejecutar una rutina PythonNet3 en el RVT abierto, ARQ-IA revisa el script y el grafo y Revit exige un Sí/No por cada ejecución, incluso en Acceso completo. El ejecutor genérico de prueba sigue limitado a `revit/test-models/`. Revisa el estado del modelo y los resultados en el chat.
 
 ## Chat, contexto y adjuntos
 

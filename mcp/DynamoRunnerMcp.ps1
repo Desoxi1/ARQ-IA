@@ -71,6 +71,19 @@ function Get-ToolDefinitions {
                 required = @('routine_id', 'authorize_possible_model_writes')
                 additionalProperties = $false
             }
+        },
+        [ordered]@{
+            name = 'execute_saved_routine_in_active_model'
+            description = 'Execute a hash-validated PythonNet3 routine in the currently open, saved RVT only after the user explicitly requests execution. First inspect the .py without loading it and explain the exact model, routine, intended elements and effects in chat. Dynamo must be open on an empty workspace. Revit then shows a separate Yes/No confirmation naming the active model and graph hash before loading and executing. No response or No cancels; Full Access never bypasses this dialog. The bridge does not save or synchronize the RVT. PythonNet3 has the permissions of Revit and Windows. If execution times out, inspect the model before considering a retry.'
+            inputSchema = [ordered]@{
+                type = 'object'
+                properties = [ordered]@{
+                    routine_id = [ordered]@{ type = 'string'; pattern = '^[a-z][a-z0-9_-]{1,47}$'; description = 'The saved routine to load and run after Revit confirmation; the current Dynamo workspace must be empty.' }
+                    authorize_possible_model_writes = [ordered]@{ type = 'boolean'; description = 'Must be true; a separate confirmation inside Revit is always required.' }
+                }
+                required = @('routine_id', 'authorize_possible_model_writes')
+                additionalProperties = $false
+            }
         }
     )
 }
@@ -128,11 +141,12 @@ function Invoke-RevitBridge([string]$Operation, [string]$RoutineId, [bool]$Confi
         $writer.AutoFlush = $true
         $request = [ordered]@{ operation = $Operation }
         if ($RoutineId) { $request.routineId = $RoutineId }
-        if ($Operation -eq 'run_saved_routine') { $request.confirmModelWrite = $ConfirmModelWrite }
+        if ($Operation -in @('run_saved_routine', 'run_saved_routine_in_active_model')) { $request.confirmModelWrite = $ConfirmModelWrite }
         $writeTask = $writer.WriteLineAsync((ConvertTo-Json -InputObject $request -Depth 4 -Compress))
         if (-not $writeTask.Wait(5000)) { throw 'bridge_write_timeout' }
         $readTask = $reader.ReadLineAsync()
-        if (-not $readTask.Wait(95000)) { throw 'bridge_response_timeout' }
+        $readTimeout = if ($Operation -eq 'run_saved_routine_in_active_model') { 305000 } else { 95000 }
+        if (-not $readTask.Wait($readTimeout)) { throw 'bridge_response_timeout' }
         $line = $readTask.Result
         if ([string]::IsNullOrWhiteSpace($line) -or $line.Length -gt 65536) { throw 'Invalid bridge response.' }
         $response = $line | ConvertFrom-Json
@@ -208,6 +222,12 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                                     Remove-Item -LiteralPath $tempManifest -Force -ErrorAction SilentlyContinue
                                 }
                             }
+                        }
+                        'execute_saved_routine_in_active_model' {
+                            $routineId = [string]$request.params.arguments.routine_id
+                            $confirmModelWrite = [bool]$request.params.arguments.authorize_possible_model_writes
+                            [void](Assert-SavedRoutine -RoutineId $routineId -ConfirmModelWrite $confirmModelWrite)
+                            $bridge = Invoke-RevitBridge -Operation 'run_saved_routine_in_active_model' -RoutineId $routineId -ConfirmModelWrite $confirmModelWrite
                         }
                         default { throw 'tool_not_allowed' }
                     }

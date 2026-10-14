@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -36,7 +36,7 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'create_dynamo_routine'
-            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. After the user asks to prepare the routine in the active model, use prepare_saved_routine_in_dynamo to request opening the graph for manual review; that tool does not call the executor. Generic MCP execution remains limited to a disposable local RVT under revit/test-models; writes_model and confirm_model_write must both be true for model-writing routines.'
+            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. After the user asks to prepare the routine in the active model, use prepare_saved_routine_in_dynamo to request opening the graph for review; that tool does not execute. The test-model executor stays restricted to revit/test-models; execution in a working RVT uses the separate execute_saved_routine_in_active_model tool with an empty Dynamo workspace and confirmation in Revit before graph load.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -207,7 +207,7 @@ function Save-DynamoRoutine([object]$Payload) {
         files = @("routines/$name.py", "routines/$name.dyn", "routines/$name.manifest.json")
         writes_model = $writesModel
         status = 'draft_not_validated'
-        next_step = 'Review the complete Python source including the result wrapper. If the user asked to work in the open model, call prepare_saved_routine_in_dynamo to request loading it in Manual mode for their review; do not execute it. The generic MCP executor remains restricted to a disposable RVT under revit/test-models.'
+        next_step = 'Review the complete Python source including the result wrapper. For a working RVT, review the Python source without loading it. If the user explicitly asks to execute, use execute_saved_routine_in_active_model with an empty Dynamo workspace; Revit asks Yes/No before loading and running. Use prepare_saved_routine_in_dynamo only when the user specifically wants to open the graph; it shows a separate warning/confirmation before loading in a working RVT. The generic test executor remains restricted to revit/test-models.'
     }
 }
 

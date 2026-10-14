@@ -165,7 +165,7 @@ def write_fake_bridge(directory: Path, pipe_name: str) -> Path:
     source = rf"""$ErrorActionPreference = 'Stop'
 $pipeName = '{pipe_name}'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-for ($index = 0; $index -lt 4; $index++) {{
+for ($index = 0; $index -lt 5; $index++) {{
     $pipe = [System.IO.Pipes.NamedPipeServerStream]::new(
         $pipeName,
         [System.IO.Pipes.PipeDirection]::InOut,
@@ -186,6 +186,8 @@ for ($index = 0; $index -lt 4; $index++) {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_change'; routineId = $request.routineId; modelChangeCheck = 'document_changed_ids_match_routine_result'; changedElementIds = @(42); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @('42') }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
     }} elseif ($request.operation -eq 'run_saved_routine' -and $request.routineId -eq 'pipe_smoke_readonly' -and $request.confirmModelWrite -eq $true) {{
         $response = [ordered]@{{ ok = $true; status = 'executed_and_verified_read_only'; routineId = $request.routineId; modelChangeCheck = 'unchanged'; changedElementIds = @(); routineResult = [ordered]@{{ status = 'ok'; affected_ids = @() }}; revitMajor = '2027'; dynamoAssemblyVersion = '4.0.2.3852' }}
+    }} elseif ($request.operation -eq 'run_saved_routine_in_active_model' -and $request.routineId -eq 'pipe_smoke_writer' -and $request.confirmModelWrite -eq $true) {{
+        $response = [ordered]@{{ ok = $false; status = 'user_declined_active_model_execution' }}
     }} else {{
         $response = [ordered]@{{ ok = $false; status = 'routine_not_allowed' }}
     }}
@@ -301,6 +303,9 @@ def main() -> int:
                 print("RUNNER_GENERIC_TOOL=FAIL missing tool definition")
                 return 1
             print("RUNNER_GENERIC_TOOL=PASS")
+            if "execute_saved_routine_in_active_model" not in available_tools:
+                print("RUNNER_ACTIVE_MODEL_TOOL=FAIL missing tool definition")
+                return 1
 
             denied = client.request(
                 "tools/call",
@@ -329,6 +334,20 @@ def main() -> int:
                 print("RUNNER_GENERIC_READONLY_CONFIRM=FAIL missing universal execution gate")
                 return 1
             print("RUNNER_GENERIC_READONLY_CONFIRM=PASS")
+
+            denied_active = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine_in_active_model",
+                    "arguments": {"routine_id": "pipe_smoke_writer", "authorize_possible_model_writes": False},
+                },
+            )
+            denied_active_items = denied_active.get("result", {}).get("content", [])
+            denied_active_payload = json.loads(denied_active_items[0]["text"]) if denied_active_items else {}
+            if not denied_active.get("result", {}).get("isError") or denied_active_payload.get("status") != "generic_execution_confirmation_required":
+                print("RUNNER_ACTIVE_MODEL_CONFIRM=FAIL")
+                return 1
+            print("RUNNER_ACTIVE_MODEL_CONFIRM=PASS")
 
             ping = client.request(
                 "tools/call", {"name": "ping_revit_dynamo_bridge", "arguments": {}}
@@ -397,6 +416,20 @@ def main() -> int:
                 print("RUNNER_GENERIC_READONLY=FAIL")
                 return 1
             print("RUNNER_GENERIC_READONLY=PASS manifest_promoted=true")
+
+            declined_active = client.request(
+                "tools/call",
+                {
+                    "name": "execute_saved_routine_in_active_model",
+                    "arguments": {"routine_id": "pipe_smoke_writer", "authorize_possible_model_writes": True},
+                },
+            )
+            declined_items = declined_active.get("result", {}).get("content", [])
+            declined_payload = json.loads(declined_items[0]["text"]) if declined_items else {}
+            if not declined_active.get("result", {}).get("isError") or declined_payload.get("status") != "user_declined_active_model_execution":
+                print("RUNNER_ACTIVE_MODEL_DECLINE=FAIL")
+                return 1
+            print("RUNNER_ACTIVE_MODEL_DECLINE=PASS")
 
             saved_listing = builder_client.request(
                 "tools/call", {"name": "list_saved_routines", "arguments": {}}
