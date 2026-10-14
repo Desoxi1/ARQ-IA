@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -74,11 +74,11 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'execute_saved_routine_in_active_model'
-            description = 'Execute a hash-validated PythonNet3 routine in the currently open, saved RVT only after the user explicitly requests execution. First inspect the .py without loading it and explain the exact model, routine, intended elements and effects in chat. Dynamo must be open on an empty workspace. Revit then shows a separate Yes/No confirmation naming the active model and graph hash before loading and executing. No response or No cancels; Full Access never bypasses this dialog. The bridge does not save or synchronize the RVT. PythonNet3 has the permissions of Revit and Windows. If execution times out, inspect the model before considering a retry.'
+            description = 'Execute a hash-validated PythonNet3 routine in the currently open, saved RVT only after the user explicitly requests execution. First inspect the .py without loading it and explain the exact model, routine, intended elements and effects in chat. Dynamo must be open on an empty workspace or on this exact saved graph without unsaved changes. Do not prepare/load the graph first when the user asked to execute. Revit then shows a separate Yes/No confirmation naming the active model and graph hash before loading and executing. No response or No cancels; Full Access never bypasses this dialog. The bridge does not save or synchronize the RVT. PythonNet3 has the permissions of Revit and Windows. If execution times out, inspect the model before considering a retry.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
-                    routine_id = [ordered]@{ type = 'string'; pattern = '^[a-z][a-z0-9_-]{1,47}$'; description = 'The saved routine to load and run after Revit confirmation; the current Dynamo workspace must be empty.' }
+                    routine_id = [ordered]@{ type = 'string'; pattern = '^[a-z][a-z0-9_-]{1,47}$'; description = 'The saved routine to load and run after Revit confirmation; the current Dynamo workspace must be empty or this exact saved graph with no unsaved edits.' }
                     authorize_possible_model_writes = [ordered]@{ type = 'boolean'; description = 'Must be true; a separate confirmation inside Revit is always required.' }
                 }
                 required = @('routine_id', 'authorize_possible_model_writes')
@@ -110,7 +110,7 @@ function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite, [swit
     if ((Get-Item -LiteralPath $routinesRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'routine_path_invalid' }
     if ((Get-Item -LiteralPath $wrapperPath).Length -gt 32768 -or (Get-Item -LiteralPath $paths.py).Length -gt 32768 -or
         (Get-Item -LiteralPath $paths.dyn).Length -gt 524288 -or (Get-Item -LiteralPath $paths.manifest).Length -gt 16384) { throw 'routine_package_too_large' }
-    $manifest = Get-Content -LiteralPath $paths.manifest -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath $paths.manifest -Raw -Encoding UTF8 | ConvertFrom-Json
     $isWriter = [bool]$manifest.writes_model
     if (-not $ConfirmModelWrite -and -not $AllowWithoutWriteAuthorization) { throw 'generic_execution_confirmation_required' }
     if ([string]$manifest.name -ne $RoutineId -or [string]$manifest.python_engine -ne 'PythonNet3' -or
@@ -122,7 +122,7 @@ function Assert-SavedRoutine([string]$RoutineId, [bool]$ConfirmModelWrite, [swit
     $code = [IO.File]::ReadAllText($paths.py, $utf8NoBom)
     $wrapper = [IO.File]::ReadAllText($wrapperPath, $utf8NoBom).Replace("`r`n", "`n").Replace("`r", "`n")
     $expectedCode = $code.TrimEnd() + "`n`n" + $wrapper.TrimStart()
-    $graph = Get-Content -LiteralPath $paths.dyn -Raw | ConvertFrom-Json
+    $graph = Get-Content -LiteralPath $paths.dyn -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($graph.Nodes.Count -ne 1 -or $graph.Nodes[0].Engine -ne 'PythonNet3' -or
         $graph.Nodes[0].Code -ne $expectedCode -or $graph.Connectors.Count -ne 0 -or
         $graph.Dependencies.Count -ne 0 -or $graph.View.Dynamo.RunType -ne 'Manual') { throw 'routine_graph_invalid' }
@@ -191,7 +191,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
                             $routineId = [string]$request.params.arguments.routine_id
                             $manifestPath = Join-Path $routinesRoot ($routineId + '.manifest.json')
                             if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'routine_files_missing' }
-                            $savedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+                            $savedManifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
                             [void](Assert-SavedRoutine -RoutineId $routineId -ConfirmModelWrite ([bool]$savedManifest.confirm_model_write) -AllowWithoutWriteAuthorization)
                             $bridge = Invoke-RevitBridge -Operation 'prepare_saved_routine_in_dynamo' -RoutineId $routineId
                         }

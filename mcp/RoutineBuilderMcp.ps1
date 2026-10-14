@@ -36,7 +36,7 @@ function Get-ToolDefinitions {
         },
         [ordered]@{
             name = 'create_dynamo_routine'
-            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. After the user asks to prepare the routine in the active model, use prepare_saved_routine_in_dynamo to request opening the graph for review; that tool does not execute. The test-model executor stays restricted to revit/test-models; execution in a working RVT uses the separate execute_saved_routine_in_active_model tool with an empty Dynamo workspace and confirmation in Revit before graph load.'
+            description = 'Save a PythonNet3 script and Manual-run Dynamo graph under routines/. Saving does not execute it. The result wrapper is appended. After the user asks to prepare the routine in the active model, use prepare_saved_routine_in_dynamo to request opening the graph for review; that tool does not execute. The test-model executor stays restricted to revit/test-models; execution in a working RVT uses the separate execute_saved_routine_in_active_model tool with an empty Dynamo workspace or the same saved graph without unsaved edits, and confirmation in Revit before graph load.'
             inputSchema = [ordered]@{
                 type = 'object'
                 properties = [ordered]@{
@@ -100,7 +100,7 @@ function Save-DynamoRoutine([object]$Payload) {
     $name = [string]$Payload.name
     $description = ([string]$Payload.description).Trim()
     $code = ([string]$Payload.python_code).Replace("`r`n", "`n").Replace("`r", "`n")
-    $wrapper = (Get-Content -LiteralPath $resultWrapperPath -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+    $wrapper = (Get-Content -LiteralPath $resultWrapperPath -Raw -Encoding UTF8).Replace("`r`n", "`n").Replace("`r", "`n")
     $runtimeCode = $code.TrimEnd() + "`n`n" + $wrapper.TrimStart()
     $scope = [string]$Payload.scope
     $writesModel = [bool]$Payload.writes_model
@@ -121,7 +121,7 @@ function Save-DynamoRoutine([object]$Payload) {
 
     if ($code -notmatch '(?m)^\s*OUT\s*=') { throw 'El script debe asignar el resultado del nodo Dynamo a OUT.' }
 
-    $graph = Get-Content -LiteralPath $templatePath -Raw | ConvertFrom-Json
+    $graph = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($graph.Nodes.Count -ne 1 -or $graph.Nodes[0].Engine -ne 'PythonNet3') { throw 'La plantilla Dynamo no cumple el formato esperado de un único nodo PythonNet3.' }
     $node = $graph.Nodes[0]
     $nodeId = [Guid]::NewGuid().ToString('N')
@@ -207,7 +207,7 @@ function Save-DynamoRoutine([object]$Payload) {
         files = @("routines/$name.py", "routines/$name.dyn", "routines/$name.manifest.json")
         writes_model = $writesModel
         status = 'draft_not_validated'
-        next_step = 'Review the complete Python source including the result wrapper. For a working RVT, review the Python source without loading it. If the user explicitly asks to execute, use execute_saved_routine_in_active_model with an empty Dynamo workspace; Revit asks Yes/No before loading and running. Use prepare_saved_routine_in_dynamo only when the user specifically wants to open the graph; it shows a separate warning/confirmation before loading in a working RVT. The generic test executor remains restricted to revit/test-models.'
+        next_step = 'Review the complete Python source including the result wrapper. For a working RVT, review the Python source without loading it. If the user explicitly asks to execute, use execute_saved_routine_in_active_model directly with an empty Dynamo workspace or the same saved graph without unsaved edits; Revit asks Yes/No before loading and running. Use prepare_saved_routine_in_dynamo only when the user specifically wants to open the graph; it shows a separate warning/confirmation before loading in a working RVT. The generic test executor remains restricted to revit/test-models.'
     }
 }
 

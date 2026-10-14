@@ -18,6 +18,15 @@ class DynamoExtensionPackageTests(unittest.TestCase):
         self.assertIn('".codex", "config.toml"', settings)
         self.assertNotIn('".codex", "config.toml.example"', settings)
 
+    def test_setup_exposes_active_model_runner_tools(self):
+        setup = (ROOT / "setup.ps1").read_text(encoding="utf-8-sig")
+        expected = (
+            '"prepare_saved_routine_in_dynamo"',
+            '"execute_saved_routine_in_active_model"',
+        )
+        for tool in expected:
+            self.assertIn(tool, setup)
+
     def test_pkg_manifest_targets_installed_dynamo_4_and_is_not_a_node_library(self):
         package = json.loads((EXTENSION / "pkg.json").read_text(encoding="utf-8"))
         self.assertEqual(package["name"], "ARQ-IA")

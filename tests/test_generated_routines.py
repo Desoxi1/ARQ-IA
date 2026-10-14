@@ -13,6 +13,10 @@ WRAPPER = ROOT / "dynamo" / "pythonnet3_result_wrapper.py"
 
 
 class GeneratedRoutineIntegrityTests(unittest.TestCase):
+    def test_runner_decodes_generated_graph_as_utf8(self):
+        runner = (ROOT / "mcp" / "DynamoRunnerMcp.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("Get-Content -LiteralPath $paths.dyn -Raw -Encoding UTF8", runner)
+
     def assert_routine_package(self, routine_id: str, writes_model: bool) -> None:
         routines = ROOT / "routines"
         source_path = routines / f"{routine_id}.py"

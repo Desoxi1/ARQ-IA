@@ -715,7 +715,7 @@ namespace BimAiDynamoBridge
             {
                 if (!TryGetDynamoWorkspaceContentState(GetDynamoModel(), out var workspaceHasContent))
                     return BridgeResponse.Fail("dynamo_workspace_state_unavailable");
-                if (workspaceHasContent)
+                if (workspaceHasContent && !IsCurrentSavedRoutineWorkspace(graphPath, validatedGraphBytes))
                     return BridgeResponse.Fail("dynamo_workspace_not_empty");
 
                 var targetPath = Path.GetFullPath(document.PathName);
@@ -725,7 +725,7 @@ namespace BimAiDynamoBridge
                     MainInstruction = "¿Ejecutar esta rutina en el modelo abierto?",
                     MainContent = "Modelo: " + document.Title + "\nRutina: " + request.RoutineId +
                         "\nAcción: ejecutar PythonNet3 en Dynamo; puede modificar el modelo.\n" +
-                        "El grafo se cargará y ejecutará solo después de Sí. El RVT no se guardará automáticamente. " +
+                        "El grafo se cargará y ejecutará solo después de Sí. Si ya está abierta esta misma rutina guardada, se sustituirá por una copia temporal de ejecución. El RVT no se guardará automáticamente. " +
                         "Revisa el archivo .py antes de continuar.",
                     ExpandedContent = "RVT: " + targetPath + "\nGrafo: " + graphPath +
                         "\nScript: " + pythonPath +
@@ -741,7 +741,8 @@ namespace BimAiDynamoBridge
                 if (!IsApplicationActiveDocument(application, document) ||
                     !String.Equals(Path.GetFullPath(document.PathName), targetPath, StringComparison.OrdinalIgnoreCase) ||
                     document.IsModifiable || !IsDynamoReadyForDocument(application, document) ||
-                    !TryGetDynamoWorkspaceContentState(GetDynamoModel(), out var stillHasContent) || stillHasContent)
+                    !TryGetDynamoWorkspaceContentState(GetDynamoModel(), out var stillHasContent) ||
+                    (stillHasContent && !IsCurrentSavedRoutineWorkspace(graphPath, validatedGraphBytes)))
                     return BridgeResponse.Fail("active_document_changed_before_execution");
             }
 
@@ -1071,6 +1072,24 @@ namespace BimAiDynamoBridge
                 var fileName = workspace?.GetType().GetProperty("FileName", BindingFlags.Public | BindingFlags.Instance)?.GetValue(workspace) as string;
                 return !String.IsNullOrWhiteSpace(fileName) &&
                     String.Equals(Path.GetFullPath(fileName), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static bool IsCurrentSavedRoutineWorkspace(string graphPath, byte[] validatedGraphBytes)
+        {
+            try
+            {
+                var model = GetDynamoModel();
+                var workspace = model?.GetType().GetProperty("CurrentWorkspace", BindingFlags.Public | BindingFlags.Instance)?.GetValue(model);
+                if (workspace == null) return false;
+                var workspaceType = workspace.GetType();
+                var fileName = workspaceType.GetProperty("FileName", BindingFlags.Public | BindingFlags.Instance)?.GetValue(workspace) as string;
+                var dirty = workspaceType.GetProperty("HasUnsavedChanges", BindingFlags.Public | BindingFlags.Instance)?.GetValue(workspace);
+                if (String.IsNullOrWhiteSpace(fileName) || dirty is not bool hasUnsavedChanges || hasUnsavedChanges ||
+                    !String.Equals(Path.GetFullPath(fileName), Path.GetFullPath(graphPath), StringComparison.OrdinalIgnoreCase))
+                    return false;
+                return File.ReadAllBytes(graphPath).SequenceEqual(validatedGraphBytes);
             }
             catch { return false; }
         }
