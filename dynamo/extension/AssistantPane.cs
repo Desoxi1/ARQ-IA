@@ -37,6 +37,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private const long MaxPendingBytes = 40L * 1024 * 1024;
 
     private string? _projectRoot;
+    private string? _workspaceRoot;
     private readonly Grid _layout;
     private FrameworkElement _contextCard;
     private readonly DispatcherTimer _readinessTimer;
@@ -52,6 +53,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     private Button? _contextButton;
     private Button? _accessButton;
     private Button? _historyButton;
+    private Button? _workspaceButton;
     private Popup? _historyPopup;
     private bool _fullAccessEnabled;
     private ComboBox? _modelBox;
@@ -77,6 +79,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
     public AssistantPane(string? projectRoot)
     {
         _projectRoot = projectRoot;
+        _workspaceRoot = projectRoot is null ? null : WorkspaceSettings.Load(projectRoot);
         if (projectRoot is not null) _conversationStore = new ConversationHistoryStore(projectRoot);
         Background = Surface;
         Focusable = true;
@@ -326,12 +329,72 @@ internal sealed class AssistantPane : UserControl, IDisposable
         var header = new Grid();
         header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(outer, 0);
         header.Children.Add(outer);
+        var workspaceButton = CreateButton(string.Empty, BrushFromRgb(40, 40, 40), TextBrush, 10);
+        _workspaceButton = workspaceButton;
+        workspaceButton.HorizontalContentAlignment = HorizontalAlignment.Left;
+        workspaceButton.Padding = new Thickness(8, 5, 8, 5);
+        workspaceButton.Margin = new Thickness(0, 0, 0, 6);
+        workspaceButton.MaxWidth = 520;
+        workspaceButton.IsEnabled = _projectRoot is not null;
+        workspaceButton.Click += (_, _) => ChooseWorkspace();
+        UpdateWorkspaceButton();
+        Grid.SetRow(workspaceButton, 1);
+        header.Children.Add(workspaceButton);
         var divider = new Border { Height = 1, Background = BrushFromRgb(62, 62, 62), Margin = new Thickness(0, 0, 0, 6) };
-        Grid.SetRow(divider, 1);
+        Grid.SetRow(divider, 2);
         header.Children.Add(divider);
         return header;
+    }
+
+    private void ChooseWorkspace()
+    {
+        if (_disposed || _projectRoot is null || _turnInProgress) return;
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Selecciona la carpeta del proyecto para Codex",
+            InitialDirectory = Directory.Exists(_workspaceRoot) ? _workspaceRoot : _projectRoot,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        var selected = Path.GetFullPath(dialog.FolderName);
+        if (!Directory.Exists(selected))
+        {
+            SetStatus("La carpeta seleccionada ya no está disponible.");
+            return;
+        }
+        if (string.Equals(selected, _workspaceRoot, StringComparison.OrdinalIgnoreCase)) return;
+
+        try { WorkspaceSettings.Save(selected); }
+        catch (Exception ex)
+        {
+            SetStatus($"No se pudo guardar la carpeta elegida ({ex.GetType().Name}).");
+            return;
+        }
+        _workspaceRoot = selected;
+        UpdateWorkspaceButton();
+        _ = ResetForWorkspaceAsync();
+    }
+
+    private async Task ResetForWorkspaceAsync()
+    {
+        await NewConversationAsync();
+        SetStatus("Carpeta de trabajo actualizada · los MCP de Revit y Dynamo siguen conectados.");
+    }
+
+    private void UpdateWorkspaceButton()
+    {
+        if (_workspaceButton is null) return;
+        var path = _workspaceRoot ?? _projectRoot;
+        var name = path is null ? "Elegir carpeta del proyecto" : Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.IsNullOrWhiteSpace(name)) name = path ?? "Elegir carpeta del proyecto";
+        _workspaceButton.Content = $"▣  {name}  ▾";
+        _workspaceButton.ToolTip = path is null
+            ? "Seleccionar carpeta de trabajo"
+            : $"Carpeta de trabajo de Codex\n{path}\n\nCambiar carpeta. Revit y Dynamo continúan conectados mediante ARQ-IA.";
     }
 
     private void ToggleHistoryPopup(Button anchor)
@@ -763,7 +826,9 @@ internal sealed class AssistantPane : UserControl, IDisposable
         if (projectRoot is null) return;
 
         _projectRoot = projectRoot;
+        _workspaceRoot = WorkspaceSettings.Load(projectRoot);
         _conversationStore = new ConversationHistoryStore(projectRoot);
+        UpdateWorkspaceButton();
         _readinessTimer.Stop();
         _prompt.IsEnabled = true;
         _attachButton.IsEnabled = true;
@@ -1002,7 +1067,7 @@ internal sealed class AssistantPane : UserControl, IDisposable
         {
             _client ??= CreateClient();
             _client.FullAccessEnabled = _fullAccessEnabled;
-            await _client.EnsureStartedAsync(_projectRoot, selectedModel, effort);
+            await _client.EnsureStartedAsync(_projectRoot, _workspaceRoot ?? _projectRoot, selectedModel, effort);
             var modelAndEffort = $"{_activeTurnModelName} · {EffortDisplayName(effort)}";
             SetStatus(unsupportedEffort
                 ? $"{EffortDisplayName(requestedEffort!)} no está disponible en {_activeTurnModelName}; se usará {EffortDisplayName(effort)} · ≈{estimateTokens} tokens…"

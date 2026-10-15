@@ -33,7 +33,7 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
     public Func<AgentApprovalRequest, Task<bool>>? ApprovalRequested { get; set; }
     public bool FullAccessEnabled { get; set; }
 
-    public async Task EnsureStartedAsync(string projectRoot, string? model = null, string? effort = null, CancellationToken cancellationToken = default)
+    public async Task EnsureStartedAsync(string projectRoot, string workingDirectory, string? model = null, string? effort = null, CancellationToken cancellationToken = default)
     {
         _projectRoot = Path.GetFullPath(projectRoot);
         if (_threadId is not null) return;
@@ -47,7 +47,7 @@ internal sealed class CodexAppServerClient : IAsyncDisposable
 
             var threadParams = new Dictionary<string, object?>
             {
-                ["cwd"] = projectRoot,
+                ["cwd"] = Path.GetFullPath(workingDirectory),
                 ["approvalPolicy"] = FullAccessEnabled ? "never" : "on-request",
                 ["sandbox"] = FullAccessEnabled ? "danger-full-access" : "read-only",
                 ["ephemeral"] = true,
